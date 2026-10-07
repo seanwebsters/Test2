@@ -84,7 +84,7 @@ export default function MorningPage() {
             </div>
             <div className="mt-4 flex flex-wrap justify-center gap-x-6 gap-y-2 text-[13px] opacity-80 lg:justify-start">
               <span className="flex items-center gap-1.5"><Clock className="h-4 w-4" /> {minutes} min listened</span>
-              <span className="flex items-center gap-1.5"><BookOpen className="h-4 w-4" /> {heardChapters.length} chapters</span>
+              <span className="flex items-center gap-1.5"><BookOpen className="h-4 w-4" /> {heardChapters.length} {heardChapters.length === 1 ? "chapter" : "chapters"}</span>
               <span className="flex items-center gap-1.5"><Sparkles className="h-4 w-4" /> {toneLabel(dream.request.tone)}</span>
             </div>
           </motion.div>
