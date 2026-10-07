@@ -157,7 +157,7 @@ function Preview() {
                   return (
                     <div key={cid} className="glass flex items-center gap-3 rounded-full py-1.5 pl-1.5 pr-4">
                       <div className="h-10 w-10 overflow-hidden rounded-full">
-                        <CharacterPortrait character={c} className="h-full w-full" />
+                        <CharacterPortrait character={c} className="h-full w-full" avatar />
                       </div>
                       <div>
                         <p className="text-sm font-medium text-white">{c.name}</p>

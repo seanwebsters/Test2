@@ -46,7 +46,7 @@ export default function YouPage() {
               return (
                 <button key={c.id} onClick={() => store.toggleFavCharacter(c.id)} className="flex flex-col items-center gap-1.5">
                   <div className={`relative h-16 w-16 overflow-hidden rounded-full ${on ? "ring-2 ring-glow-300 ring-offset-2 ring-offset-night-950" : "opacity-60 ring-1 ring-white/10"}`}>
-                    <CharacterPortrait character={c} className="h-full w-full" />
+                    <CharacterPortrait character={c} className="h-full w-full" avatar />
                   </div>
                   <span className={`text-center text-[10px] leading-tight ${on ? "text-white" : "text-mist-400"}`}>{c.name.replace(/^The /, "")}</span>
                 </button>

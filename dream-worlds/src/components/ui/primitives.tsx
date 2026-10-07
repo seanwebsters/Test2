@@ -9,8 +9,8 @@ export function SectionHeader({ eyebrow, title, href, action = "See all", classN
   return (
     <div className={`mb-4 flex items-end justify-between gap-4 px-5 lg:px-10 ${className}`}>
       <div>
-        {eyebrow && <p className="eyebrow mb-1.5">{eyebrow}</p>}
-        <h2 className="font-display text-[22px] font-light leading-tight text-mist-100 lg:text-[28px]">{title}</h2>
+        {eyebrow && <p className="eyebrow mb-1.5 hidden lg:block">{eyebrow}</p>}
+        <h2 className="font-display text-[23px] font-normal leading-tight tracking-[-0.01em] text-white lg:text-[28px]" style={{ fontVariationSettings: '"opsz" 72, "SOFT" 50' }}>{title}</h2>
       </div>
       {href && (
         <Link href={href} className="flex shrink-0 items-center gap-0.5 text-xs font-medium text-mist-300 transition hover:text-white">

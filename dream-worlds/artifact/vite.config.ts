@@ -17,6 +17,7 @@ export default defineConfig({
     ],
   },
   css: { postcss: r("..") },
-  build: { outDir: r("dist"), emptyOutDir: true, chunkSizeWarningLimit: 4000 },
+  // inline every image so the page stays a single self-contained file
+  build: { outDir: r("dist"), emptyOutDir: true, chunkSizeWarningLimit: 8000, assetsInlineLimit: 100_000_000 },
   logLevel: "warn",
 });

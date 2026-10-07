@@ -46,7 +46,9 @@ export default function HomePage() {
   return (
     <div className="overflow-x-hidden">
       <HomeHero featured={originals[0]} name={store.prefs.displayName} />
-      <HowItWorks />
+      <div className="hidden lg:block">
+        <HowItWorks />
+      </div>
 
       <div className="mx-auto mt-12 max-w-[1480px] space-y-14 lg:mt-16 lg:space-y-20">
         {continuing.length > 0 && (

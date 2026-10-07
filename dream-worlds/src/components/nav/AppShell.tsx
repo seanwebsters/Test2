@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { Compass, House, Library, Sparkles, UserRound } from "lucide-react";
 import { CalmMark } from "../ui/CalmMark";
 import { MiniPlayer } from "./MiniPlayer";
+import { Splash } from "./Splash";
 import { haptic } from "@/lib/ui/haptics";
 
 const NAV = [
@@ -26,6 +27,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      <Splash />
       {!immersive && (
         <header className="fixed inset-x-0 top-0 z-40 hidden lg:block">
           <div className="mx-auto flex h-20 max-w-[1480px] items-center gap-10 px-10">

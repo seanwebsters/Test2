@@ -274,7 +274,7 @@ export default function PlayerPage() {
                 {present.map((c) => (
                   <motion.div key={c!.id} layout initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.6 }} transition={{ duration: 1.2 }} className="flex items-center gap-2 rounded-full bg-white/[0.06] py-1 pl-1 pr-3 backdrop-blur" title={c!.name}>
                     <div className="h-7 w-7 overflow-hidden rounded-full">
-                      <CharacterPortrait character={c!} className="h-full w-full" />
+                      <CharacterPortrait character={c!} className="h-full w-full" avatar />
                     </div>
                     <span className="text-[11px] text-mist-200">{c!.name.replace(/^The /, "")}</span>
                   </motion.div>

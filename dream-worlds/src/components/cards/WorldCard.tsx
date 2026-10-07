@@ -27,7 +27,7 @@ export function WorldCard({ world, size = "md", href, selected, blocked, onClick
       whileHover={{ y: -4 }}
       whileTap={{ scale: 0.97 }}
       transition={{ type: "spring", stiffness: 300, damping: 24 }}
-      className={`group relative shrink-0 snap-start overflow-hidden rounded-[22px] ${SIZES[size]} ${selected ? "ring-2 ring-glow-300 ring-offset-2 ring-offset-night-950" : "ring-1 ring-white/[0.08]"} ${blocked ? "opacity-40 grayscale-[60%]" : ""}`}
+      className={`group relative shrink-0 snap-start overflow-hidden rounded-[22px] ${SIZES[size]} ${selected ? "ring-2 ring-glow-300 ring-offset-2 ring-offset-night-950" : "ring-1 ring-white/[0.08] shadow-[0_18px_40px_-18px_rgba(0,0,0,0.9)]"} ${blocked ? "opacity-40 grayscale-[60%]" : ""}`}
     >
       <WorldArt scene={world.visualStyle.scene} palette={world.visualStyle.palette} seed={world.id} className="absolute inset-0 transition-transform duration-[1200ms] group-hover:scale-105" />
       <div className="absolute inset-0 bg-gradient-to-t from-night-950/95 via-night-950/20 to-transparent" />

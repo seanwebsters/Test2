@@ -23,7 +23,7 @@ export function CastStack({ ids, size = 28 }: { ids: string[]; size?: number }) 
         if (!c) return null;
         return (
           <div key={id} className="overflow-hidden rounded-full ring-2 ring-night-950" style={{ width: size, height: size }} title={c.name}>
-            <CharacterPortrait character={c} className="h-full w-full" />
+            <CharacterPortrait character={c} className="h-full w-full" avatar />
           </div>
         );
       })}

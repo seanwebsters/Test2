@@ -9,8 +9,30 @@ import { memo, useId } from "react";
 import type { Character } from "@/lib/types";
 import { worldById } from "@/lib/data/worlds";
 import { WorldArt, blend } from "./WorldArt";
+import { CHARACTER_ART } from "@/lib/artAssets";
 
-export const CharacterPortrait = memo(function CharacterPortrait({ character, className = "", showWorld = true }: { character: Character; className?: string; showWorld?: boolean }) {
+export const CharacterPortrait = memo(function CharacterPortrait({ character, className = "", showWorld = true, avatar = false }: { character: Character; className?: string; showWorld?: boolean; avatar?: boolean }) {
+  const world = worldById(character.worldId)!;
+  const src = character.portrait.assetUrl ?? CHARACTER_ART[character.id];
+  if (src)
+    return (
+      <div className={`${/\babsolute\b/.test(className) ? "" : "relative"} overflow-hidden bg-night-950 ${className}`} aria-hidden>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt=""
+          draggable={false}
+          decoding="async"
+          className="absolute inset-0 h-full w-full select-none object-cover"
+          // avatars crop in on head and shoulders
+          style={avatar ? { objectPosition: "50% 42%", transform: "scale(1.9)", transformOrigin: "50% 52%" } : { objectPosition: "50% 30%" }}
+        />
+      </div>
+    );
+  return <VectorPortrait character={character} className={className} showWorld={showWorld} />;
+});
+
+const VectorPortrait = memo(function VectorPortrait({ character, className = "", showWorld = true }: { character: Character; className?: string; showWorld?: boolean }) {
   const world = worldById(character.worldId)!;
   const raw = "u" + useId().replace(/[^a-zA-Z0-9]/g, "");
   const id = (n: string) => `${raw}-${n}`;

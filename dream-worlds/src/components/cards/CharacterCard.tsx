@@ -24,7 +24,7 @@ export function CharacterCard({ character, size = "md", selected, blocked, onCli
     <motion.div
       whileHover={{ y: -4 }}
       whileTap={{ scale: 0.97 }}
-      className={`group relative shrink-0 snap-start overflow-hidden rounded-[20px] ${dims} ${selected ? "ring-2 ring-glow-300 ring-offset-2 ring-offset-night-950" : "ring-1 ring-white/[0.08]"} ${blocked ? "opacity-35 grayscale" : ""}`}
+      className={`group relative shrink-0 snap-start overflow-hidden rounded-[20px] ${dims} ${selected ? "ring-2 ring-glow-300 ring-offset-2 ring-offset-night-950" : "ring-1 ring-white/[0.08] shadow-[0_18px_40px_-18px_rgba(0,0,0,0.9)]"} ${blocked ? "opacity-35 grayscale" : ""}`}
     >
       <CharacterPortrait character={character} className="absolute inset-0" />
       {character.isNew && <NewBadge className="absolute left-2.5 top-2.5" />}

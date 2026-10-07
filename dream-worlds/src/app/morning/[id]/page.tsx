@@ -98,7 +98,7 @@ export default function MorningPage() {
                 {chars.map((c) => (
                   <div key={c!.id} className="flex flex-col items-center gap-1.5">
                     <div className="h-14 w-14 overflow-hidden rounded-full ring-2 ring-white/70">
-                      <CharacterPortrait character={c!} className="h-full w-full" />
+                      <CharacterPortrait character={c!} className="h-full w-full" avatar />
                     </div>
                     <span className="max-w-[72px] text-center text-[11px] leading-tight opacity-80">{c!.name.replace(/^The /, "")}</span>
                   </div>

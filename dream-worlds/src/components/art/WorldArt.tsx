@@ -10,6 +10,7 @@
  */
 import React, { memo, useEffect, useId, useRef, useState } from "react";
 import type { IPWorld, SceneKind } from "@/lib/types";
+import { WORLD_ART } from "@/lib/artAssets";
 
 type Palette = IPWorld["visualStyle"]["palette"];
 
@@ -63,11 +64,14 @@ export const WorldArt = memo(function WorldArt({ scene, palette, seed = scene, c
     return () => ro.disconnect();
   }, [scene]);
 
-  if (artUrl)
+  // Rendered key art (or a partner-supplied asset) wins over the vector fallback.
+  const src = artUrl ?? WORLD_ART[scene];
+  if (src)
     return (
-      <div className={`${/\babsolute\b/.test(className) ? "" : "relative"} overflow-hidden ${className}`}>
+      <div className={`${/\babsolute\b/.test(className) ? "" : "relative"} overflow-hidden bg-night-950 ${className}`} aria-hidden>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={artUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        <img src={src} alt="" draggable={false} decoding="async" className="absolute inset-0 h-full w-full select-none object-cover" style={{ objectPosition: `${FOCUS[scene] * 100}% 50%` }} />
+        {dim > 0 && <div className="pointer-events-none absolute inset-0 bg-night-950 transition-opacity duration-[3000ms]" style={{ opacity: dim }} />}
       </div>
     );
 
