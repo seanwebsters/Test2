@@ -25,3 +25,9 @@ Then open <http://localhost:8000> on desktop or mobile.
 ## Goal
 
 Collect all stars, then reach the portal without touching slimes.
+
+---
+
+## Dream Worlds prototype
+
+The `dream-worlds/` folder contains the Calm Dream Worlds consumer prototype (Next.js, TypeScript, Tailwind, Framer Motion). See [`dream-worlds/README.md`](dream-worlds/README.md).
