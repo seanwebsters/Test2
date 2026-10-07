@@ -58,7 +58,7 @@ export default function MorningPage() {
         <path d="M0 210 Q100 180 200 200 T400 195 L400 220 L0 220 Z" fill="#dcd2ef" opacity="0.8" />
       </svg>
 
-      <div className="relative mx-auto max-w-5xl px-5 pt-[max(env(safe-area-inset-top),18px)] lg:px-10 lg:pt-10">
+      <div className="relative mx-auto max-w-5xl px-5 pt-[max(var(--safe-top),18px)] lg:px-10 lg:pt-10">
         <header className="flex justify-end">
           <Link href="/" className="grid h-10 w-10 place-items-center rounded-full bg-white/50 backdrop-blur" aria-label="Close">
             <X className="h-4 w-4" />
@@ -72,7 +72,7 @@ export default function MorningPage() {
           <p className="mt-3 text-[15px] opacity-70">Here&apos;s what you dreamed.</p>
         </motion.div>
 
-        <div className="mt-10 grid gap-6 lg:grid-cols-[1.15fr_1fr] lg:gap-10">
+        <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-[1.15fr_1fr] lg:gap-10">
           <motion.div {...fade(0.6)}>
             <div className="relative aspect-[16/11] overflow-hidden rounded-[28px] shadow-[0_30px_80px_-30px_rgba(60,50,120,0.55)]">
               <DreamCover dream={dream} detail="hero" className="absolute inset-0" />
@@ -89,7 +89,7 @@ export default function MorningPage() {
             </div>
           </motion.div>
 
-          <motion.div {...fade(1)} className="space-y-5">
+          <motion.div {...fade(1)} className="min-w-0 space-y-5">
             <p className="font-display text-[24px] font-light leading-snug lg:text-[30px]">{dream.output.summary}</p>
 
             <div className="rounded-3xl bg-white/45 p-5 backdrop-blur-md">

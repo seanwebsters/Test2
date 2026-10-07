@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { Compass, House, Library, Sparkles, UserRound } from "lucide-react";
 import { CalmMark } from "../ui/CalmMark";
+import { MiniPlayer } from "./MiniPlayer";
+import { haptic } from "@/lib/ui/haptics";
 
 const NAV = [
   { href: "/", label: "Home", icon: House },
@@ -14,7 +16,8 @@ const NAV = [
   { href: "/you", label: "You", icon: UserRound },
 ];
 
-const IMMERSIVE = ["/play", "/morning", "/pitch", "/create", "/dream/"];
+/** Full-screen flows: no tab bar, like modal stacks in a native app. */
+const IMMERSIVE = ["/play", "/morning", "/pitch", "/create", "/dream/", "/device"];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname() ?? "/";
@@ -47,34 +50,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
       )}
 
-      <main className={immersive ? "" : "pb-nav lg:pb-16"}>{children}</main>
+      {/* opacity-only transition: transforms would break position:fixed screens like the player */}
+      <motion.main key={path} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.35, ease: "easeOut" }} className={immersive ? "" : "pb-nav lg:pb-16"}>
+        {children}
+      </motion.main>
 
       {!immersive && (
-        <nav className="fixed inset-x-0 bottom-0 z-40 lg:hidden" style={{ paddingBottom: "var(--safe-bottom)" }}>
-          <div className="absolute inset-0 bg-gradient-to-t from-night-950 via-night-950/95 to-night-950/0" />
-          <div className="relative mx-auto flex max-w-md items-end justify-around px-3 pb-2 pt-3">
-            {NAV.map((n) => {
-              const Icon = n.icon;
-              const on = active(n.href);
-              if (n.href === "/create")
+        <div className="fixed inset-x-0 bottom-0 z-40 lg:hidden">
+          <MiniPlayer />
+          <nav className="border-t border-white/[0.07] bg-night-950/90 backdrop-blur-2xl backdrop-saturate-150" style={{ paddingBottom: "var(--safe-bottom)" }} aria-label="Tabs">
+            <div className="mx-auto flex h-[var(--tabbar)] max-w-md items-center justify-around px-2">
+              {NAV.map((n) => {
+                const Icon = n.icon;
+                const on = active(n.href);
+                if (n.href === "/create")
+                  return (
+                    <Link key={n.href} href={n.href} onClick={() => haptic("medium")} className="press flex w-16 flex-col items-center gap-1" aria-label="Create a Dream">
+                      <span className="btn-dream grid h-10 w-10 place-items-center rounded-[14px]">
+                        <Sparkles className="h-5 w-5" />
+                      </span>
+                      <span className="text-[10px] font-medium text-mist-300">Create</span>
+                    </Link>
+                  );
                 return (
-                  <Link key={n.href} href={n.href} className="-mt-5 flex flex-col items-center gap-1" aria-label="Create a Dream">
-                    <span className="btn-dream grid h-14 w-14 place-items-center rounded-full">
-                      <Sparkles className="h-6 w-6" />
-                    </span>
-                    <span className="text-[10px] font-medium text-mist-300">Create</span>
+                  <Link key={n.href} href={n.href} onClick={() => haptic()} className="press relative flex h-full w-16 flex-col items-center justify-center gap-1">
+                    {on && <motion.span layoutId="tabglow" className="absolute top-0 h-[2px] w-6 rounded-full bg-glow-300" transition={{ type: "spring", stiffness: 400, damping: 32 }} />}
+                    <Icon className={`h-[23px] w-[23px] transition-colors ${on ? "text-white" : "text-mist-400"}`} strokeWidth={on ? 2 : 1.6} />
+                    <span className={`text-[10px] font-medium ${on ? "text-white" : "text-mist-400"}`}>{n.label}</span>
                   </Link>
                 );
-              return (
-                <Link key={n.href} href={n.href} className="flex w-16 flex-col items-center gap-1 py-1">
-                  <Icon className={`h-[22px] w-[22px] transition ${on ? "text-glow-300" : "text-mist-400"}`} strokeWidth={on ? 2 : 1.6} />
-                  <span className={`text-[10px] font-medium ${on ? "text-glow-300" : "text-mist-400"}`}>{n.label}</span>
-                  {on && <motion.span layoutId="botnav" className="h-1 w-1 rounded-full bg-glow-300" />}
-                </Link>
-              );
-            })}
-          </div>
-        </nav>
+              })}
+            </div>
+          </nav>
+        </div>
       )}
     </>
   );

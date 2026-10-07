@@ -16,6 +16,7 @@ import { Chip } from "@/components/ui/primitives";
 import { SleepCurve } from "@/components/player/SleepCurve";
 import { WorldArt } from "@/components/art/WorldArt";
 import { DreamingLoader } from "@/components/create/DreamingLoader";
+import { haptic } from "@/lib/ui/haptics";
 
 const STEPS = ["Choose your worlds", "Choose your characters", "What kind of dream?", "Make it yours"];
 const LENGTHS: { id: DreamLength; label: string }[] = [
@@ -78,17 +79,19 @@ function CreateFlow() {
   }, [tone, tonesOk]);
 
   const toggleWorld = (id: string) => {
+    haptic();
     if (worldIds.includes(id)) {
       setWorldIds(worldIds.filter((w) => w !== id));
       setCharIds(charIds.filter((c) => characterById(c)!.worldId !== id));
       return;
     }
     const reason = worldBlockReason(id, worldIds);
-    if (reason) return setToast(reason);
+    if (reason) return haptic("medium"), setToast(reason);
     setWorldIds([...worldIds, id]);
   };
 
   const toggleChar = (id: string) => {
+    haptic();
     if (charIds.includes(id)) return setCharIds(charIds.filter((c) => c !== id));
     if (charIds.length >= 4) return setToast("Up to four characters per dream — any more and it gets a little crowded for sleep.");
     const ch = characterById(id)!;
@@ -106,6 +109,7 @@ function CreateFlow() {
   };
 
   const create = async () => {
+    haptic("success");
     setGenerating(true);
     const finalWorlds = [...new Set([...worldIds, ...charIds.map((c) => characterById(c)!.worldId)])];
     const dream = await store.createDream({
@@ -139,7 +143,7 @@ function CreateFlow() {
       </AnimatePresence>
       <div className="fixed inset-0 -z-10 bg-gradient-to-b from-night-950/80 via-night-950/90 to-night-950" />
 
-      <div className="mx-auto max-w-5xl px-5 pb-40 pt-[max(env(safe-area-inset-top),18px)] lg:px-10 lg:pt-10">
+      <div className="mx-auto max-w-5xl px-5 pb-40 pt-[max(var(--safe-top),18px)] lg:px-10 lg:pt-10">
         <header className="flex items-center justify-between">
           <button onClick={() => go(-1)} className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/5" aria-label="Back">
             <ArrowLeft className="h-4 w-4" />
@@ -294,7 +298,7 @@ function CreateFlow() {
                       onChange={(e) => setPrompt(e.target.value)}
                       rows={5}
                       placeholder="e.g. A peaceful journey aboard a pirate ship where the Star Admiral unexpectedly appears and everyone has to work together."
-                      className="glass w-full resize-none rounded-2xl p-4 text-[15px] leading-relaxed text-white placeholder:text-mist-500 focus:outline-none focus:ring-1 focus:ring-dusk-400/60"
+                      className="glass w-full resize-none rounded-2xl p-4 text-base leading-relaxed text-white placeholder:text-mist-500 focus:outline-none focus:ring-1 focus:ring-dusk-400/60"
                     />
                     <div className="mt-2 flex flex-wrap gap-2">
                       {["A storm passes and everyone shares soup", "We find an island that isn't on any map", "A quiet night watch under the stars"].map((s) => (
@@ -319,7 +323,7 @@ function CreateFlow() {
       </div>
 
       {/* sticky footer CTA */}
-      <div className="fixed inset-x-0 bottom-0 z-30 bg-gradient-to-t from-night-950 via-night-950/95 to-transparent pb-[max(env(safe-area-inset-bottom),20px)] pt-10">
+      <div className="fixed inset-x-0 bottom-0 z-30 bg-gradient-to-t from-night-950 via-night-950/95 to-transparent pb-[max(var(--safe-bottom),20px)] pt-10">
         <div className="mx-auto max-w-5xl px-5 lg:px-10">
           {step < 3 ? (
             <button

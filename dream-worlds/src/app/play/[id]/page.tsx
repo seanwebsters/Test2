@@ -2,7 +2,8 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useDragControls } from "framer-motion";
+import { haptic } from "@/lib/ui/haptics";
 import { AudioLines, ChevronDown, Ellipsis, Gauge, Mic, Moon, Pause, Play, RotateCcw, RotateCw, Sunrise, Timer, X } from "lucide-react";
 import type { DialogueLine, SleepStage } from "@/lib/types";
 import { useDreamStore } from "@/lib/store";
@@ -45,6 +46,7 @@ export default function PlayerPage() {
   const startedAt = useRef(Date.now());
   const audio = useRef<AmbientEngine | null>(null);
   const ended = useRef(false);
+  const drag = useDragControls();
 
   const total = dream?.totalMinutes ?? 40;
   const chapters = dream?.output.chapters ?? [];
@@ -124,6 +126,7 @@ export default function PlayerPage() {
   useEffect(() => () => audio.current?.stop(), []);
 
   const toggle = () => {
+    haptic("medium");
     if (!audio.current) audio.current = new AmbientEngine();
     if (playing) {
       audio.current.pause();
@@ -198,7 +201,20 @@ export default function PlayerPage() {
   const textSize = ["text-[19px] lg:text-[26px]", "text-[18px] lg:text-[24px]", "text-[17px] lg:text-[22px]", "text-[16px] lg:text-[20px]"][stageIdx];
 
   return (
-    <div className="fixed inset-0 overflow-hidden bg-night-950 text-white">
+    <motion.div
+      drag="y"
+      dragControls={drag}
+      dragListener={false}
+      dragConstraints={{ top: 0, bottom: 0 }}
+      dragElastic={{ top: 0, bottom: 0.6 }}
+      onDragEnd={(_, info) => {
+        if (info.offset.y > 140 || info.velocity.y > 700) {
+          haptic();
+          router.back();
+        }
+      }}
+      className="fixed inset-0 overflow-hidden bg-night-950 text-white"
+    >
       {/* cinematic backdrop */}
       <AnimatePresence>
         <motion.div key={sceneWorld.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 4 }} className="absolute inset-0" style={{ filter: BLUR[stage], transition: "filter 6s ease" }}>
@@ -216,9 +232,12 @@ export default function PlayerPage() {
         ))}
       </div>
 
-      <motion.div animate={{ opacity: idle && stage !== "awake" ? 0.35 : 1 }} transition={{ duration: 2 }} className="relative mx-auto flex h-full max-w-6xl flex-col px-5 pb-[max(env(safe-area-inset-bottom),16px)] pt-[max(env(safe-area-inset-top),14px)] lg:px-10">
+      <motion.div animate={{ opacity: idle && stage !== "awake" ? 0.35 : 1 }} transition={{ duration: 2 }} className="relative mx-auto flex h-full max-w-6xl flex-col px-5 pb-[max(var(--safe-bottom),16px)] pt-[max(var(--safe-top),14px)] lg:px-10">
+        {/* grabber: swipe down anywhere on the top bar to dismiss */}
+        <div onPointerDown={(e) => drag.start(e)} className="absolute inset-x-0 top-0 h-24 touch-none" />
+        <span className="pointer-events-none mx-auto mb-2 block h-1 w-9 rounded-full bg-white/25 lg:hidden" />
         {/* top bar */}
-        <header className="flex items-center justify-between">
+        <header onPointerDown={(e) => drag.start(e)} className="relative flex touch-none items-center justify-between">
           <button onClick={() => router.back()} className="grid h-10 w-10 place-items-center rounded-full bg-white/5 backdrop-blur" aria-label="Minimise">
             <ChevronDown className="h-5 w-5" />
           </button>
@@ -375,7 +394,7 @@ export default function PlayerPage() {
       </motion.div>
 
       {/* demo speed badge */}
-      <button onClick={() => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length])} className="absolute right-5 top-[calc(max(env(safe-area-inset-top),14px)+52px)] flex items-center gap-1 rounded-full bg-white/[0.06] px-2.5 py-1 text-[10px] font-semibold text-mist-300 backdrop-blur lg:right-10" title="Prototype time-lapse">
+      <button onClick={() => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length])} className="absolute right-5 top-[calc(max(var(--safe-top),14px)+52px)] flex items-center gap-1 rounded-full bg-white/[0.06] px-2.5 py-1 text-[10px] font-semibold text-mist-300 backdrop-blur lg:right-10" title="Prototype time-lapse">
         <Gauge className="h-3 w-3" /> Demo {speed}×
       </button>
 
@@ -408,7 +427,7 @@ export default function PlayerPage() {
                 </li>
               ))}
             </ol>
-            <p className="absolute bottom-[max(env(safe-area-inset-bottom),24px)] text-[11px] text-mist-500">Tap anywhere to return</p>
+            <p className="absolute bottom-[max(var(--safe-bottom),24px)] text-[11px] text-mist-500">Tap anywhere to return</p>
           </motion.button>
         )}
       </AnimatePresence>
@@ -418,7 +437,7 @@ export default function PlayerPage() {
         {sheet && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSheet(null)} className="absolute inset-0 z-40 bg-night-950/60 backdrop-blur-sm" />
-            <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 30, stiffness: 260 }} className="glass-strong absolute inset-x-0 bottom-0 z-50 mx-auto max-w-lg rounded-t-[28px] p-6 pb-[max(env(safe-area-inset-bottom),28px)]">
+            <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 30, stiffness: 260 }} className="glass-strong absolute inset-x-0 bottom-0 z-50 mx-auto max-w-lg rounded-t-[28px] p-6 pb-[max(var(--safe-bottom),28px)]">
               <div className="mb-5 flex items-center justify-between">
                 <h3 className="font-display text-xl font-light">{sheet === "timer" ? "Sleep timer" : sheet === "sound" ? "Background soundscape" : "Dream options"}</h3>
                 <button onClick={() => setSheet(null)} className="grid h-8 w-8 place-items-center rounded-full bg-white/5" aria-label="Close">
@@ -487,7 +506,7 @@ export default function PlayerPage() {
           </>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 }
 

@@ -36,7 +36,7 @@ export default function WorldPage() {
         <WorldArt scene={world.visualStyle.scene} palette={world.visualStyle.palette} seed={`world-${world.id}`} detail="hero" className="absolute inset-0 animate-pan" />
         <div className="grain absolute inset-0" />
         <div className="absolute inset-0 bg-gradient-to-t from-night-950 via-night-950/20 to-night-950/50" />
-        <button onClick={() => router.back()} className="absolute left-5 top-[max(env(safe-area-inset-top),18px)] grid h-10 w-10 place-items-center rounded-full bg-night-950/40 backdrop-blur lg:left-10 lg:top-24" aria-label="Back">
+        <button onClick={() => router.back()} className="absolute left-5 top-[max(var(--safe-top),18px)] grid h-10 w-10 place-items-center rounded-full bg-night-950/40 backdrop-blur lg:left-10 lg:top-24" aria-label="Back">
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div className="absolute inset-x-0 bottom-0 mx-auto max-w-[1480px] px-5 pb-8 lg:px-10 lg:pb-14">
@@ -69,7 +69,7 @@ export default function WorldPage() {
           </Rail>
         </section>
 
-        <section className="grid gap-6 px-5 lg:grid-cols-[1.4fr_1fr] lg:px-10">
+        <section className="grid grid-cols-1 gap-6 px-5 lg:grid-cols-[1.4fr_1fr] lg:px-10">
           <div>
             <h2 className="mb-3 font-display text-2xl font-light">Lore</h2>
             <p className="font-display text-lg font-light italic leading-relaxed text-mist-200">{world.lore}</p>

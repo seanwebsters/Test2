@@ -75,7 +75,7 @@ function Preview() {
       </div>
       <div className="fixed inset-0 -z-10 bg-night-950/80" />
 
-      <div className="mx-auto max-w-6xl px-5 pt-[max(env(safe-area-inset-top),18px)] lg:px-10 lg:pt-10">
+      <div className="mx-auto max-w-6xl px-5 pt-[max(var(--safe-top),18px)] lg:px-10 lg:pt-10">
         <header className="flex items-center justify-between">
           <button onClick={() => router.back()} className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/5" aria-label="Back">
             <ArrowLeft className="h-4 w-4" />
@@ -94,7 +94,7 @@ function Preview() {
           <span className="w-10" />
         </header>
 
-        <div className="mt-6 grid gap-8 lg:mt-10 lg:grid-cols-[1.1fr_1fr] lg:gap-14">
+        <div className="mt-6 grid grid-cols-1 gap-8 lg:mt-10 lg:grid-cols-[1.1fr_1fr] lg:gap-14">
           {/* Dream card */}
           <motion.div initial={{ opacity: 0, y: 30, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}>
             <div className="relative aspect-[4/5] overflow-hidden rounded-[32px] shadow-[0_40px_120px_-30px_rgba(108,91,212,0.55)] ring-1 ring-white/10 lg:aspect-[4/4.4]">
@@ -119,7 +119,7 @@ function Preview() {
           </motion.div>
 
           {/* details */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.2 }} className="flex flex-col">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, delay: 0.2 }} className="flex min-w-0 flex-col">
             <p className="font-display text-xl font-light italic leading-relaxed text-mist-100 lg:text-2xl">{o.hook}</p>
 
             {prev && (

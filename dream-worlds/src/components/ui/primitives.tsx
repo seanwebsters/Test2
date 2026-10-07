@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
+import { CompactHeader } from "./CompactHeader";
+import { haptic } from "@/lib/ui/haptics";
 
 export function SectionHeader({ eyebrow, title, href, action = "See all", className = "" }: { eyebrow?: string; title: string; href?: string; action?: string; className?: string }) {
   return (
@@ -39,8 +41,11 @@ export function Chip({ on, children, onClick, disabled, title }: { on?: boolean;
       type="button"
       title={title}
       disabled={disabled}
-      onClick={onClick}
-      className={`rounded-full px-4 py-2.5 text-[13px] font-medium transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-35 ${
+      onClick={() => {
+        haptic();
+        onClick?.();
+      }}
+      className={`press min-h-[44px] rounded-full px-4 py-2.5 text-[13px] font-medium transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-35 ${
         on ? "chip-on" : "border border-white/10 bg-white/[0.04] text-mist-200 hover:border-white/20 hover:bg-white/[0.07]"
       }`}
     >
@@ -58,9 +63,10 @@ export function Meta({ icon: Icon, children }: { icon: React.ComponentType<{ cla
   );
 }
 
-export function PageTitle({ eyebrow, title, subtitle }: { eyebrow?: string; title: React.ReactNode; subtitle?: string }) {
+export function PageTitle({ eyebrow, title, subtitle, compactTitle }: { eyebrow?: string; title: React.ReactNode; subtitle?: string; compactTitle?: string }) {
   return (
-    <div className="px-5 pt-14 lg:px-10 lg:pt-28">
+    <div className="px-5 pt-[calc(max(var(--safe-top),14px)+28px)] lg:px-10 lg:pt-28">
+      <CompactHeader title={compactTitle ?? (typeof title === "string" ? title : "")} />
       {eyebrow && <p className="eyebrow mb-2">{eyebrow}</p>}
       <h1 className="font-display text-[34px] font-light leading-[1.05] tracking-tight text-white lg:text-5xl">{title}</h1>
       {subtitle && <p className="mt-2 max-w-xl text-sm text-mist-300">{subtitle}</p>}

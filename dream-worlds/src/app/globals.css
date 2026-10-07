@@ -4,7 +4,34 @@
 
 :root {
   color-scheme: dark;
+  --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* height of the bottom tab bar, excluding the home-indicator inset */
+  --tabbar: 64px;
+}
+
+/* Native-app feel: no rubber-band page bounce, no grey tap flashes, no callouts,
+   no 300ms double-tap delay, and UI chrome that doesn't text-select on long-press. */
+html {
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  overscroll-behavior-y: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+button,
+a,
+nav,
+header,
+[role="tab"] {
+  -webkit-user-select: none;
+  user-select: none;
+}
+img,
+svg {
+  -webkit-user-drag: none;
 }
 
 html,
@@ -74,7 +101,16 @@ body {
     scrollbar-width: none;
   }
   .pb-nav {
-    padding-bottom: calc(96px + var(--safe-bottom));
+    padding-bottom: calc(var(--tabbar) + var(--safe-bottom) + 88px);
+  }
+  .pt-safe {
+    padding-top: max(var(--safe-top), 14px);
+  }
+  .pb-safe {
+    padding-bottom: max(var(--safe-bottom), 16px);
+  }
+  .press {
+    @apply transition-transform duration-150 active:scale-[0.97];
   }
 }
 
@@ -119,4 +155,12 @@ body {
   border: 0;
   border-radius: 999px;
   background: #fff;
+}
+
+/* Inside the /device presenter frame, scrollbars would never appear on a phone. */
+html[data-framed] {
+  scrollbar-width: none;
+}
+html[data-framed]::-webkit-scrollbar {
+  display: none;
 }

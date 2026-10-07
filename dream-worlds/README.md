@@ -17,6 +17,22 @@ npm run build && npm start
 
 No API keys or backend are needed. Everything persists to `localStorage`. To start fresh, use **You → Reset demo**.
 
+## It's a mobile app
+
+The product is designed phone-first; desktop only adds a streaming-style discovery layout.
+
+- **On a phone:** open the URL, then *Share → Add to Home Screen*. It launches full-screen with its own icon and a translucent status bar, respecting the notch and home indicator.
+- **On a laptop:** open **`/device`** to present the live app inside an iPhone frame, with shortcuts to each key screen. Use this for founder reviews.
+- **Native patterns:**
+  - a glass bottom tab bar with a raised Create button
+  - a "now dreaming" mini-player docked above the tab bar
+  - large titles that collapse into a compact bar as you scroll
+  - full-screen modal flows (Create, Preview, Player, Morning) that hide the tab bar
+  - a player you can swipe down to dismiss
+  - bottom sheets, haptic ticks on selection, 44px touch targets
+  - 16px inputs, so iOS doesn't zoom when a field is focused
+  - no rubber-band bounce or tap flashes
+
 ## Demo path (≈3 minutes)
 
 1. **Home** — "What would you like to dream tonight?" Then: Continue Dreaming, New This Week, Featured Worlds, Characters You Love, Calm Originals, Popular Dreams, Because You Dreamed About…, Explore New Worlds.

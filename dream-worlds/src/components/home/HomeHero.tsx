@@ -24,7 +24,7 @@ export function HomeHero({ featured, name }: { featured: Dream; name: string }) 
   const world = worldById(ROTATION[i])!;
 
   return (
-    <section className="relative h-[86svh] min-h-[620px] w-full overflow-hidden lg:h-[88vh] lg:min-h-[720px]">
+    <section className="relative h-[calc(100svh-var(--tabbar)-var(--safe-bottom)-60px)] min-h-[600px] w-full overflow-hidden lg:h-[88vh] lg:min-h-[720px]">
       <AnimatePresence mode="sync">
         <motion.div key={world.id} initial={{ opacity: 0, scale: 1.04 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 2.4, ease: "easeOut" }} className="absolute inset-0">
           <WorldArt scene={world.visualStyle.scene} palette={world.visualStyle.palette} seed={`hero-${world.id}`} detail="hero" className="absolute inset-0 animate-pan" />
@@ -35,7 +35,7 @@ export function HomeHero({ featured, name }: { featured: Dream; name: string }) 
       <div className="absolute inset-0 hidden bg-gradient-to-r from-night-950/90 via-night-950/30 to-transparent lg:block" />
 
       {/* mobile top bar */}
-      <div className="absolute inset-x-0 top-0 flex items-center justify-between px-5 pt-[max(env(safe-area-inset-top),18px)] lg:hidden">
+      <div className="absolute inset-x-0 top-0 flex items-center justify-between px-5 pt-[max(var(--safe-top),18px)] lg:hidden">
         <div className="flex items-center gap-2.5">
           <CalmMark className="text-[26px]" />
           <span className="mt-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-mist-200/80">Dream Worlds</span>

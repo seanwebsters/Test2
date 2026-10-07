@@ -37,14 +37,14 @@ function Explore() {
     <div className="mx-auto max-w-[1480px]">
       <PageTitle eyebrow="Discover" title="Explore" subtitle="Official worlds, beloved characters, and dreams from Calm and creators." />
 
-      <div className="sticky top-0 z-30 mt-6 bg-night-950/80 px-5 pb-3 pt-3 backdrop-blur-xl lg:top-20 lg:px-10">
+      <div className="sticky top-[calc(max(var(--safe-top),14px)+44px)] z-20 mt-6 bg-night-950/80 px-5 pb-3 pt-3 backdrop-blur-xl lg:top-20 lg:px-10">
         <label className="glass flex items-center gap-3 rounded-full px-4 py-3">
           <Search className="h-4 w-4 text-mist-400" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search worlds, characters, dreams…" className="w-full bg-transparent text-sm text-white placeholder:text-mist-500 focus:outline-none" />
+          <input type="search" enterKeyHint="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search worlds, characters, dreams…" className="w-full bg-transparent text-base text-white placeholder:text-mist-500 focus:outline-none" />
         </label>
         <div className="mt-3 flex gap-6 border-b border-white/[0.06]">
           {TABS.map((t) => (
-            <button key={t} onClick={() => setTab(t)} className={`relative pb-3 text-sm capitalize transition ${tab === t ? "text-white" : "text-mist-400 hover:text-mist-200"}`}>
+            <button key={t} onClick={() => setTab(t)} role="tab" className={`relative min-h-[40px] pb-3 pt-1 text-sm capitalize transition ${tab === t ? "text-white" : "text-mist-400 hover:text-mist-200"}`}>
               {t}
               {tab === t && <motion.span layoutId="exptab" className="absolute inset-x-0 -bottom-px h-[2px] rounded-full bg-gradient-to-r from-ember-200 to-dusk-400" />}
             </button>
@@ -57,7 +57,7 @@ function Explore() {
           <>
             <div className="no-scrollbar -mx-5 mb-5 flex gap-2 overflow-x-auto px-5 lg:mx-0 lg:px-0">
               {[null, ...new Set(worlds.map((w) => w.genre))].map((g) => (
-                <button key={g ?? "all"} onClick={() => setGenre(g)} className={`shrink-0 rounded-full px-4 py-2 text-xs transition ${genre === g ? "chip-on" : "border border-white/10 text-mist-300"}`}>
+                <button key={g ?? "all"} onClick={() => setGenre(g)} className={`press min-h-[40px] shrink-0 rounded-full px-4 py-2 text-xs transition ${genre === g ? "chip-on" : "border border-white/10 text-mist-300"}`}>
                   {g ?? "All"}
                 </button>
               ))}

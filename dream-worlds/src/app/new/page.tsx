@@ -6,7 +6,7 @@ import { NewThisWeek } from "@/components/home/NewThisWeek";
 
 export default function NewPage() {
   return (
-    <div className="pt-[max(env(safe-area-inset-top),18px)] lg:pt-24">
+    <div className="pt-[max(var(--safe-top),18px)] lg:pt-24">
       <div className="mx-auto max-w-[1480px] px-5 pb-6 lg:px-10">
         <Link href="/" className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/5" aria-label="Back">
           <ArrowLeft className="h-4 w-4" />

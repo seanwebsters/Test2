@@ -20,7 +20,7 @@ export default function YouPage() {
 
   return (
     <div className="mx-auto max-w-[1100px] pb-10">
-      <PageTitle eyebrow="Preferences" title={<>Good evening, <span className="italic text-gradient">{p.displayName}</span></>} subtitle="Dream Worlds learns what helps you sleep. Tune it here." />
+      <PageTitle eyebrow="Preferences" compactTitle="You" title={<>Good evening, <span className="italic text-gradient">{p.displayName}</span></>} subtitle="Dream Worlds learns what helps you sleep. Tune it here." />
 
       <div className="mt-8 space-y-10 px-5 lg:px-10">
         <Section title="Favourite worlds">

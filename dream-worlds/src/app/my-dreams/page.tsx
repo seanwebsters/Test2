@@ -13,6 +13,7 @@ import { ContinueCard, DreamRow, CastStack, DreamCover } from "@/components/card
 import { WorldCard } from "@/components/cards/WorldCard";
 import { CharacterCard } from "@/components/cards/CharacterCard";
 import { Rail, SectionHeader } from "@/components/ui/primitives";
+import { CompactHeader } from "@/components/ui/CompactHeader";
 
 const TABS = ["Recent", "Saved", "Favourites"] as const;
 
@@ -39,7 +40,8 @@ export default function MyDreamsPage() {
 
   return (
     <div className="mx-auto max-w-[1480px] pb-10">
-      <div className="flex items-end justify-between px-5 pt-14 lg:px-10 lg:pt-28">
+      <CompactHeader title="My Dreams" />
+      <div className="flex items-end justify-between px-5 pt-[calc(max(var(--safe-top),14px)+28px)] lg:px-10 lg:pt-28">
         <div>
           <p className="eyebrow mb-2">Your personal universe</p>
           <h1 className="font-display text-[38px] font-light leading-none text-white lg:text-6xl">My Dreams</h1>
@@ -77,7 +79,7 @@ export default function MyDreamsPage() {
       <section className="mt-10 px-5 lg:px-10">
         <div className="inline-flex rounded-full border border-white/10 bg-white/[0.03] p-1">
           {TABS.map((t) => (
-            <button key={t} onClick={() => setTab(t)} className={`relative rounded-full px-5 py-2 text-sm transition ${tab === t ? "text-night-900" : "text-mist-300"}`}>
+            <button key={t} onClick={() => setTab(t)} role="tab" className={`relative min-h-[40px] rounded-full px-5 py-2 text-sm transition ${tab === t ? "text-night-900" : "text-mist-300"}`}>
               {tab === t && <motion.span layoutId="mdtab" className="chip-on absolute inset-0 rounded-full" />}
               <span className="relative">{t}</span>
             </button>
@@ -106,12 +108,12 @@ export default function MyDreamsPage() {
                 <div className="relative">
                   <p className="eyebrow text-ember-200/90">{eps.length} {eps.length === 1 ? "night" : "nights"} so far</p>
                   <h3 className="mt-1.5 font-display text-xl font-light text-white">{last.output.dream_title.replace(/ · Night \d+$/, "")}</h3>
-                  <div className="mt-4 space-y-2.5 text-[13px] text-mist-300">
-                    <p className="flex gap-2.5"><Brain className="mt-0.5 h-4 w-4 shrink-0 text-dusk-400" /> {c.events.length} events remembered — <span className="line-clamp-1 text-mist-400">{c.events[c.events.length - 1]}</span></p>
-                    <p className="flex gap-2.5"><Users className="mt-0.5 h-4 w-4 shrink-0 text-dusk-400" /> {c.relationships.map((r) => `${characterById(r.a)?.name.replace(/^The /, "")} & ${characterById(r.b)?.name.replace(/^The /, "")} ${r.bond.split(", then ").pop()}`)[0] ?? "Getting to know each other"}</p>
-                    <p className="flex gap-2.5"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-dusk-400" /> {c.locationsVisited.length} places visited</p>
-                    {c.openThreads[0] && <p className="flex gap-2.5"><Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-ember-200" /> <span className="italic">Next time: {c.openThreads[0]}</span></p>}
-                  </div>
+                  <ul className="mt-4 space-y-2.5 text-[13px] leading-snug text-mist-300">
+                    <li className="flex gap-2.5"><Brain className="mt-0.5 h-4 w-4 shrink-0 text-dusk-400" /><span>{c.events.length} moments remembered</span></li>
+                    <li className="flex gap-2.5"><Users className="mt-0.5 h-4 w-4 shrink-0 text-dusk-400" /><span>{c.relationships.map((r) => `${characterById(r.a)?.name.replace(/^The /, "")} & ${characterById(r.b)?.name.replace(/^The /, "")} ${r.bond.split(", then ").pop()}`)[0] ?? "Getting to know each other"}</span></li>
+                    <li className="flex gap-2.5"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-dusk-400" /><span>{c.locationsVisited.length} places visited</span></li>
+                    {c.openThreads[0] && <li className="flex gap-2.5"><Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-ember-200" /><span className="italic">Next time: {c.openThreads[0]}</span></li>}
+                  </ul>
                   <div className="mt-4"><CastStack ids={last.request.characters} size={28} /></div>
                 </div>
               </Link>

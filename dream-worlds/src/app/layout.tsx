@@ -10,18 +10,32 @@ const sans = Manrope({ subsets: ["latin"], variable: "--font-sans", display: "sw
 export const metadata: Metadata = {
   title: "Dream Worlds · Calm",
   description: "Pick a world. Pick your characters. AI tells you the story — built for sleep.",
+  applicationName: "Dream Worlds",
+  appleWebApp: { capable: true, title: "Dream Worlds", statusBarStyle: "black-translucent" },
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {
   themeColor: "#04060f",
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: "cover",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${sans.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`${display.variable} ${sans.variable}`}>
+      <head>
+        {/* When running inside the /device presenter frame, emulate iPhone safe areas. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(window.self!==window.top){var r=document.documentElement.style;r.setProperty('--safe-top','54px');r.setProperty('--safe-bottom','30px');document.documentElement.dataset.framed='1'}}catch(e){}`,
+          }}
+        />
+      </head>
       <body className="font-sans">
         <DreamStoreProvider>
           <AppShell>{children}</AppShell>
