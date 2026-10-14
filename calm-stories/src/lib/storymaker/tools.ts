@@ -14,6 +14,7 @@ import { PALETTES } from "@/lib/seed/catalog";
 import type { AiToolCall, AssistantCard } from "@/lib/types";
 import { newId, nowIso } from "@/lib/util";
 import * as svc from "./service";
+import * as audio from "@/lib/audio/production";
 
 export interface ToolContext {
   viewer: Viewer;
@@ -333,6 +334,65 @@ export const TOOLS: AnyTool[] = [
     },
   }),
   tool({
+    name: "preview_voice",
+    description: "Render a short preview of an approved narrator voice with the given settings.",
+    input: z.object({ voice_id: z.string(), speed: z.number().min(0.7).max(1.1).optional(), stability: z.number().min(0).max(1).optional(), warmth: z.number().min(0).max(1).optional() }),
+    run: async (i, ctx) => {
+      const a = await audio.previewVoice(ctx.viewer, i.voice_id, i);
+      return { summary: `Voice preview ready${a.simulated ? " (simulated narrator: placeholder murmur, not a real voice)" : ""}.`, data: { url: a.url, simulated: a.simulated } };
+    },
+  }),
+  tool({
+    name: "set_narration",
+    description: "Choose the narrator voice and delivery for an episode: speed (0.7–1.1), warmth and stability (0–1).",
+    input: z.object({ episode_id: episodeId, voice_id: z.string().optional(), speed: z.number().min(0.7).max(1.1).optional(), stability: z.number().min(0).max(1).optional(), warmth: z.number().min(0).max(1).optional() }),
+    run: async ({ episode_id, ...patch }, ctx) => {
+      const p = await audio.updateProductionSettings(ctx.viewer, episode_id, patch);
+      return { summary: `Narration settings saved (speed ${p.settings.speed}).` };
+    },
+  }),
+  tool({
+    name: "generate_soundscape",
+    description: "Choose the ambience bed for an episode: a library soundscape, optional extra layers, and ambience/music volume (0–1).",
+    input: z.object({
+      episode_id: episodeId,
+      soundscape_id: z.string().optional(),
+      extra_layers: z.array(z.object({ kind: z.enum(["rain", "forest", "ocean", "fire", "thunder", "space", "wind", "village", "stream", "pad"]), gain: z.number().min(0).max(1) })).max(4).optional(),
+      ambience_volume: z.number().min(0).max(1).optional(),
+      music_volume: z.number().min(0).max(1).optional(),
+    }),
+    run: async ({ episode_id, ...patch }, ctx) => {
+      const p = await audio.updateProductionSettings(ctx.viewer, episode_id, patch);
+      const sc = p.settings.soundscape_id ? await getDb().get("soundscapes", p.settings.soundscape_id) : null;
+      return { summary: `Ambience set to ${sc?.name ?? "none"}${p.settings.extra_layers.length ? ` with ${p.settings.extra_layers.map((l) => l.kind).join(", ")}` : ""}.` };
+    },
+  }),
+  tool({
+    name: "generate_narration",
+    description: "Generate narration for an episode's script, section by section. Pass section_index to regenerate one section.",
+    input: z.object({ episode_id: episodeId, section_index: z.number().int().min(0).optional() }),
+    confirm: async (i, ctx) => {
+      const view = await audio.getProduction(ctx.viewer, i.episode_id);
+      if (view.voiceProvider.simulated) return null;
+      const cents = i.section_index === undefined ? view.pendingCents : Math.ceil(view.estimateCents / Math.max(1, view.sections.length));
+      return `This generates narration with ${view.voiceProvider.name}, a paid service. Estimated cost: $${(cents / 100).toFixed(2)}.`;
+    },
+    run: async (i, ctx) => {
+      const r = await audio.generateNarration(ctx.viewer, i.episode_id, { sectionIndex: i.section_index });
+      return { summary: r.generated ? `Narrated ${r.generated} section${r.generated === 1 ? "" : "s"}${r.simulated ? " with the simulated narrator (placeholder murmur, not a voice)" : ` ($${(r.costCents / 100).toFixed(2)})`}.` : "Narration is already up to date." };
+    },
+  }),
+  tool({
+    name: "mix_episode_audio",
+    description: "Mix narration with the ambience bed, master it, run audio QA and attach the result to the episode.",
+    input: z.object({ episode_id: episodeId }),
+    run: async (i, ctx) => {
+      const { asset, qa } = await audio.mixAndMaster(ctx.viewer, i.episode_id);
+      const notes = qa.issues.filter((x) => x.severity !== "pass");
+      return { summary: `Mixed and mastered (${Math.round(asset.duration_seconds / 60)} min, approx. ${qa.integrated_loudness_approx_lufs} LUFS). QA: ${qa.passed ? "passed" : "failed"}${notes.length ? `; ${notes.length} note${notes.length === 1 ? "" : "s"}` : ""}.`, data: { url: asset.url, qa: { passed: qa.passed, notes: notes.map((n) => n.message) } } };
+    },
+  }),
+  tool({
     name: "schedule_episode",
     description: "Request a public release time for an episode. It is only released at that time after editorial approval.",
     input: z.object({ episode_id: episodeId, release_at: z.string().describe("ISO 8601 date-time") }),
@@ -420,7 +480,14 @@ export async function dispatchTool(name: string, rawInput: unknown, ctx: ToolCon
   const t = getTool(name);
   const input = parseToolInput(t, rawInput);
   if (!opts.confirmed && t.confirm) {
-    const reason = await t.confirm(input, ctx);
+    let reason: string | null;
+    try {
+      reason = await t.confirm(input, ctx);
+    } catch (err) {
+      if (!(err instanceof Error && "status" in err)) throw err;
+      const call = await audit(ctx, name, input, { status: "failed", error: err.message, executed_at: nowIso() });
+      return { status: "failed", call, error: err.message };
+    }
     if (reason) {
       const call = await audit(ctx, name, input, { status: "pending_confirmation", confirmation_reason: reason });
       return { status: "needs_confirmation", call, reason };
