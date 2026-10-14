@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-serif: "Cormorant Garamond", Georgia, serif;
+  --font-sans: "Inter Variable", system-ui, -apple-system, sans-serif;
+  color-scheme: dark;
+}
+
+html {
+  background: #07152e;
+}
+
+body {
+  @apply min-h-screen bg-night font-sans text-white antialiased;
+  background-image:
+    radial-gradient(1200px 600px at 80% -10%, rgba(139, 157, 244, 0.14), transparent 60%),
+    radial-gradient(900px 500px at -10% 20%, rgba(169, 155, 244, 0.08), transparent 60%);
+  background-attachment: fixed;
+}
+
+::selection {
+  background: rgba(169, 155, 244, 0.45);
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Range input used for seek / volume. --pct drives the filled track. */
+.range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, #a99bf4 0%, #8b9df4 var(--pct, 0%), rgba(255, 255, 255, 0.18) var(--pct, 0%));
+  cursor: pointer;
+}
+.range:focus-visible {
+  outline: 2px solid #a99bf4;
+  outline-offset: 4px;
+}
+.range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(169, 155, 244, 0.25);
+}
+.range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+}
+.range:disabled {
+  opacity: 0.4;
+}
+
+.prose-calm p {
+  @apply mb-4 leading-relaxed text-white/85;
+}
+
+.card-surface {
+  @apply rounded-3xl border border-white/10 bg-white/[0.03] shadow-card backdrop-blur;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
