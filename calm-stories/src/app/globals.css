@@ -81,3 +81,8 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* Cormorant's default old-style figures read as letters (0 → o, 1 → I). */
+.font-serif {
+  font-variant-numeric: lining-nums;
+}

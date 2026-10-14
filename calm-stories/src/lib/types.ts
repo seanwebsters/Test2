@@ -314,6 +314,8 @@ export interface ConversationMessage {
   /** Structured UI cards (concept proposals, tool results, confirmations). */
   cards?: AssistantCard[];
   tool_call_ids?: ID[];
+  /** True when produced by the offline simulated assistant (no AI provider). */
+  simulated?: boolean;
   created_at: ISODate;
 }
 
@@ -323,6 +325,7 @@ export type AssistantCard =
   | { type: "confirmation"; tool: string; summary: string; tool_call_id: ID; reason: string }
   | { type: "continuity"; report: ContinuityReport }
   | { type: "direction"; proposal: DirectionProposal }
+  | { type: "sleep_check"; score: number; notes: string[] }
   | { type: "error"; message: string }
   | { type: "suggestions"; items: string[] };
 

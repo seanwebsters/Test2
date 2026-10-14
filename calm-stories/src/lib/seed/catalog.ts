@@ -100,6 +100,9 @@ const P = {
   snow: ["#0b1830", "#2c4c75", "#d6e6ff", "#ffffff"] as [string, string, string, string],
 };
 
+/** Named artwork palettes, reused by generated cover art. */
+export const PALETTES = P;
+
 export const SEED_SERIES: SeedSeries[] = [
   {
     slug: "the-moonlit-kingdom",
