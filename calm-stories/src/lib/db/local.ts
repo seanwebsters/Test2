@@ -63,6 +63,7 @@ export class LocalDatabase implements Database {
 
   persistNow() {
     if (!this.filePath) return;
+    fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
     const tmp = `${this.filePath}.tmp`;
     fs.writeFileSync(tmp, JSON.stringify(this.data));
     fs.renameSync(tmp, this.filePath);
