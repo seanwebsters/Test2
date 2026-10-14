@@ -41,3 +41,33 @@ export function ffmpegTranscode(
     proc.stdin.end(input);
   });
 }
+
+/** Decode any audio FFmpeg understands into 16-bit mono WAV at the given rate. */
+export function ffmpegDecodeToWav(ffmpeg: string, input: Buffer, sampleRate = 22050): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(ffmpeg, ["-hide_banner", "-loglevel", "error", "-i", "pipe:0", "-ac", "1", "-ar", String(sampleRate), "-f", "wav", "-acodec", "pcm_s16le", "pipe:1"]);
+    const chunks: Buffer[] = [];
+    const errs: Buffer[] = [];
+    proc.stdout.on("data", (c: Buffer) => chunks.push(c));
+    proc.stderr.on("data", (c: Buffer) => errs.push(c));
+    proc.on("error", reject);
+    proc.on("close", (code) => (code === 0 ? resolve(fixWavSizes(Buffer.concat(chunks))) : reject(new Error(`ffmpeg decode failed: ${Buffer.concat(errs).toString()}`))));
+    proc.stdin.end(input);
+  });
+}
+
+/** WAV written to a pipe has placeholder chunk sizes; patch them so decoders read the whole file. */
+function fixWavSizes(buf: Buffer): Buffer {
+  if (buf.length < 44 || buf.toString("ascii", 0, 4) !== "RIFF") return buf;
+  buf.writeUInt32LE(buf.length - 8, 4);
+  let off = 12;
+  while (off + 8 <= buf.length) {
+    const id = buf.toString("ascii", off, off + 4);
+    if (id === "data") {
+      buf.writeUInt32LE(buf.length - off - 8, off + 4);
+      break;
+    }
+    off += 8 + buf.readUInt32LE(off + 4);
+  }
+  return buf;
+}

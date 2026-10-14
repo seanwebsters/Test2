@@ -12,6 +12,7 @@ import { contextToPrompt, loadStoryContext } from "@/lib/story/context";
 import { allTools, type ToolContext } from "./registry";
 import { executeTool, TOOL_LABELS, type ExecuteOutcome } from "./execute";
 import { currentScriptText } from "./scripts";
+import { getProduction } from "@/lib/production/audio";
 
 export const WELCOME = "Every great story starts somewhere. What would you like to create?";
 
@@ -229,7 +230,7 @@ async function planIntent(text: string, seriesId: string | null): Promise<Plan> 
     return { steps: [{ tool: "generate_season_outline", input: { episode_count: n ? Math.min(30, Number(n[1])) : 10, season_number: season ? Number(season[1]) : 1, brief: text } }] };
   }
   if (/outline (episode|it|this)/.test(m) && (byNumber ?? firstUnwritten)) return { steps: [{ tool: "generate_episode_outline", input: { episode_id: (byNumber ?? firstUnwritten)!.id } }] };
-  if (/\bwrite\b|draft (the|an|episode)|script/.test(m) && !/rewrite/.test(m)) {
+  if (/\bwrite\b|draft (the|an|episode)/.test(m) && !/rewrite/.test(m)) {
     const ep = byNumber ?? firstUnwritten ?? ctx.episodes[ctx.episodes.length - 1];
     if (!ep) return { reply: "There are no episodes to write yet. Shall I plan a season first?", cards: [{ type: "suggestions", items: ["Plan a 10-episode season"] }], steps: [] };
     const settings: Record<string, unknown> = {};
@@ -242,6 +243,38 @@ async function planIntent(text: string, seriesId: string | null): Promise<Plan> 
   if (/continuity|contradict|consisten/.test(m)) {
     if (!target) return { reply: "Write an episode first, then I'll check it against the Story Bible.", steps: [] };
     return { steps: [{ tool: "check_story_continuity", input: { episode_id: target.id } }] };
+  }
+  if (/narrat|voice|rain|ambien|soundscape|music|produce (the )?audio|thunder|ocean|fireplace|fire\b|wind|crickets|forest sounds|warmer|softer voice|deeper/.test(m)) {
+    const ep = byNumber ?? latestScripted;
+    if (!ep) return { reply: "Write an episode script first – then I can narrate it and add a soundscape.", steps: [] };
+    const prod = await getProduction(ep.id);
+    const patch: Record<string, unknown> = { episode_id: ep.id };
+    let voiceChange = false;
+    if (/warmer|warm\b|more emotion|tender/.test(m)) { patch.warmth = Math.round(Math.min(1, prod.settings.warmth + 0.2) * 100) / 100; voiceChange = true; }
+    if (/cooler|less emotion|neutral/.test(m)) { patch.warmth = Math.round(Math.max(0, prod.settings.warmth - 0.2) * 100) / 100; voiceChange = true; }
+    if (/slower|more slowly/.test(m)) { patch.speed = Math.max(0.7, Math.round((prod.settings.speed - 0.05) * 100) / 100); voiceChange = true; }
+    if (/faster|quicker/.test(m)) { patch.speed = Math.min(1.1, Math.round((prod.settings.speed + 0.05) * 100) / 100); voiceChange = true; }
+    const voices = await db.list("voice_profiles", { where: { approved: true } });
+    const named = voices.find((v) => m.includes(v.name.toLowerCase()));
+    const deeper = /deeper|lower voice/.test(m) ? voices.find((v) => v.tone === "deep") : undefined;
+    if (named ?? deeper) { patch.voice_id = (named ?? deeper)!.id; voiceChange = true; }
+    const layerWords: [RegExp, string][] = [[/rain/, "rain"], [/thunder/, "thunder"], [/ocean|waves|sea\b/, "ocean"], [/fire(place)?\b|crackl/, "fire"], [/wind|breeze/, "wind"], [/crickets|forest sounds|night forest/, "forest"], [/stream|brook|river/, "stream"], [/space|cosmic/, "space"], [/village|bells/, "village"]];
+    const remove = /(remove|no more|without|stop the|take out|less)\s/.test(m);
+    const layers = layerWords.filter(([re]) => re.test(m)).map(([, k]) => k);
+    if (layers.length) {
+      if (remove) patch.remove_layers = layers;
+      else patch.add_layers = layers.map((kind) => ({ kind, gain: /gentle|soft|light/.test(m) ? 0.4 : 0.6 }));
+    }
+    if (/music (up|louder)|more music/.test(m)) patch.music_volume = Math.min(1, prod.settings.music_volume + 0.15);
+    if (/music (down|quieter|softer)|less music|no music/.test(m)) patch.music_volume = /no music/.test(m) ? 0 : Math.max(0, prod.settings.music_volume - 0.1);
+    if (/ambience (up|louder)|louder (rain|ambience)/.test(m)) patch.ambience_volume = Math.min(1, prod.settings.ambience_volume + 0.15);
+    if (/ambience (down|quieter)|quieter (rain|ambience)/.test(m)) patch.ambience_volume = Math.max(0, prod.settings.ambience_volume - 0.1);
+    const steps: Plan["steps"] = [];
+    if (Object.keys(patch).length > 1) steps.push({ tool: "update_production_settings", input: patch });
+    const hasNarration = prod.section_asset_ids.some(Boolean);
+    if (voiceChange || !hasNarration || /produce|generate|narrat/.test(m)) steps.push({ tool: "generate_narration", input: { episode_id: ep.id } });
+    else steps.push({ tool: "mix_episode_audio", input: { episode_id: ep.id } });
+    return { steps };
   }
   const rewriteKinds: [RegExp, string][] = [
     [/ending/, "ending"],
@@ -263,13 +296,6 @@ async function planIntent(text: string, seriesId: string | null): Promise<Plan> 
       }
       return { steps: [{ tool: "rewrite_script_section", input }] };
     }
-  }
-  if (/narrat|voice|rain|ambien|soundscape|music|produce (the )?audio|thunder|ocean|fireplace|wind/.test(m)) {
-    return {
-      reply: `Audio is produced in the Production workspace for each episode${target ? ` – open “${target.title}” there` : ""}. Tell me the narrator and soundscape you'd like and I'll set it up once the episode script is approved.`,
-      cards: [{ type: "suggestions", items: ["Approve the script", "Open audio production"] }],
-      steps: [],
-    };
   }
   if (/cover|artwork|key art|poster|art\b/.test(m)) {
     const scene = /(kingdom|forest|cabin|space|ocean|garden|library|village|coast|desert|aurora|city|lake)/.exec(m)?.[1];

@@ -16,8 +16,8 @@ export function StatTile({ label, value, hint, sample }: { label: string; value:
 
 export function BarChart({ data, label, className }: { data: { label: string; value: number }[]; label: string; className?: string }) {
   const max = Math.max(1, ...data.map((d) => d.value));
-  const w = 320;
-  const h = 120;
+  const w = 640;
+  const h = 130;
   const bw = w / Math.max(1, data.length);
   return (
     <figure className={cx("w-full", className)}>
@@ -27,8 +27,8 @@ export function BarChart({ data, label, className }: { data: { label: string; va
           return (
             <g key={i}>
               <rect x={i * bw + bw * 0.18} y={h - bh} width={bw * 0.64} height={Math.max(1, bh)} rx={4} fill="url(#barg)" />
-              <text x={i * bw + bw / 2} y={h + 13} textAnchor="middle" fontSize="9" fill="#AAB6CF">{d.label}</text>
-              <text x={i * bw + bw / 2} y={h - bh - 4} textAnchor="middle" fontSize="9" fill="#ffffff">{d.value}</text>
+              <text x={i * bw + bw / 2} y={h + 13} textAnchor="middle" fontSize="11" fill="#AAB6CF">{d.label}</text>
+              <text x={i * bw + bw / 2} y={h - bh - 4} textAnchor="middle" fontSize="11" fill="#ffffff">{d.value}</text>
             </g>
           );
         })}
