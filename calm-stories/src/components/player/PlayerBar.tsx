@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { SceneArt } from "@/components/art/SceneArt";
 import { Icon } from "@/components/ui/Icon";
 import { usePlayer } from "./PlayerProvider";
@@ -10,9 +10,20 @@ import { AutoplayToggle, SeekBar, SleepTimerControl, SpeedControl, TransportButt
 export function PlayerBar() {
   const p = usePlayer();
   const visible = Boolean(p.episode);
+  const barRef = useRef<HTMLElement>(null);
 
+  // Reserve exactly the bar's height at the bottom of the page (it wraps on mobile).
   useEffect(() => {
-    document.documentElement.style.setProperty("--player-h", visible ? "112px" : "0px");
+    const el = barRef.current;
+    const set = (h: number) => document.documentElement.style.setProperty("--player-h", `${Math.ceil(h)}px`);
+    if (!visible || !el) {
+      set(0);
+      return;
+    }
+    set(el.getBoundingClientRect().height);
+    const ro = new ResizeObserver(([entry]) => entry && set(entry.contentRect.height + 1));
+    ro.observe(el);
+    return () => ro.disconnect();
   }, [visible]);
 
   return (
@@ -25,6 +36,7 @@ export function PlayerBar() {
       )}
       {visible && p.episode && (
         <section
+          ref={barRef}
           aria-label="Audio player"
           className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-night-2/90 backdrop-blur-xl"
         >

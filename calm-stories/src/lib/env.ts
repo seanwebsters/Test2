@@ -16,7 +16,14 @@ export const env = {
     | "test",
   dataBackend: (opt("DATA_BACKEND") ?? "local") as "local" | "supabase",
   dataDir: opt("DATA_DIR") ?? ".data",
-  sessionSecret: opt("SESSION_SECRET") ?? "dev-only-insecure-session-secret-change-me",
+  get sessionSecret(): string {
+    const v = opt("SESSION_SECRET");
+    if (v) return v;
+    if (process.env.NODE_ENV === "production" && opt("APP_ENV") !== "development" && process.env.NEXT_PHASE !== "phase-production-build") {
+      throw new Error("SESSION_SECRET must be set in production.");
+    }
+    return "dev-only-insecure-session-secret-change-me";
+  },
   authProvider: (opt("AUTH_PROVIDER") ?? "demo") as "demo" | "supabase",
 
   supabaseUrl: opt("SUPABASE_URL") ?? opt("NEXT_PUBLIC_SUPABASE_URL"),
