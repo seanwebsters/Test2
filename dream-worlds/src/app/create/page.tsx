@@ -297,7 +297,7 @@ function CreateFlow() {
                       value={prompt}
                       onChange={(e) => setPrompt(e.target.value)}
                       rows={5}
-                      placeholder="e.g. A peaceful journey aboard a pirate ship where the Star Admiral unexpectedly appears and everyone has to work together."
+                      placeholder={`e.g. A peaceful journey aboard a pirate ship where ${characterById("star-admiral")!.name} unexpectedly appears and everyone has to work together.`}
                       className="glass w-full resize-none rounded-2xl p-4 text-base leading-relaxed text-white placeholder:text-mist-500 focus:outline-none focus:ring-1 focus:ring-dusk-400/60"
                     />
                     <div className="mt-2 flex flex-wrap gap-2">

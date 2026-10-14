@@ -1,5 +1,6 @@
 "use client";
 
+import "./data/skin";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { Dream, DreamEngineInput, ListeningSession, StoryHistoryEntry, UserPreferences } from "./types";
 import { repository, type PersistedState } from "./services/storage";

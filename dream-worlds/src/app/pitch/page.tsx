@@ -6,6 +6,8 @@ import { motion } from "framer-motion";
 import { ArrowDown, ArrowRight, AudioLines, BookOpen, Building2, Clapperboard, Cpu, Gamepad2, Mic2, Moon, Music, Radio, ShieldCheck, Sparkles, Trophy, Tv, Users } from "lucide-react";
 import { worldById } from "@/lib/data/worlds";
 import { partners } from "@/lib/data/partners";
+import { contentMode } from "@/lib/data/skin";
+import { CONCEPT_NOTE } from "@/lib/data/concept";
 import { DREAM_ENGINE_SYSTEM_PROMPT } from "@/lib/engine/systemPrompt";
 import { WorldArt } from "@/components/art/WorldArt";
 import { CalmMark } from "@/components/ui/CalmMark";
@@ -191,7 +193,7 @@ export default function PitchPage() {
               </div>
             </motion.div>
             <motion.div {...reveal}>
-              <h3 className="font-display text-2xl font-light">Demo partners in this prototype</h3>
+              <h3 className="font-display text-2xl font-light">{contentMode === "concept" ? "Example IP partners (concept)" : "Demo partners in this prototype"}</h3>
               <div className="mt-5 grid gap-2">
                 {partners.map((p) => (
                   <div key={p.id} className="glass flex items-center justify-between rounded-2xl p-4">
@@ -203,7 +205,7 @@ export default function PitchPage() {
                   </div>
                 ))}
               </div>
-              <p className="mt-3 text-xs text-mist-500">All partners, worlds and characters are fictional. Real licensed IP plugs into the same data model.</p>
+              <p className="mt-3 text-xs text-mist-500">{contentMode === "concept" ? CONCEPT_NOTE : "All partners, worlds and characters are fictional."} Real licensed IP plugs into the same data model.</p>
             </motion.div>
           </div>
 

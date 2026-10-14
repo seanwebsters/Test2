@@ -11,6 +11,8 @@ import type { DreamLength } from "@/lib/types";
 import { WorldArt } from "@/components/art/WorldArt";
 import { CharacterPortrait } from "@/components/art/CharacterPortrait";
 import { Chip, PageTitle } from "@/components/ui/primitives";
+import { contentMode } from "@/lib/data/skin";
+import { setContentMode } from "@/lib/data/concept";
 
 const LENGTHS: DreamLength[] = [20, 40, 60, "all-night"];
 
@@ -90,6 +92,28 @@ export default function YouPage() {
             </div>
           </Section>
         </div>
+
+        <Section title="Demo content">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {[
+              { id: "concept" as const, label: "Franchise concept", hint: "Star Wars, Harry Potter, Pirates of the Caribbean and more. Names only, not licensed." },
+              { id: "fictional" as const, label: "Fictional originals", hint: "Original demo worlds and characters, safe to share anywhere." },
+            ].map((m) => (
+              <button
+                key={m.id}
+                onClick={() => {
+                  if (m.id === contentMode) return;
+                  setContentMode(m.id);
+                  window.location.reload();
+                }}
+                className={`rounded-2xl p-4 text-left transition ${contentMode === m.id ? "chip-on" : "glass hover:bg-white/[0.07]"}`}
+              >
+                <p className={`text-sm font-semibold ${contentMode === m.id ? "text-night-900" : "text-white"}`}>{m.label}</p>
+                <p className={`mt-0.5 text-xs ${contentMode === m.id ? "text-night-800/80" : "text-mist-400"}`}>{m.hint}</p>
+              </button>
+            ))}
+          </div>
+        </Section>
 
         <div className="glass flex flex-col gap-4 rounded-3xl p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>

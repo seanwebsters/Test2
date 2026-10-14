@@ -19,7 +19,10 @@ export interface DreamRepository {
   clear(): void;
 }
 
-const KEY = "calm.dreamworlds.v1";
+import { getContentMode } from "../data/concept";
+
+// separate libraries per demo-content mode, so titles never mix
+const KEY = `calm.dreamworlds.v1.${getContentMode()}`;
 
 export class LocalDreamRepository implements DreamRepository {
   load() {

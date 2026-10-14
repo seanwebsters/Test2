@@ -15,6 +15,8 @@ import { WorldCard } from "@/components/cards/WorldCard";
 import { CharacterCard } from "@/components/cards/CharacterCard";
 import { ContinueCard, DreamCard, DreamCover, CastStack } from "@/components/cards/DreamCard";
 import { worldById } from "@/lib/data/worlds";
+import { contentMode } from "@/lib/data/skin";
+import { CONCEPT_NOTE } from "@/lib/data/concept";
 
 export default function HomePage() {
   const store = useDreamStore();
@@ -149,7 +151,7 @@ export default function HomePage() {
         )}
 
         <footer className="px-5 pb-6 text-center text-[11px] leading-relaxed text-mist-500 lg:px-10">
-          Dream Worlds prototype · All worlds, characters and partners shown are fictional demo content.
+          Dream Worlds prototype · {contentMode === "concept" ? CONCEPT_NOTE : "All worlds, characters and partners shown are fictional demo content."}
           <br />
           Designed so licensed IP can plug into the same platform.
         </footer>
