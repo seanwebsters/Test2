@@ -951,3 +951,50 @@ export async function workspaceSnapshot(viewer: Viewer, seriesId: string) {
   };
 }
 export type WorkspaceSnapshot = Awaited<ReturnType<typeof workspaceSnapshot>>;
+
+/* ------------------------------------------------------------------ production helpers */
+
+/**
+ * Sleep Editor pass: softens the passages that score as stimulating or
+ * distressing, saving the result as a new version (the original is kept).
+ */
+export async function sleepEdit(viewer: Viewer, episodeId: string): Promise<{ before: number; after: number; softened: number }> {
+  const bundle = await getScriptBundle(viewer, episodeId);
+  const script = bundle.current?.content ?? "";
+  if (!script.trim()) throw new HttpError(409, "There's no script to edit.");
+  const before = analyseSleepSuitability(script).score;
+  if (before >= 80) return { before, after: before, softened: 0 };
+  const paras = script.split(/\n\s*\n/);
+  let softened = 0;
+  for (let i = 0; i < paras.length && softened < 6; i++) {
+    const p = paras[i] as string;
+    if (analyseSleepSuitability(`${p}\n\nAnd rest.`).score >= 90) continue;
+    const { text } = await proposeRewrite(viewer, episodeId, p, REWRITE_ACTIONS.relaxing);
+    paras[i] = text;
+    softened++;
+  }
+  const next = paras.join("\n\n");
+  if (softened) await saveScript(viewer, episodeId, next, `Sleep Editor: softened ${softened} passage${softened === 1 ? "" : "s"}`, "agent");
+  return { before, after: analyseSleepSuitability(next).score, softened };
+}
+
+/** Calm Originals own their rights; record that once for the production engine. */
+export async function ensureOfficialRights(viewer: Viewer, seriesId: string) {
+  const { series, viewer: v } = await editableSeries(viewer, seriesId);
+  const db = getDb();
+  const existing = await db.findOne("rights_declarations", { series_id: seriesId });
+  if (!series.is_official) return existing;
+  if (!series.ai_disclosure) await db.update("series", series.id, { ai_disclosure: "Some episodes are produced by Calm's editorial team with AI-assisted writing and narration, and every one is reviewed by an editor." });
+  if (existing) return existing;
+  return db.insert("rights_declarations", {
+    id: newId("rights"),
+    series_id: seriesId,
+    user_id: v.user.id,
+    original_work: true,
+    ai_assisted: true,
+    third_party_material: "",
+    voice_consent: true,
+    accepted_terms_version: TERMS_VERSION,
+    created_at: nowIso(),
+  });
+}

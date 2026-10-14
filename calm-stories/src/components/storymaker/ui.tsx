@@ -72,10 +72,29 @@ export function StatusPill({ status }: { status: string }) {
     approved: "bg-emerald-300/15 text-emerald-200",
     published: "bg-emerald-300/20 text-emerald-100",
     rejected: "bg-rose-300/15 text-rose-200",
+    queued: "bg-white/10 text-mist",
+    running: "bg-periwinkle/20 text-periwinkle",
+    paused: "bg-amber-300/15 text-amber-200",
+    succeeded: "bg-emerald-300/15 text-emerald-200",
+    failed: "bg-rose-300/15 text-rose-200",
+    cancelled: "bg-white/10 text-mist",
+    pending: "bg-amber-300/15 text-amber-200",
+    archived: "bg-white/10 text-mist",
+    removed: "bg-rose-300/15 text-rose-200",
+    open: "bg-amber-300/15 text-amber-200",
+    actioned: "bg-emerald-300/15 text-emerald-200",
+    dismissed: "bg-white/10 text-mist",
   };
   return <span className={cx("rounded-full px-2 py-0.5 text-[11px] capitalize", tone[status] ?? "bg-white/10 text-mist")}>{status.replace(/_/g, " ")}</span>;
 }
 
 export function Empty({ children }: { children: React.ReactNode }) {
   return <div className="rounded-3xl border border-dashed border-white/15 p-8 text-center text-sm text-mist">{children}</div>;
+}
+
+/** False during server rendering and hydration; true once running in the browser (for local-time UI). */
+export function useMounted() {
+  const [m, setM] = useState(false);
+  useEffect(() => setM(true), []);
+  return m;
 }

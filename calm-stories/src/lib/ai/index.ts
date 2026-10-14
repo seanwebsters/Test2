@@ -7,6 +7,7 @@
  * and every artefact is flagged `simulated: true`.
  */
 import "server-only";
+import { AsyncLocalStorage } from "node:async_hooks";
 import type * as z from "zod/v4";
 import { getDb } from "@/lib/db";
 import { env } from "@/lib/env";
@@ -119,6 +120,21 @@ export interface GenerationScope {
   model?: string | null;
 }
 
+const ambient = new AsyncLocalStorage<GenerationScope>();
+
+/**
+ * Runs `fn` with an ambient generation scope (job id, agent provider/model
+ * overrides). Every generation inside inherits it, so the production engine
+ * can attribute costs and pick models without threading parameters through.
+ */
+export function withGenerationScope<T>(scope: GenerationScope, fn: () => Promise<T>): Promise<T> {
+  return ambient.run({ ...ambient.getStore(), ...scope }, fn);
+}
+
+export function currentGenerationScope(): GenerationScope {
+  return ambient.getStore() ?? {};
+}
+
 /** Records cost and an audit row for one model call. */
 export async function recordGeneration(
   task: string,
@@ -179,7 +195,9 @@ export interface GenerateRequest<T> {
  * Runs one structured generation. Real providers are always preferred; the
  * mock is used only when none is configured, and the result says so.
  */
-export async function generate<T>(req: GenerateRequest<T>, scope: GenerationScope = {}): Promise<{ value: T; meta: GenerationMeta }> {
+export async function generate<T>(req: GenerateRequest<T>, explicit: GenerationScope = {}): Promise<{ value: T; meta: GenerationMeta }> {
+  const amb = currentGenerationScope();
+  const scope: GenerationScope = { ...explicit, jobId: explicit.jobId ?? amb.jobId, provider: amb.provider ?? explicit.provider, model: amb.model ?? explicit.model };
   const settings = await getAiSettings();
   const name = resolveProviderName(scope.provider ?? settings.writing_provider);
   const instruction = promptFor(settings, req.promptKey ?? req.task);

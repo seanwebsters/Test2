@@ -32,6 +32,29 @@ export interface MixResult {
 export const VOICE_RMS_DB = -20;
 export const CEILING = 0.89; // ≈ -1 dBFS
 
+/**
+ * Renders a ~75 s ambience loop once and tiles it with equal-power
+ * crossfades, so long episodes mix quickly without audible seams.
+ */
+export function loopedAmbience(layers: SoundLayer[], seconds: number, rate: number, seed: number, targetRmsDb: number, fadeIn: number, fadeOut: number): Float32Array {
+  const total = Math.floor(seconds * rate);
+  const loopSec = Math.min(seconds, 75);
+  const loop = renderAmbience(layers, { seconds: loopSec, sampleRate: rate, seed, targetRmsDb, fadeInSeconds: 0, fadeOutSeconds: 0 });
+  const out = new Float32Array(total);
+  const xf = Math.min(Math.floor(rate * 5), Math.floor(loop.length / 4));
+  const hop = loop.length - xf;
+  for (let start = 0; start < total; start += hop) {
+    for (let i = 0; i < loop.length && start + i < total; i++) {
+      let g = 1;
+      if (start > 0 && i < xf) g = Math.sin(((i / xf) * Math.PI) / 2);
+      else if (i >= hop && start + hop < total) g = Math.cos((((i - hop) / xf) * Math.PI) / 2);
+      out[start + i] = (out[start + i] ?? 0) + (loop[i] ?? 0) * g;
+    }
+  }
+  applyFades(out, rate, fadeIn, fadeOut);
+  return out;
+}
+
 function dbToGain(db: number) {
   return Math.pow(10, db / 20);
 }
@@ -84,10 +107,10 @@ export function mixEpisode(input: MixInput): MixResult {
   // 2. Ambience bed and music pad, relative to the voice.
   const seconds = total / rate;
   const ambDb = VOICE_RMS_DB - 14 + 20 * Math.log10(Math.max(0.02, input.ambienceVolume) / 0.35);
-  const bed = input.ambience.length ? renderAmbience(input.ambience, { seconds, sampleRate: rate, seed: input.seed, targetRmsDb: ambDb, fadeInSeconds: 4, fadeOutSeconds: 10 }) : new Float32Array(total);
+  const bed = input.ambience.length ? loopedAmbience(input.ambience, seconds, rate, input.seed, ambDb, 4, 10) : new Float32Array(total);
   if (input.musicVolume > 0.01) {
     const padDb = VOICE_RMS_DB - 20 + 20 * Math.log10(input.musicVolume / 0.15);
-    const pad = renderAmbience([{ kind: "pad", gain: 1 }], { seconds, sampleRate: rate, seed: input.seed + 17, targetRmsDb: padDb, fadeInSeconds: 8, fadeOutSeconds: 12 });
+    const pad = loopedAmbience([{ kind: "pad", gain: 1 }], seconds, rate, input.seed + 17, padDb, 8, 12);
     for (let i = 0; i < total; i++) bed[i] = (bed[i] ?? 0) + (pad[i] ?? 0);
   }
 

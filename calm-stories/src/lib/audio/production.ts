@@ -4,7 +4,7 @@
  * production engine (Calm's editorial team).
  */
 import "server-only";
-import { assertWithinBudget, getAiSettings } from "@/lib/ai";
+import { assertWithinBudget, currentGenerationScope, getAiSettings } from "@/lib/ai";
 import { HttpError } from "@/lib/api";
 import type { Viewer } from "@/lib/auth/viewer";
 import { getDb } from "@/lib/db";
@@ -188,7 +188,7 @@ export async function generateNarration(
     await db.insert("audio_assets", asset);
     await db.insert("production_costs", {
       id: newId("cost"),
-      job_id: opts.jobId ?? null,
+      job_id: opts.jobId ?? currentGenerationScope().jobId ?? null,
       series_id: series.id,
       episode_id: ep.id,
       category: "tts",
@@ -312,7 +312,7 @@ export async function mixAndMaster(viewer: Viewer, episodeId: string, opts: { jo
   };
   asset.url = assetUrl(asset.id);
   await db.insert("audio_assets", asset);
-  await db.insert("production_costs", { id: newId("cost"), job_id: opts.jobId ?? null, series_id: series.id, episode_id: ep.id, category: "audio_processing", provider: "calm-mixer", model: "pure-ts-v1", units: asset.duration_seconds, unit_label: "seconds", cost_cents: 0, simulated: false, created_at: nowIso() });
+  await db.insert("production_costs", { id: newId("cost"), job_id: opts.jobId ?? currentGenerationScope().jobId ?? null, series_id: series.id, episode_id: ep.id, category: "audio_processing", provider: "calm-mixer", model: "pure-ts-v1", units: asset.duration_seconds, unit_label: "seconds", cost_cents: 0, simulated: false, created_at: nowIso() });
   await db.upsert("episode_productions", { ...view.production, mix_asset_id: asset.id, updated_at: nowIso() });
   const nextStatus = ep.status === "script_ready" || ep.status === "draft" || ep.status === "planned" ? "audio_ready" : ep.status;
   await db.update("episodes", ep.id, { audio_asset_id: asset.id, duration_seconds: Math.round(asset.duration_seconds), status: nextStatus, updated_at: nowIso() });
