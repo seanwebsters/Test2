@@ -10,7 +10,7 @@ import { EpisodeCard } from "@/components/catalog/EpisodeCard";
 import { ShelfScroller } from "@/components/catalog/Shelf";
 import type { ArtworkSpec } from "@/lib/types";
 
-const HERO_ART: ArtworkSpec = { scene: "kingdom", palette: ["#06102b", "#1f2a63", "#c9b8ff", "#f8ecc6"], seed: 20261014 };
+const HERO_ART: ArtworkSpec = { scene: "kingdom", palette: ["#06102b", "#24306e", "#c9b8ff", "#fff3d6"], seed: 20261014, moon_x: 0.8 };
 
 export default async function HomePage() {
   const viewer = await getViewer();
@@ -24,7 +24,7 @@ export default async function HomePage() {
     <>
       <section className="relative isolate flex min-h-[88vh] items-end overflow-hidden pb-20 pt-32 sm:pb-28">
         <SceneArt spec={HERO_ART} className="absolute inset-0 -z-10 h-full w-full" title="A moonlit kingdom above a misty valley" priority />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-night via-night/60 to-transparent" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-night via-night/50 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 -z-10 h-56 bg-gradient-to-t from-night to-transparent" />
         <div className="mx-auto w-full max-w-[1400px] px-4 sm:px-8">
           <div className="max-w-2xl animate-fade-up">

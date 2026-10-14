@@ -566,7 +566,8 @@ export function SceneArt({
   const rand = prng(spec.seed);
   const p = spec.palette;
   const { moon, layers } = sceneLayers(spec.scene, rand, p, `${spec.seed}`);
-  const moonX = W * (0.25 + rand() * 0.5);
+  const autoMoonX = W * (0.25 + rand() * 0.5);
+  const moonX = spec.moon_x !== undefined ? W * spec.moon_x : autoMoonX;
   const moonY = H * (0.16 + rand() * 0.14);
   const skyId = `cs-sky-${spec.seed}-${spec.scene}`;
   const glowId = `cs-glow-${spec.seed}-${spec.scene}`;

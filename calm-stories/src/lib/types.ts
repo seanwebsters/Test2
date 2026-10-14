@@ -83,6 +83,8 @@ export interface ArtworkSpec {
   seed: number;
   /** Optional uploaded / generated image URL that overrides the procedural scene. */
   image_url?: string | null;
+  /** Optional moon position (0–1 across the frame) for compositions with text overlays. */
+  moon_x?: number;
 }
 
 export interface ArtworkAsset {
