@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-serif: "Cormorant Garamond", Georgia, serif;
+  --font-sans: "Inter Variable", system-ui, -apple-system, sans-serif;
+  --player-h: 0px;
+  color-scheme: dark;
+}
+
+html {
+  background: #07152e;
+}
+
+body {
+  @apply bg-night font-sans text-white antialiased;
+  background-image:
+    radial-gradient(1200px 600px at 80% -10%, rgba(169, 155, 244, 0.12), transparent 60%),
+    radial-gradient(900px 500px at -10% 10%, rgba(139, 157, 244, 0.1), transparent 60%);
+  background-attachment: fixed;
+  padding-bottom: var(--player-h);
+}
+
+::selection {
+  background: rgba(169, 155, 244, 0.45);
+}
+
+:focus-visible {
+  outline: 2px solid #a99bf4;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.cs-twinkle {
+  animation: twinkle 4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-white text-night hover:bg-lavender/90;
+  }
+  .btn-accent {
+    @apply btn bg-gradient-to-r from-lavender to-periwinkle text-night shadow-glow hover:brightness-110;
+  }
+  .btn-ghost {
+    @apply btn border border-white/15 bg-white/5 text-white backdrop-blur hover:bg-white/10;
+  }
+  .btn-danger {
+    @apply btn border border-rose-300/30 bg-rose-400/10 text-rose-100 hover:bg-rose-400/20;
+  }
+  .btn-sm {
+    @apply px-3.5 py-1.5 text-xs;
+  }
+  .card {
+    @apply rounded-3xl border border-white/10 bg-night-2/80 shadow-card backdrop-blur;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wider text-mist;
+  }
+  .input {
+    @apply w-full rounded-2xl border border-white/10 bg-night/70 px-4 py-2.5 text-sm text-white placeholder:text-mist/60 focus:border-lavender/60 focus:outline-none;
+  }
+  .label {
+    @apply mb-1.5 block text-xs font-medium uppercase tracking-wider text-mist;
+  }
+  .headline {
+    @apply font-serif font-semibold tracking-tight;
+  }
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
