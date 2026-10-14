@@ -526,7 +526,7 @@ export function mockDirection(input: { seriesTitle: string; scene: SceneKind; le
   const s = settingForScene(input.scene);
   const thread = input.threads[0];
   const loc = pick(rand, s.locations);
-  const beat = pick(rand, BEATS);
+  const beat = pick(rand, BEATS.slice(1)); // "Arrival" only opens a series
   return {
     episode_title: `${beat[0]}${rand() < 0.5 ? ` at ${loc.name.replace(/^The /, "")}` : ""}`,
     summary: `${input.lead} ${beat[1]} ${loc.name.replace(/^The /, "the ")}${thread ? `, and finds a small clue about ${lower(thread)}` : ""}. Nothing is rushed; the episode ends warm and settled.`,

@@ -5,7 +5,7 @@ import { GENRES } from "@/lib/types";
 import { contextToPrompt, type StoryContext } from "@/lib/story/context";
 import { checkFacts, checkUnknownNames, checkWorldRules } from "@/lib/story/checks";
 import { nowIso } from "@/lib/util";
-import { resolveWriter, type AiTask } from "./index";
+import { resolveWriter, taskGuidance, type AiTask } from "./index";
 import { toJsonSchema } from "./json-schema";
 import { estimateCostCents } from "./provider";
 import * as mock from "./mock-writer";
@@ -42,7 +42,7 @@ function meta(providerName: string, model: string, simulated: boolean, usage?: {
 async function structured<T>(task: AiTask, schema: z.ZodType<T, z.ZodTypeDef, unknown>, prompt: string, simulate: () => T, maxTokens = 8000) {
   const w = await resolveWriter(task);
   if (!w.provider) return { data: simulate(), meta: meta(w.providerName, w.model, true) };
-  const res = await w.provider.json({ model: w.model, system: SLEEP_STORY_SYSTEM, prompt, schema, jsonSchema: toJsonSchema(schema, true), maxTokens });
+  const res = await w.provider.json({ model: w.model, system: SLEEP_STORY_SYSTEM + (await taskGuidance(task)), prompt, schema, jsonSchema: toJsonSchema(schema, true), maxTokens });
   return { data: res.data, meta: meta(w.providerName, res.model, false, res.usage) };
 }
 
@@ -155,7 +155,7 @@ export async function writeEpisodeScript(ctx: StoryContext, episodeId: string, s
     return { content, meta: meta(w.providerName, w.model, true) };
   }
   const prompt = `Write the full narration script for Episode ${ep.number}: "${ep.title}".\nEpisode summary: ${ep.summary}\n\nSTORY BIBLE\n${contextToPrompt(ctx, { upToEpisodeId: ep.id })}\n\nSETTINGS\n- Target length: about ${words} words (${settings.duration_minutes} minutes at a sleep-story pace)\n- Mood: ${settings.mood}\n- Perspective: ${settings.perspective}-person\n- Style: ${settings.style}\n- Dialogue: ${settings.dialogue}\n- Romance: ${settings.romance} (always sleep-friendly and non-explicit)\n- Pacing: ${settings.pacing}\n\nBegin with a short, calming welcome that invites the listener to settle. Return only the narration text, in paragraphs separated by blank lines. No headings, no stage directions.`;
-  const res = await w.provider.turn({ model: w.model, system: SLEEP_STORY_SYSTEM, messages: [{ role: "user", text: prompt }], maxTokens: Math.min(32000, Math.round(words * 2.2) + 2000) });
+  const res = await w.provider.turn({ model: w.model, system: SLEEP_STORY_SYSTEM + (await taskGuidance("script")), messages: [{ role: "user", text: prompt }], maxTokens: Math.min(32000, Math.round(words * 2.2) + 2000) });
   if (res.stop === "max_tokens") throw new Error("The script was cut off before it finished. Try a shorter duration.");
   return { content: res.text.trim(), meta: meta(w.providerName, res.model, false, res.usage) };
 }
@@ -178,7 +178,7 @@ export async function rewritePassage(ctx: StoryContext, input: { passage: string
     return { text: mock.mockRewrite(input.passage, input.instruction, ctx.series.artwork.scene, input.custom ?? ""), meta: meta(w.providerName, w.model, true) };
   }
   const prompt = `${REWRITE_INSTRUCTIONS[input.instruction]}${input.custom ? `\nCreator's note: ${input.custom}` : ""}\n\nSTORY BIBLE\n${contextToPrompt(ctx, { recent: 3 })}\n\nTEXT BEFORE (for context, do not repeat):\n${(input.before ?? "").slice(-1200)}\n\nPASSAGE TO REWRITE:\n${input.passage}\n\nTEXT AFTER (for context, do not repeat):\n${(input.after ?? "").slice(0, 800)}\n\nReturn only the replacement passage.`;
-  const res = await w.provider.turn({ model: w.model, system: SLEEP_STORY_SYSTEM, messages: [{ role: "user", text: prompt }], maxTokens: 6000, effort: "low" });
+  const res = await w.provider.turn({ model: w.model, system: SLEEP_STORY_SYSTEM + (await taskGuidance("rewrite")), messages: [{ role: "user", text: prompt }], maxTokens: 6000, effort: "low" });
   return { text: res.text.trim(), meta: meta(w.providerName, res.model, false, res.usage) };
 }
 
@@ -208,7 +208,7 @@ export async function reviewContinuity(ctx: StoryContext, script: string): Promi
     };
   }
   const prompt = `Check this episode script against the Story Bible. List any contradictions with established facts, world rules, character personalities, relationships or previous events, quoting the evidence. Do not rewrite anything. If there are no problems, return an empty list.\n\nSTORY BIBLE\n${contextToPrompt(ctx)}\n\nSCRIPT\n${script.slice(0, 60000)}`;
-  const res = await w.provider.json({ model: w.model, system: SLEEP_STORY_SYSTEM, prompt, schema: ContinuitySchema, jsonSchema: toJsonSchema(ContinuitySchema, true), effort: "low" });
+  const res = await w.provider.json({ model: w.model, system: SLEEP_STORY_SYSTEM + (await taskGuidance("continuity")), prompt, schema: ContinuitySchema, jsonSchema: toJsonSchema(ContinuitySchema, true), effort: "low" });
   return {
     report: { checked_at: nowIso(), issues: [...ruleIssues, ...res.data.issues], summary: res.data.summary, simulated: false },
     meta: meta(w.providerName, res.model, false, res.usage),

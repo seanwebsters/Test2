@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { getDb } from "@/lib/db";
+import { isAdmin } from "@/lib/auth/policy";
 import { badRequest, notFound } from "@/lib/errors";
 import { GENRES, type Genre, type ScriptSettings } from "@/lib/types";
 import { hashString, newId, nowIso, slugify } from "@/lib/util";
@@ -104,11 +105,14 @@ defineTool({
     let slug = slugify(input.title) || "untitled";
     if (await db.findOne("series", { slug })) slug = `${slug}-${Math.random().toString(36).slice(2, 6)}`;
     const id = newId("ser");
-    const isOfficial = (await db.findOne("creator_profiles", { user_id: ctx.viewer.user.id }))?.is_official ?? false;
+    // Administrators create Calm Originals, owned by the official Calm profile.
+    const official = isAdmin(ctx.viewer) ? await db.findOne("creator_profiles", { is_official: true }) : null;
+    const ownerId = official?.user_id ?? ctx.viewer.user.id;
+    const isOfficial = Boolean(official) || ((await db.findOne("creator_profiles", { user_id: ctx.viewer.user.id }))?.is_official ?? false);
     await db.insert("series", {
       id,
       slug,
-      creator_id: ctx.viewer.user.id,
+      creator_id: ownerId,
       title: input.title,
       tagline: input.tagline,
       description: input.synopsis,
