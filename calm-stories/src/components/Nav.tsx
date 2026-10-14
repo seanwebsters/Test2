@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import type { PublicViewer } from "@/lib/auth/viewer";
 import { cx } from "@/lib/util";
 import { Logo } from "./Logo";
-import { SearchIcon } from "./icons";
+import { BellIcon, SearchIcon } from "./icons";
 import { Avatar } from "./Avatar";
 
 const LINKS = [
@@ -22,7 +22,7 @@ export interface Persona {
   description: string;
 }
 
-export function Nav({ viewer, personas, demoAuth }: { viewer: PublicViewer; personas: readonly Persona[]; demoAuth: boolean }) {
+export function Nav({ viewer, personas, demoAuth, unread = 0 }: { viewer: PublicViewer; personas: readonly Persona[]; demoAuth: boolean; unread?: number }) {
   const pathname = usePathname();
   const router = useRouter();
   const [q, setQ] = useState("");
@@ -56,6 +56,12 @@ export function Nav({ viewer, personas, demoAuth }: { viewer: PublicViewer; pers
           <SearchIcon size={20} />
         </Link>
         <PlanBadge viewer={viewer} />
+        {viewer.id && (
+          <Link href="/notifications" className="relative rounded-full p-2 text-mist hover:text-white" aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}>
+            <BellIcon size={20} />
+            {unread > 0 && <span aria-hidden className="absolute right-0.5 top-0.5 min-w-4 rounded-full bg-lavender px-1 text-center text-[10px] font-semibold leading-4 text-night">{unread > 9 ? "9+" : unread}</span>}
+          </Link>
+        )}
         <AccountMenu viewer={viewer} personas={personas} demoAuth={demoAuth} />
       </div>
       <nav aria-label="Primary mobile" className="flex gap-1 overflow-x-auto px-4 pb-2 md:hidden">

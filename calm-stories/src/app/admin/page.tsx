@@ -35,7 +35,7 @@ export default async function AdminOverview() {
     ["Jobs running", String(jobs.filter((j) => j.status === "running" || j.status === "queued").length), `${jobs.filter((j) => j.status === "failed").length} failed`],
     ["Open reports", String(reports.length)],
     ["AI spend this month", formatCents(costs.totalCents), `of ${formatCents(settings.monthly_cost_limit_cents)} limit · ${costs.simulatedCalls} simulated calls`],
-    ["Listening (7 days)", `${listenedHours.toFixed(1)} h`, `${new Set(events.map((e) => e.user_id ?? e.anonymous_id)).size} listeners`],
+    ["Listening (7 days)", `${listenedHours.toFixed(1)} h`, `${new Set(events.map((e) => e.user_id ?? e.anonymous_id)).size} listeners${events.some((e) => e.is_sample) ? " · includes sample data" : ""}`],
   ];
   return (
     <div className="space-y-10">

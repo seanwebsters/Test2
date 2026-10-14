@@ -9,7 +9,7 @@ import { listMySeries, workspaceSnapshot } from "@/lib/storymaker/service";
 
 export const metadata: Metadata = { title: "Storymaker" };
 
-export default async function CreatePage({ searchParams }: { searchParams: Promise<{ series?: string; new?: string }> }) {
+export default async function CreatePage({ searchParams }: { searchParams: Promise<{ series?: string; new?: string; episode?: string }> }) {
   const viewer = await getViewer();
   if (!viewer.user) return <SignInPrompt title="Calm Storymaker" body="Sign in with a creator account to start building a Sleep Story series with your AI creative partner." />;
   if (!viewer.isCreator) {
@@ -27,6 +27,7 @@ export default async function CreatePage({ searchParams }: { searchParams: Promi
       snapshot={snapshot}
       conversation={conversation}
       writer={{ provider: writer.provider, model: writer.model, simulated: writer.simulated }}
+      initialEpisodeId={params.episode ?? null}
       mySeries={mine.map((s) => ({ id: s.id, title: s.title, status: s.status }))}
     />
   );

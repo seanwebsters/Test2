@@ -8,7 +8,22 @@ import { ChevronDown } from "@/components/icons";
 import { usePlayer } from "./PlayerProvider";
 import { AutoplayToggle, Scrubber, SleepMenu, SpeedMenu, Transport, VolumeSlider } from "./controls";
 
-export function ListenView({ track, summary, nextTitle, isPremium }: { track: PlayerTrack; summary: string; nextTitle: string | null; isPremium: boolean }) {
+export function ListenView({
+  track,
+  summary,
+  nextTitle,
+  isPremium,
+  draftStatus = null,
+  extra,
+}: {
+  track: PlayerTrack;
+  summary: string;
+  nextTitle: string | null;
+  isPremium: boolean;
+  /** Set when the owner or an editor previews an unpublished episode. */
+  draftStatus?: string | null;
+  extra?: React.ReactNode;
+}) {
   const p = usePlayer();
   const isCurrent = p.track?.episodeId === track.episodeId;
 
@@ -36,9 +51,15 @@ export function ListenView({ track, summary, nextTitle, isPremium }: { track: Pl
           <Link href={`/series/${t.seriesSlug}`} className="inline-flex items-center gap-1 text-sm text-lavender hover:underline">
             <ChevronDown size={14} className="rotate-90" /> {t.seriesTitle}
           </Link>
+          {draftStatus && (
+            <p role="note" className="mt-4 rounded-2xl border border-amber-200/30 bg-amber-200/10 px-4 py-2 text-sm text-amber-100">
+              Draft preview ({draftStatus.replace(/_/g, " ")}). Only you and Calm’s editors can hear this until it’s approved and released.
+            </p>
+          )}
           <p className="mt-4 text-xs uppercase tracking-[0.2em] text-mist">Episode {t.number}</p>
           <h1 className="mt-2 font-serif text-4xl font-semibold leading-tight sm:text-5xl">{t.title}</h1>
           <p className="mt-4 text-white/75">{summary}</p>
+          {extra && <div className="mt-3">{extra}</div>}
 
           {t.access === "locked" ? (
             <div className="card-surface mt-8 p-6">

@@ -322,6 +322,28 @@ export function buildSeedSnapshot(now: Date): Snapshot {
     }
   }
 
+  // Sample listening history so analytics have something to show. Marked
+  // is_sample so Creator Studio and the admin dashboard can label it.
+  for (const def of SEED_SERIES) {
+    const rand = prng(5000 + def.slug.length * 31 + def.popularity);
+    for (const ep of s.episodes.filter((e) => e.series_id === `series-${def.slug}` && e.status === "published" && e.published_at)) {
+      const since = Math.max(new Date(ep.published_at!).getTime(), t0 - 28 * DAY);
+      if (since >= t0) continue;
+      const plays = Math.round((def.popularity / 9) * (0.6 + rand() * 0.8));
+      for (let k = 0; k < plays; k++) {
+        const uid = `user-demo-${Math.floor(rand() * 40)}`;
+        const at = since + rand() * (t0 - since);
+        const reach = Math.min(1, 0.25 + rand() * 0.95);
+        const listened = Math.round(SAMPLE_SECONDS * reach); // positions within the sample audio
+
+        const base = { user_id: uid, anonymous_id: null, episode_id: ep.id, series_id: ep.series_id, is_sample: true };
+        s.listening_events.push({ ...base, id: `le-${ep.id}-${k}-p`, kind: "play", position_seconds: 0, listened_seconds: 0, created_at: iso(at) });
+        s.listening_events.push({ ...base, id: `le-${ep.id}-${k}-g`, kind: "pause", position_seconds: listened, listened_seconds: listened, created_at: iso(at + listened * 1000) });
+        if (reach >= 1) s.listening_events.push({ ...base, id: `le-${ep.id}-${k}-c`, kind: "complete", position_seconds: listened, listened_seconds: 0, created_at: iso(at + listened * 1000) });
+      }
+    }
+  }
+
   for (const u of s.users) {
     s.user_settings.push({ id: u.id, autoplay_next: true, autoplay_limit: 3, default_speed: 1, default_sleep_timer_minutes: null, new_episode_updates: true, private_listening_history: false, updated_at: created });
   }

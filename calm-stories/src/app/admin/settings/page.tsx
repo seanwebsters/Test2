@@ -11,7 +11,7 @@ export const metadata = { title: "AI settings" };
 
 const KEY_LABELS: Record<string, [string, string]> = {
   anthropic: ["Anthropic", "Writing (preferred)"],
-  openai: ["OpenAI", "Writing fallback, cover art"],
+  openai: ["OpenAI", "Writing fallback"],
   elevenlabs: ["ElevenLabs", "Narration"],
   trigger: ["Trigger.dev", "Background jobs"],
   posthog: ["PostHog", "Analytics"],

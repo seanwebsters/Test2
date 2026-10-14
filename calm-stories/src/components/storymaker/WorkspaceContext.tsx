@@ -86,19 +86,23 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 export function WorkspaceProvider({
   initialSnapshot,
   initialConversation,
+  initialEpisodeId,
   writer,
   children,
 }: {
   initialSnapshot: WorkspaceSnapshot | null;
   initialConversation: AiConversation | null;
+  /** Opens this episode's script on load (links from Creator Studio). */
+  initialEpisodeId?: string | null;
   writer: WriterBadge;
   children: React.ReactNode;
 }) {
   const router = useRouter();
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [conversation, setConversation] = useState(initialConversation);
-  const [section, setSection] = useState<SectionId>("overview");
-  const [episodeId, setEpisodeId] = useState<string | null>(initialSnapshot?.episodes[0]?.id ?? null);
+  const startEpisode = initialSnapshot?.episodes.find((e) => e.id === initialEpisodeId)?.id ?? null;
+  const [section, setSection] = useState<SectionId>(startEpisode ? "scripts" : "overview");
+  const [episodeId, setEpisodeId] = useState<string | null>(startEpisode ?? initialSnapshot?.episodes[0]?.id ?? null);
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<PendingConfirm | null>(null);

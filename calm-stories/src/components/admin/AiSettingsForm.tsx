@@ -65,18 +65,11 @@ export function AiSettingsForm({ settings, defaults }: { settings: AiSettings; d
             <option value="mock">Simulated (no cost)</option>
           </select>
         </Field>
-        <Field label="Cover art">
-          <select value={s.image_provider} onChange={(e) => set("image_provider", e.target.value as AiSettings["image_provider"])} className={inputCls}>
-            <option value="procedural">Procedural (no cost)</option>
-            <option value="auto">Auto</option>
-            <option value="openai">OpenAI images</option>
-          </select>
+        <Field label="Cover art" hint="Image generation isn’t connected in this build.">
+          <input value="Procedural illustration (built in)" readOnly className={inputCls} />
         </Field>
-        <Field label="Soundscapes">
-          <select value={s.sound_provider} onChange={(e) => set("sound_provider", e.target.value as AiSettings["sound_provider"])} className={inputCls}>
-            <option value="library">Licensed library</option>
-            <option value="generative">Generative (procedural)</option>
-          </select>
+        <Field label="Soundscapes" hint="Procedurally synthesised ambience beds.">
+          <input value="Built-in soundscape library" readOnly className={inputCls} />
         </Field>
         <Field label="Approval policy" hint="Every episode is reviewed by an editor before release.">
           <select value={s.approval_policy} onChange={(e) => set("approval_policy", e.target.value as AiSettings["approval_policy"])} className={inputCls}>

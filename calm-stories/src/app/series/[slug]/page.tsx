@@ -92,7 +92,7 @@ export default async function SeriesPage({ params }: { params: Promise<{ slug: s
           {series.ai_disclosure && (
             <div className="rounded-2xl border border-white/10 p-4 text-xs leading-relaxed text-mist">
               <p className="font-semibold text-white/80">About this series</p>
-              <p className="mt-1">{series.ai_disclosure} Community series pass Calm editorial review before release.</p>
+              <p className="mt-1">{series.ai_disclosure}{series.is_official ? "" : " Community series pass Calm editorial review before release."}</p>
             </div>
           )}
           <ReportButton targetType="series" targetId={series.id} signedIn={signedIn} />

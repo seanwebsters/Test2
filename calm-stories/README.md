@@ -26,7 +26,7 @@ Sign in with the **account menu → Prototype sign-in**:
 | Calm administrator | Editorial review, agents, production engine |
 
 ```bash
-npm test            # vitest: policies, journeys, audio, jobs
+npm test            # vitest: policies, journeys, Storymaker, audio, production, studio
 npm run typecheck
 npm run db:reset    # wipe the local database (re-seeds on next request)
 npm run db:seed-sql # write supabase/seed.sql for a Postgres database
@@ -42,18 +42,35 @@ npm run db:seed-sql # write supabase/seed.sql for a Postgres database
 | Episode audio in the seeded catalogue | **Sample ambience**, procedurally synthesised (labelled in the player) |
 | Trending / popular ranking | **Sample ranking** (labelled), replaced by analytics in production |
 | Supabase PostgreSQL schema + RLS | Real (`supabase/migrations`), validated against Postgres 16 |
+| Storymaker agent, tools, World Bible, characters, seasons, scripts, rewrites, continuity and sleep checks | Real; writing uses Anthropic or OpenAI when a key is set, otherwise a **simulated writer** (labelled) |
+| Narration | ElevenLabs stock voices when a key is set, otherwise a **simulated narrator** (labelled placeholder audio). No voice cloning |
+| Mixing, mastering, loudness and QA | Real, pure TypeScript (MP3 via ffmpeg when available) |
+| Cover art | Procedurally illustrated in-app |
+| Production engine (13-step jobs, workflows, retries, budgets, pause/resume/cancel) | Real; inline worker or Trigger.dev |
+| Editorial review, publishing calendar, scheduled release, moderation | Real. Nothing is published without an editor's approval |
+| AI cost tracking and audit trail | Real records; costs are **estimates** from token and character counts |
+| Creator Studio analytics | Real calculations over listening events; the seeded history is **sample data** (labelled) |
+| Notifications | Real, in-app (new episodes, review decisions, production) |
 
 See `docs/INTEGRATIONS.md` for connecting Supabase, Anthropic/OpenAI, ElevenLabs, R2, PostHog and Trigger.dev.
+
+## Scheduler and background jobs
+
+`vercel.json` runs `GET /api/cron/tick` every 15 minutes (set `CRON_SECRET`). It fills production workflow release slots, releases approved episodes that are due and starts queued jobs. In development the admin overview and calendar run the release step when opened, and jobs run inline. Set `JOB_DRIVER=trigger` to hand jobs to Trigger.dev; see `docs/INTEGRATIONS.md`. Rights, voices and AI disclosure are covered in `docs/RIGHTS.md`.
 
 ## Layout
 
 ```
 src/app            routes (App Router) and API route handlers
-src/components     UI (player, cards, shelves, artwork)
+src/components     UI (player, cards, shelves, artwork, storymaker, admin, studio)
 src/lib/db         Database interface, local JSON store, Supabase adapter
 src/lib/auth       identity + entitlement providers, policy rules
 src/lib/services   catalogue, listener, recommendations
-src/lib/audio      WAV codec, ambience synthesiser, ffmpeg helpers
+src/lib/ai         provider-independent AI layer (Anthropic, OpenAI, simulated), prompts, schemas
+src/lib/storymaker Storymaker agent, tool registry and story services
+src/lib/audio      WAV codec, ambience synthesiser, narration, mixer, QA, ffmpeg helpers
+src/lib/jobs       production pipeline, job engine and workflows
+src/lib/publishing.ts, admin.ts, studio.ts, notifications.ts
 src/lib/storage    blob storage (local, R2, Supabase Storage)
 supabase/          migrations (schema + RLS)
 tests/             vitest suites

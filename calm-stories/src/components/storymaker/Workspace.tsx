@@ -22,9 +22,10 @@ export function Workspace(props: {
   conversation: AiConversation | null;
   writer: WriterBadge;
   mySeries: SeriesOption[];
+  initialEpisodeId?: string | null;
 }) {
   return (
-    <WorkspaceProvider initialSnapshot={props.snapshot} initialConversation={props.conversation} writer={props.writer} key={props.snapshot?.series.id ?? "new"}>
+    <WorkspaceProvider initialSnapshot={props.snapshot} initialConversation={props.conversation} initialEpisodeId={props.initialEpisodeId} writer={props.writer} key={props.snapshot?.series.id ?? "new"}>
       <Shell mySeries={props.mySeries} />
     </WorkspaceProvider>
   );

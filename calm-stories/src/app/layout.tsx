@@ -9,6 +9,7 @@ import { getViewer, toPublicViewer } from "@/lib/auth";
 import { DEMO_PERSONAS } from "@/lib/auth/personas";
 import { env } from "@/lib/env";
 import { getDb } from "@/lib/db";
+import { unreadCount } from "@/lib/notifications";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { PlayerProvider, type PlayerPrefs } from "@/components/player/PlayerProvider";
@@ -25,7 +26,7 @@ export const dynamic = "force-dynamic";
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const viewer = await getViewer();
-  const settings = viewer.user ? await getDb().get("user_settings", viewer.user.id) : null;
+  const [settings, unread] = await Promise.all([viewer.user ? getDb().get("user_settings", viewer.user.id) : null, unreadCount(viewer)]);
   const prefs: PlayerPrefs = {
     autoplayNext: settings?.autoplay_next ?? true,
     autoplayLimit: settings?.autoplay_limit ?? 3,
@@ -39,7 +40,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           Skip to content
         </a>
         <PlayerProvider prefs={prefs} key={viewer.user?.id ?? "visitor"}>
-          <Nav viewer={toPublicViewer(viewer)} personas={DEMO_PERSONAS} demoAuth={env.authProvider === "demo"} />
+          <Nav viewer={toPublicViewer(viewer)} personas={DEMO_PERSONAS} demoAuth={env.authProvider === "demo"} unread={unread} />
           <main id="main" className="pb-32">
             {children}
           </main>
