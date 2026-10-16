@@ -296,6 +296,8 @@ export interface StudioSettings {
   image_model: string;
   /** Optional Gemini imageConfig.imageSize ("1K" | "2K" | "4K") for models that support it. */
   image_size: "" | "1K" | "2K" | "4K";
+  /** fal.ai endpoint for Nano Banana when using FAL_KEY instead of a Gemini key. */
+  fal_image_endpoint: string;
   tts_model: string;
   sfx_model: string;
   music_model: string;

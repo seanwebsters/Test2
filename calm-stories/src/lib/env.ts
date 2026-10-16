@@ -50,6 +50,8 @@ export const env = {
   elevenLabsApiKey: opt("ELEVENLABS_API_KEY"),
   /** Art agent ("Nano Banana" – Gemini image generation). */
   geminiApiKey: opt("GEMINI_API_KEY") ?? opt("GOOGLE_API_KEY"),
+  /** Alternative route to Nano Banana via fal.ai (used when no Gemini key is set). */
+  falKey: opt("FAL_KEY") ?? opt("FAL_API_KEY"),
 
   storageBackend: (opt("STORAGE_BACKEND") ?? "local") as "local" | "r2" | "supabase",
   r2AccountId: opt("R2_ACCOUNT_ID"),

@@ -88,3 +88,36 @@ describe("autopilot", () => {
     expect(wf?.episodes_per_week).toBe(2);
   });
 });
+
+describe("fal.ai as the Nano Banana provider", () => {
+  it("generates artwork through fal (text-to-image and /edit with reference images) when only FAL_KEY is set", async () => {
+    const { vi } = await import("vitest");
+    const sharp = (await import("sharp")).default;
+    const { env } = await import("@/lib/env");
+    const { generateArtwork } = await import("@/lib/studio/art");
+    freshDb();
+    const keys = env as { geminiApiKey?: string; falKey?: string };
+    keys.geminiApiKey = undefined;
+    keys.falKey = "test-fal";
+    const png = await sharp({ create: { width: 64, height: 96, channels: 3, background: "#123" } }).png().toBuffer();
+    const calls: { url: string; body?: Record<string, unknown> }[] = [];
+    vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+      calls.push({ url: String(url), body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      if (String(url).startsWith("https://fal.run/")) {
+        expect((init!.headers as Record<string, string>).authorization).toBe("Key test-fal");
+        return Response.json({ images: [{ url: "https://cdn.fal.media/x.png", content_type: "image/png" }] });
+      }
+      return new Response(new Uint8Array(png), { headers: { "content-type": "image/png" } });
+    });
+    const meta = { runId: null, stepId: null, seriesId: "ser_the-moonlit-kingdom" };
+    const a = await generateArtwork({ meta, seriesId: "ser_the-moonlit-kingdom", kind: "poster", prompt: "p", aspectRatio: "2:3" });
+    await generateArtwork({ meta, seriesId: "ser_the-moonlit-kingdom", kind: "episode_cover", prompt: "p", aspectRatio: "16:9", references: [{ mimeType: "image/png", data: png }] });
+    expect(calls[0]!.url).toBe("https://fal.run/fal-ai/nano-banana");
+    expect(calls[0]!.body!.aspect_ratio).toBe("2:3");
+    expect(calls[2]!.url).toBe("https://fal.run/fal-ai/nano-banana/edit");
+    expect(String((calls[2]!.body!.image_urls as string[])[0])).toMatch(/^data:image\/png;base64,/);
+    expect(a.asset.provider).toBe("fal");
+    keys.falKey = undefined;
+    vi.unstubAllGlobals();
+  });
+});

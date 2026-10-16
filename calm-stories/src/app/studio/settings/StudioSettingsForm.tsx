@@ -36,6 +36,7 @@ export function StudioSettingsForm({ initial, canEdit }: { initial: StudioSettin
         {text("default_model", "Default Claude model", "Agents without their own model use this.")}
         {text("image_model", "Nano Banana model", "e.g. gemini-2.5-flash-image, or a newer Nano Banana model")}
         <label className="text-xs text-mist">Image size<select className="input mt-1 text-sm" value={f.image_size} onChange={(e) => setF({ ...f, image_size: e.target.value as typeof f.image_size })}>{["", "1K", "2K", "4K"].map((x) => <option key={x} value={x}>{x || "Model default"}</option>)}</select><span className="mt-1 block text-[11px] text-mist/70">Only for models that support imageSize.</span></label>
+        {text("fal_image_endpoint", "fal.ai Nano Banana endpoint", "Used when FAL_KEY is set instead of GEMINI_API_KEY, e.g. fal-ai/nano-banana-pro")}
         {text("tts_model", "ElevenLabs narration model")}
         {text("sfx_model", "ElevenLabs sound-effects model")}
         {text("music_model", "ElevenLabs music model")}

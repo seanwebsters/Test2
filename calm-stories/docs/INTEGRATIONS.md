@@ -34,6 +34,10 @@ x-goog-api-key: …
 
 The model defaults to `gemini-2.5-flash-image`. Switch to a newer Nano Banana model (for example Nano Banana Pro or Nano Banana 2) in Settings. Set *Image size* (1K/2K/4K) only for models that support `imageSize`. Character portraits are sent as reference images for consistency. Prompts always forbid in-image text; titles are typeset separately. Error handling: 401/403 block the step, 429 waits for `retry-after`, 5xx retries.
 
+### Or: Nano Banana through fal.ai
+
+Set `FAL_KEY` instead of `GEMINI_API_KEY`; it is used when no Gemini key is set. Images go to `POST https://fal.run/fal-ai/nano-banana`. Calls with reference images (character consistency) go to `…/edit`, with the references sent as data URIs in `image_urls`. Change the endpoint (for example `fal-ai/nano-banana-pro`) in *Settings → fal.ai Nano Banana endpoint*.
+
 ## ElevenLabs – voices, narration, pronunciation, sound effects, music
 
 Set `ELEVENLABS_API_KEY`. `lib/providers/elevenlabs.ts` uses:

@@ -9,6 +9,7 @@ import { getStorage } from "@/lib/storage";
 import { newId, nowIso } from "@/lib/util";
 import type { ArtworkAsset, ArtworkKind } from "@/lib/types";
 import { GeminiError, nanoBananaImage, type AspectRatio } from "@/lib/providers/nano-banana";
+import { falNanoBanana } from "@/lib/providers/fal";
 import { BlockedError, RateLimitedError, StepFailure } from "./errors";
 import { getStudioSettings } from "./settings";
 import type { CallMeta } from "./llm";
@@ -24,27 +25,32 @@ export async function generateArtwork(input: {
   aspectRatio: AspectRatio;
   references?: { mimeType: string; data: Buffer; label?: string }[];
 }): Promise<{ asset: ArtworkAsset; cost_cents: number }> {
-  if (!env.geminiApiKey) throw new BlockedError("GEMINI_API_KEY", "Connect a Gemini API key so the Art Director can create artwork with Nano Banana.");
+  if (!env.geminiApiKey && !env.falKey) throw new BlockedError("GEMINI_API_KEY", "Connect a Gemini API key (or a fal.ai FAL_KEY) so the Art Director can create artwork with Nano Banana.");
   const settings = await getStudioSettings();
+  const viaFal = !env.geminiApiKey;
+  const keyName = viaFal ? "FAL_KEY" : "GEMINI_API_KEY";
   let img;
   try {
-    img = await nanoBananaImage(env.geminiApiKey, {
-      prompt: input.prompt,
-      model: settings.image_model,
-      aspectRatio: input.aspectRatio,
-      imageSize: settings.image_size || undefined,
-      references: input.references,
-    });
+    img = viaFal
+      ? await falNanoBanana(env.falKey!, { prompt: input.prompt, endpoint: settings.fal_image_endpoint, aspectRatio: input.aspectRatio, references: input.references })
+      : await nanoBananaImage(env.geminiApiKey!, {
+          prompt: input.prompt,
+          model: settings.image_model,
+          aspectRatio: input.aspectRatio,
+          imageSize: settings.image_size || undefined,
+          references: input.references,
+        });
   } catch (err) {
     if (err instanceof GeminiError) {
-      if (err.status === 401 || err.status === 403) throw new BlockedError("GEMINI_API_KEY", `Gemini rejected the API key (${err.status}). Check GEMINI_API_KEY.`);
-      if (err.status === 429) throw new RateLimitedError("Gemini", err.retryAfterMs ?? 30_000);
+      if (err.status === 401 || err.status === 403) throw new BlockedError(keyName, `${viaFal ? "fal.ai" : "Gemini"} rejected the API key (${err.status}). Check ${keyName}.`);
+      if (err.status === 429) throw new RateLimitedError(viaFal ? "fal.ai" : "Gemini", err.retryAfterMs ?? 30_000);
       if (err.status >= 500) throw new StepFailure(err.message, true);
       throw new StepFailure(err.message, err.status === 502);
     }
     throw err;
   }
-  const asset = await storeArtwork({ ...input, data: img.data, mimeType: img.mimeType, provider: "gemini", model: settings.image_model });
+  const model = viaFal ? settings.fal_image_endpoint : settings.image_model;
+  const asset = await storeArtwork({ ...input, data: img.data, mimeType: img.mimeType, provider: viaFal ? "fal" : "gemini", model });
   await getDb().insert("usage_records", {
     id: newId("use"),
     run_id: input.meta.runId,
@@ -53,7 +59,7 @@ export async function generateArtwork(input: {
     agent: "art_director",
     provider: "gemini",
     operation: `image:${input.kind}`,
-    model: settings.image_model,
+    model,
     input_tokens: 0,
     output_tokens: 0,
     cache_read_tokens: 0,

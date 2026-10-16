@@ -9,6 +9,7 @@ const Body = z.object({
   default_model: z.string().trim().min(1).max(100),
   image_model: z.string().trim().min(1).max(100),
   image_size: z.enum(["", "1K", "2K", "4K"]),
+  fal_image_endpoint: z.string().trim().min(1).max(120),
   tts_model: z.string().trim().min(1).max(100),
   sfx_model: z.string().trim().min(1).max(100),
   music_model: z.string().trim().min(1).max(100),

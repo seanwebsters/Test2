@@ -530,6 +530,7 @@ create table public.studio_settings (
   default_model text not null,
   image_model text not null,
   image_size text not null default '',
+  fal_image_endpoint text not null default 'fal-ai/nano-banana',
   tts_model text not null,
   sfx_model text not null,
   music_model text not null,
