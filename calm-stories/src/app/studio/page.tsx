@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { getTeamState } from "@/lib/studio/team";
+import { getStudioSettings } from "@/lib/studio/settings";
 import { providerStatus } from "@/lib/studio/providers";
 import { AGENT_BY_KEY } from "@/lib/studio/agents";
 import { TeamRoom } from "@/components/studio/TeamRoom";
@@ -28,6 +29,7 @@ export default async function StudioOverview() {
   const greenlit = projects.filter((p) => p.status === "greenlit").length;
   const approvals = projects.filter((p) => p.status === "awaiting_greenlight").length + reviews.length;
   const providers = providerStatus();
+  const settings = await getStudioSettings();
   const missing = providers.filter((p) => !p.connected);
   return (
     <div className="space-y-10">
@@ -56,6 +58,17 @@ export default async function StudioOverview() {
             <div className="text-xs text-mist">{hint}</div>
           </div>
         ))}
+      </section>
+
+      <section className={cx("flex flex-wrap items-center gap-3 rounded-3xl border p-4 text-sm", settings.autopilot ? "border-lavender/30 bg-lavender/[0.05]" : "border-white/10 bg-white/[0.02]")}>
+        <span className={cx("h-2.5 w-2.5 rounded-full", settings.autopilot ? "bg-lavender" : "bg-white/30")} />
+        <span className="text-white">Autopilot {settings.autopilot ? "on" : "off"}</span>
+        <span className="text-mist">
+          {settings.autopilot
+            ? `The Program Director commissions a new series every ${settings.autopilot_interval_hours}h when fewer than ${settings.autopilot_pipeline} are in development; greenlit series get ${settings.autopilot_episodes_per_week} episode(s) a week. You only greenlight and approve.`
+            : "Series start only from your briefs."}
+        </span>
+        <Link href="/studio/settings" className="ml-auto text-lavender">Change</Link>
       </section>
 
       {missing.length > 0 && (

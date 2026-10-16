@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/lib/env";
 import { log } from "@/lib/log";
 import { releaseDueEpisodes } from "@/lib/services/releases";
-import { runScheduledProduction, tick } from "@/lib/studio";
+import { runAutopilot, runScheduledProduction, tick } from "@/lib/studio";
 
 export const maxDuration = 800;
 
@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
   if (env.cronSecret ? auth !== `Bearer ${env.cronSecret}` : env.appEnv === "production") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  await runAutopilot();
   const scheduled = await runScheduledProduction();
   const started = await tick({ wait: true });
   const released = await releaseDueEpisodes();

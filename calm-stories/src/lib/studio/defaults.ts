@@ -16,6 +16,10 @@ export const DEFAULT_STUDIO_SETTINGS: Omit<StudioSettings, "updated_at"> = {
   default_series_budget_cents: 2500,
   web_research: true,
   publish_roles: ["admin", "editor"],
+  autopilot: true,
+  autopilot_pipeline: 1,
+  autopilot_interval_hours: 24,
+  autopilot_episodes_per_week: 2,
 };
 
 /**

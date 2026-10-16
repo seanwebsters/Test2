@@ -6,7 +6,9 @@ import type { StudioSettings, WritingGuidelines } from "./types";
 
 export async function getStudioSettings(): Promise<StudioSettings> {
   const db = getDb();
-  return (await db.get("studio_settings", "global")) ?? db.insert("studio_settings", { ...DEFAULT_STUDIO_SETTINGS, updated_at: nowIso() });
+  const saved = await db.get("studio_settings", "global");
+  // Merge so settings saved before a new option existed pick up its default.
+  return saved ? { ...DEFAULT_STUDIO_SETTINGS, ...saved } : db.insert("studio_settings", { ...DEFAULT_STUDIO_SETTINGS, updated_at: nowIso() });
 }
 
 /** Global guidelines plus any series-specific addendum. */

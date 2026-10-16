@@ -17,6 +17,7 @@ export default async function NewSeriesPage() {
     <div className="mx-auto max-w-3xl">
       <p className="text-[11px] uppercase tracking-[0.35em] text-lavender">Network Executive</p>
       <h1 className="font-serif text-5xl text-white">Brief the team</h1>
+      <p className="mt-2 rounded-2xl border border-lavender/30 bg-lavender/[0.05] p-3 text-sm text-white/85">Optional: with Autopilot on, the Program Director commissions new series by itself. Use this page only when you have a specific idea.</p>
       <p className="mt-2 text-mist">
         Describe the series you want. The Program Director researches the genre, the Creative Director develops three original concepts, the Story Critic picks the strongest, and the team builds the bible, cast, world, season plan and cinematic artwork. Then it comes back to you for a greenlight. Nothing is produced or published without your approval.
       </p>

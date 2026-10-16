@@ -61,3 +61,29 @@ describe("workflow engine guarantees", () => {
     expect(runs.every((r) => r.idempotency_key?.startsWith("sched:") && r.params.release_at)).toBe(true);
   });
 });
+
+describe("autopilot", () => {
+  it("commissions and develops a new series without a brief, one at a time, and schedules greenlit series", async () => {
+    const { runAutopilot, resolveGate } = await import("@/lib/studio");
+    const db = freshDb();
+    setClaudeTransport(fakeClaude({ calls: [], synthesisRounds: 0 }));
+    const run = await runAutopilot();
+    expect(run).not.toBeNull();
+    expect(await runAutopilot()).toBeNull(); // one in flight at a time
+    await drain({ maxTicks: 6 });
+    const st = (await db.findOne("workflow_steps", { run_id: run!.id, key: "commission" }))!;
+    expect(st.status, st.error ?? "").toBe("succeeded");
+    const projects = await db.list("series_projects");
+    expect(projects).toHaveLength(1);
+    expect(projects[0]!.brief.length).toBeGreaterThan(5);
+    expect(await runAutopilot()).toBeNull(); // slate is full
+    // Greenlight → automatic release schedule.
+    const dev = (await db.get("workflow_runs", projects[0]!.run_id!))!;
+    await db.update("series_projects", projects[0]!.id, { series_id: "ser_the-moonlit-kingdom" });
+    await db.insert("workflow_steps", { id: "gs", run_id: dev.id, key: "greenlight", type: "series.greenlight", agent: "network_executive", label: "Greenlight", activity: "reading", deps: [], params: {}, status: "awaiting_approval", attempts: 1, not_before: null, started_at: null, finished_at: null, summary: null, error: null, needs: null, deliverable_ids: [], cost_cents: 0, created_at: nowIso(), updated_at: nowIso() });
+    await resolveGate(dev.id, "greenlight", { approved: true, userId: "usr_calm-editor", notes: "" });
+    const wf = await db.findOne("production_workflows", { series_id: "ser_the-moonlit-kingdom" });
+    expect(wf?.status).toBe("active");
+    expect(wf?.episodes_per_week).toBe(2);
+  });
+});

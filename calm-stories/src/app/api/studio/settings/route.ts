@@ -19,6 +19,10 @@ const Body = z.object({
   default_series_budget_cents: z.number().int().min(0).max(1_000_000),
   web_research: z.boolean(),
   publish_roles: z.array(z.enum(["admin", "editor"])).min(1),
+  autopilot: z.boolean(),
+  autopilot_pipeline: z.number().int().min(0).max(5),
+  autopilot_interval_hours: z.number().int().min(1).max(24 * 30),
+  autopilot_episodes_per_week: z.number().int().min(0).max(7),
 });
 
 export const PUT = route(async (req) => {

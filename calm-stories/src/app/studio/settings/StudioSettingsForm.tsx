@@ -23,6 +23,15 @@ export function StudioSettingsForm({ initial, canEdit }: { initial: StudioSettin
   );
   return (
     <form onSubmit={save} className="mt-4">
+      <fieldset disabled={!canEdit} className="mb-6 rounded-2xl border border-lavender/30 bg-lavender/[0.05] p-4">
+        <label className="flex items-center gap-2 text-white"><input type="checkbox" className="accent-lavender" checked={f.autopilot} onChange={(e) => setF({ ...f, autopilot: e.target.checked })} /> <span className="font-serif text-xl">Autopilot</span></label>
+        <p className="mt-1 text-xs text-mist">The Program Director invents new series from audience data and catalogue gaps – no brief needed – and the team develops them up to your greenlight. Greenlit series get a release schedule automatically. Publishing still always needs your approval.</p>
+        <div className="mt-3 grid gap-4 md:grid-cols-3">
+          {num("autopilot_pipeline", "Series in development at once")}
+          {num("autopilot_interval_hours", "Hours between new series")}
+          {num("autopilot_episodes_per_week", "Episodes per week for greenlit series", "0 = don't schedule automatically")}
+        </div>
+      </fieldset>
       <fieldset disabled={!canEdit} className="grid gap-4 md:grid-cols-3">
         {text("default_model", "Default Claude model", "Agents without their own model use this.")}
         {text("image_model", "Nano Banana model", "e.g. gemini-2.5-flash-image, or a newer Nano Banana model")}

@@ -307,6 +307,14 @@ export interface StudioSettings {
   web_research: boolean;
   /** Only these roles may press "Publish". Never the agents. */
   publish_roles: ("admin" | "editor")[];
+  /** Autopilot: the Program Director invents and develops new series without a brief. */
+  autopilot: boolean;
+  /** Keep this many studio series in development / awaiting greenlight at once. */
+  autopilot_pipeline: number;
+  /** Minimum hours between new autopilot series. */
+  autopilot_interval_hours: number;
+  /** Episodes per week scheduled automatically for every greenlit series (0 = don't schedule). */
+  autopilot_episodes_per_week: number;
   updated_at: ISODate;
 }
 

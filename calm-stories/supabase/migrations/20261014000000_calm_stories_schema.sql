@@ -540,6 +540,10 @@ create table public.studio_settings (
   default_series_budget_cents int not null,
   web_research boolean not null default true,
   publish_roles text[] not null default '{admin,editor}',
+  autopilot boolean not null default true,
+  autopilot_pipeline int not null default 1,
+  autopilot_interval_hours int not null default 24,
+  autopilot_episodes_per_week int not null default 2,
   updated_at timestamptz not null default now()
 );
 

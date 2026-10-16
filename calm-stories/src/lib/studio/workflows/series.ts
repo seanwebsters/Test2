@@ -425,6 +425,13 @@ registerGateHook("series.greenlight", async (run, _step, decision) => {
     updated_at: nowIso(),
   });
   if (!decision.approved) return;
+  // Autopilot keeps episodes coming: give the series a release schedule.
+  const settings = await getStudioSettings();
+  if (settings.autopilot && settings.autopilot_episodes_per_week > 0 && p.series_id && !(await db.findOne("production_workflows", { series_id: p.series_id }))) {
+    const bible = await getBible(p.series_id);
+    const days = [[5], [2, 5], [1, 3, 5], [1, 2, 4, 6], [1, 2, 3, 4, 5], [0, 1, 2, 3, 4, 5], [0, 1, 2, 3, 4, 5, 6]][settings.autopilot_episodes_per_week - 1]!;
+    await db.insert("production_workflows", { id: newId("wf"), series_id: p.series_id, status: "active", episodes_per_week: settings.autopilot_episodes_per_week, release_days: days, release_hour_utc: 20, target_minutes: bible.identity?.target_minutes ?? 25, budget_cents: settings.default_episode_budget_cents, created_at: nowIso(), updated_at: nowIso() });
+  }
   // Greenlit: cast voices, build the pronunciation dictionary, then start episode one.
   return [
     { key: "casting", type: "audio.casting", agent: "audio_director", label: "Audition and cast voices", activity: "reading", deps: ["greenlight"] },
@@ -454,3 +461,56 @@ registerHandler("program.proposals", async (ctx) => {
   await ctx.deliver({ kind: "proposals", key: "program_proposals", title: "Program Director proposals", data: res.data, reasoning: res.data.summary, model: res.model });
   return { summary: res.data.proposals.map((p) => p.title).join(" · ") };
 });
+
+/* ------------------------------------------------------------------ */
+/* Autopilot: new series without a brief                               */
+/* ------------------------------------------------------------------ */
+
+registerHandler("program.autopilot", async (ctx) => {
+  const db = getDb();
+  const projects = await db.list("series_projects");
+  const res = await ctx.claude({
+    context: await catalogueSummary(),
+    prompt: `You are commissioning the network's next original series on your own – nobody has given you a brief. Based on the real audience data above and the gaps in the catalogue, propose three options and put the strongest first. Prioritise premium adult romantasy unless the data argues otherwise. Each needs a brief the creative team can start from, and must be clearly different from what the studio has already made:\n${projects.map((p) => `- ${p.brief.slice(0, 160)}`).join("\n") || "- nothing yet"}`,
+    schema: ProposalsSchema,
+  });
+  await ctx.deliver({ kind: "proposals", key: "program_proposals", title: "Program Director proposals (autopilot)", data: res.data, reasoning: res.data.summary, model: res.model });
+  const pick = res.data.proposals[0];
+  if (!pick) throw new StepFailure("The Program Director didn't propose anything.", true);
+  const brief = `${pick.title}. ${pick.brief}\n\nWhy now: ${pick.rationale}`;
+  const { project } = await startSeriesDevelopment({ brief, userId: ctx.run.created_by ?? (await systemUser()) });
+  return { summary: `Commissioned “${pick.title}” on autopilot – development started (${project.id}).` };
+});
+
+async function systemUser(): Promise<string> {
+  const admin = (await getDb().list("user_roles", { where: { role: "admin" } }))[0];
+  if (!admin) throw new StepFailure("No administrator account to commission series under.");
+  return admin.user_id;
+}
+
+/**
+ * Keep the development slate full: when fewer than `autopilot_pipeline` studio
+ * series are in development or awaiting greenlight, ask the Program Director to
+ * commission one. At most one autopilot commission is in flight at a time, and
+ * they're spaced at least `autopilot_interval_hours` apart.
+ */
+export async function runAutopilot(now = new Date()) {
+  const db = getDb();
+  const settings = await getStudioSettings();
+  if (!settings.autopilot || settings.autopilot_pipeline < 1) return null;
+  const active = (await db.list("series_projects", { where: { status: ["developing", "awaiting_greenlight"] } })).length;
+  if (active >= settings.autopilot_pipeline) return null;
+  const autos = (await db.list("workflow_runs", { where: { kind: "series_development" } })).filter((r) => r.idempotency_key?.startsWith("autopilot:"));
+  if (autos.some((r) => ["running", "blocked", "paused"].includes(r.status))) return null;
+  const last = autos.sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0];
+  if (last && now.getTime() - new Date(last.created_at).getTime() < settings.autopilot_interval_hours * 3600_000) return null;
+  const { run } = await createRun({
+    kind: "series_development",
+    title: "Autopilot: Program Director commissions a new series",
+    budget_cents: 200,
+    idempotency_key: `autopilot:${now.toISOString().slice(0, 13)}`,
+    created_by: await systemUser(),
+    steps: [{ key: "commission", type: "program.autopilot", agent: "program_director", label: "Commission a new series from audience data", activity: "thinking", deps: [] }],
+  });
+  return run;
+}
