@@ -41,11 +41,14 @@ export function StudioSettingsForm({ initial, canEdit }: { initial: StudioSettin
         {text("sfx_model", "ElevenLabs sound-effects model")}
         {text("music_model", "ElevenLabs music model")}
         {num("max_revision_rounds", "Revision rounds (max)", "Per writing, continuity and QC loop.")}
+        {num("max_episode_minutes", "Episode length cap (minutes)", "Narration is the main cost – about $0.07 a minute with ElevenLabs Flash.")}
+        {num("cover_concepts", "Cover concepts per episode", "1 = cheapest (no extra image review).")}
         {num("max_parallel_steps", "Parallel steps per workflow")}
         {num("max_concurrent_runs", "Workflows at once")}
         {num("default_episode_budget_cents", "Episode budget (¢)")}
         {num("default_series_budget_cents", "Series development budget (¢)")}
         <div className="space-y-2 text-xs text-mist">
+          <label className="flex items-center gap-2"><input type="checkbox" className="accent-lavender" checked={f.episode_music} onChange={(e) => setF({ ...f, episode_music: e.target.checked })} /> Music cues (one per series, reused; costs extra the first time)</label>
           <label className="flex items-center gap-2"><input type="checkbox" className="accent-lavender" checked={f.web_research} onChange={(e) => setF({ ...f, web_research: e.target.checked })} /> Program Director may research the web</label>
           <div>Who may publish episodes</div>
           {(["admin", "editor"] as const).map((r) => (

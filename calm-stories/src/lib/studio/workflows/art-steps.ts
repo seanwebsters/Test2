@@ -6,6 +6,7 @@ import { getBible, seriesContext, updateBible } from "../bible";
 import { registerHandler, type NewStep, type StepContext } from "../engine";
 import { StepFailure } from "../errors";
 import { applyTitle, artworkForReview, generateArtwork } from "../art";
+import { getStudioSettings } from "../settings";
 import { CoverPromptsSchema, ImageReviewSchema, VisualIdentitySchema, type ImageReview } from "../schemas";
 import type { SeriesBible } from "../types";
 
@@ -184,7 +185,7 @@ registerHandler("art.cover_concepts", async (ctx) => {
   const script = await db.findOne("episode_scripts", { episode_id: ep.id });
   const plan = await ctx.claude({
     context: await seriesContext(sid),
-    prompt: `Write two distinct cover-art prompts for episode ${ep.number}, “${ep.title}”: ${ep.summary}\nUse the episode's most evocative image from the script (opening scenes below). Cinematic 16:9 composition, features the named characters exactly as described, no text.\n\n${script?.scenes.slice(0, 2).map((s) => s.text.slice(0, 1500)).join("\n\n") ?? ""}`,
+    prompt: `Write ${(await getStudioSettings()).cover_concepts === 1 ? "one cover-art prompt" : "two or three distinct cover-art prompts"} for episode ${ep.number}, “${ep.title}”: ${ep.summary}\nUse the episode's most evocative image from the script (opening scenes below). Cinematic 16:9 composition, features the named characters exactly as described, no text.\n\n${script?.scenes.slice(0, 2).map((s) => s.text.slice(0, 1500)).join("\n\n") ?? ""}`,
     schema: CoverPromptsSchema,
   });
   const chars = await db.list("characters", { where: { series_id: sid } });
@@ -195,7 +196,7 @@ registerHandler("art.cover_concepts", async (ctx) => {
     const img = a ? await artworkForReview(a, 768) : null;
     if (img) refs.push({ ...img, label: `${c.name} – keep this exact face, hair and look` });
   }
-  for (const [i, p] of plan.data.prompts.slice(0, 3).entries()) {
+  for (const [i, p] of plan.data.prompts.slice(0, (await getStudioSettings()).cover_concepts).entries()) {
     await ctx.ensureBudget(5);
     const { cost_cents } = await generateArtwork({
       meta: ctx.meta,
@@ -215,6 +216,16 @@ registerHandler("art.cover_review", async (ctx) => {
   const db = getDb();
   const covers = await db.list("artwork_assets", { where: { run_id: ctx.run.id, kind: "episode_cover" } });
   if (!covers.length) throw new StepFailure("No covers to review.");
+  if (covers.length === 1) {
+    // Budget mode: a single concept is used directly – no paid image review.
+    const only = covers[0]!;
+    await db.update("artwork_assets", only.id, { status: "selected" });
+    const ep1 = (await db.get("episodes", ctx.run.episode_id!))!;
+    const s1 = (await db.get("series", ctx.run.series_id!))!;
+    await applyTitle(only, { title: ep1.title, kicker: `${s1.title} · Episode ${ep1.number}` });
+    await db.update("episodes", ep1.id, { artwork_url: only.variants["1600w"] ?? only.url, updated_at: nowIso() });
+    return { summary: "Cover in place (single concept – no review needed)." };
+  }
   const review = await reviewImages(ctx, covers, "These are episode cover concepts; they must match the series identity and keep characters consistent with their portraits.");
   await ctx.deliver({ kind: "image_review", key: "cover_review", title: "Cover review", data: review, reasoning: review.rationale, model: review.model });
   const chosen = covers[Math.max(1, review.selected_index) - 1]!;

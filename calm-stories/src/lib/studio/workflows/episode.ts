@@ -142,7 +142,8 @@ export function scriptText(s: ScriptData, opts: { numbered?: boolean } = {}): st
 }
 
 async function targetMinutes(seriesId: string) {
-  return (await getBible(seriesId)).identity?.target_minutes ?? 25;
+  const settings = await getStudioSettings();
+  return Math.min((await getBible(seriesId)).identity?.target_minutes ?? 25, settings.max_episode_minutes);
 }
 
 /** Spoken words per minute at a slow bedtime pace, including pauses. */

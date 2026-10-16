@@ -38,6 +38,28 @@ npm run build
 npm run db:reset       # wipe local data and re-seed on next start
 ```
 
+## What it costs
+
+Budget mode is the default and aims for **under $1 per ~10-minute episode**:
+
+* **Hard cap:** each episode run stops at $1.00 and each series at $5.00 (*Settings → budgets*). A run that hits its cap pauses as blocked rather than overspending.
+* **Writing:** Sonnet for the Lead Writer and Creative Director, Haiku for everyone else, and one revision round.
+* **Length:** episodes are capped at 10 minutes.
+* **Narration:** ElevenLabs Flash.
+* **Art:** one cover, with no extra image review.
+* **Sound:** up to two ambience beds per scene, generated once per series and then reused. No music unless you turn it on.
+
+Rough estimate for one episode:
+
+| Item | Estimate |
+| --- | --- |
+| Narration (~7.5k characters) | ~70¢ |
+| Claude | ~10–20¢ |
+| Cover | ~4¢ |
+| Ambience (new sounds only) | ~12¢ each |
+
+These are list-price estimates; the studio records each call's estimated cost in Analytics, so check your provider bills. Each series also costs about $0.50–$1 once, for development, portraits and posters.
+
 ## How a series gets made
 
 1. **Brief** (`/studio/series/new`): describe the series you want.

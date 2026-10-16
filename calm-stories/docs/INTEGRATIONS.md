@@ -8,7 +8,7 @@ If a key is missing or rejected, the agents that need it stop with a clear messa
 
 Set `ANTHROPIC_API_KEY`. `lib/studio/llm.ts` uses the official `@anthropic-ai/sdk`:
 
-* **Model:** `claude-opus-5-5` by default. Change it globally or per agent in Settings.
+* **Models (budget mode):** the Lead Writer and Creative Director use `claude-sonnet-5-5`; every other agent uses `claude-haiku-5-5`. Change them globally or per agent in Settings.
 * **Requests:** streamed with `finalMessage()`, with adaptive thinking (the model default) and a per-agent `output_config.effort`.
 * **Structured outputs:** `output_config.format` with JSON Schemas generated from the zod handoff schemas, re-validated on receipt.
 * **Prompt caching:** the series bible is a cached system block.
@@ -50,7 +50,7 @@ Set `ELEVENLABS_API_KEY`. `lib/providers/elevenlabs.ts` uses:
 | Ambience | `POST /v1/sound-generation` with `loop: true`, 30 s, `model_id` `eleven_text_to_sound_v2` |
 | Music cues | `POST /v1/music` with `prompt`, `music_length_ms`, `force_instrumental` |
 
-Models are set in Settings (`eleven_multilingual_v2`, `eleven_text_to_sound_v2`, `music_v1` by default). Music generation and some voices need a plan that includes them. A 403 blocks the step with ElevenLabs' message. Costs shown in the studio are estimates from list prices; check ElevenLabs for billing.
+Models are set in Settings (`eleven_flash_v2_5`, `eleven_text_to_sound_v2`, `music_v1` by default). Ambience and music are stored in a per-series library (`audio/<series>/library/`) keyed by prompt, so a sound is paid for once per series. Music is off by default (*Settings → Music cues*). Music generation and some voices need a plan that includes them. A 403 blocks the step with ElevenLabs' message. Costs shown in the studio are estimates from list prices; check ElevenLabs for billing.
 
 ## FFmpeg – mixing and mastering
 

@@ -101,4 +101,4 @@ export async function composeMusic(apiKey: string, input: { prompt: string; mode
 }
 
 /** Approximate list prices, for cost tracking only. */
-export const ELEVEN_PRICES = { tts_per_1k_chars_cents: 18, sfx_per_second_cents: 0.4, music_per_minute_cents: 50 };
+export const ELEVEN_PRICES = { tts_per_1k_chars_cents: 18, tts_flash_per_1k_chars_cents: 9, sfx_per_second_cents: 0.4, music_per_minute_cents: 50 };

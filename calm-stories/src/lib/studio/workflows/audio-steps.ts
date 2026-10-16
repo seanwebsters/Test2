@@ -1,4 +1,5 @@
 import "server-only";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { env } from "@/lib/env";
@@ -64,7 +65,33 @@ async function eleven<T>(ctx: StepContext, op: string, estimateCents: number, fn
   }
 }
 
-const ttsCost = (chars: number) => Math.round((chars / 1000) * ELEVEN_PRICES.tts_per_1k_chars_cents * 100) / 100;
+/** Flash/Turbo TTS costs about half of Multilingual/v3 per character. */
+const ttsRate = (model: string) => (/flash|turbo/.test(model) ? ELEVEN_PRICES.tts_flash_per_1k_chars_cents : ELEVEN_PRICES.tts_per_1k_chars_cents);
+const ttsCost = (chars: number, model: string) => Math.round((chars / 1000) * ttsRate(model) * 100) / 100;
+
+/** At most this many ambience beds per scene (each is a paid generation the first time). */
+const MAX_AMBIENCE_LAYERS = 2;
+/** Library music length; the mixer loops it under the scene. */
+const LIBRARY_MUSIC_SECONDS = 60;
+
+/** Per-series sound library: identical prompts reuse the stored file instead of paying again. */
+const libraryKey = (seriesId: string, kind: "sfx" | "music", prompt: string) =>
+  `audio/${seriesId}/library/${kind}-${crypto.createHash("sha256").update(prompt.trim().toLowerCase().replace(/\s+/g, " ")).digest("hex").slice(0, 16)}.mp3`;
+
+async function seriesSoundPalette(seriesId: string, excludeEpisodeId: string): Promise<{ ambience: string[]; music: string[] }> {
+  const rows = await getDb().list("deliverables", { where: { series_id: seriesId, key: "audio_direction" } as never });
+  const ambience = new Set<string>();
+  const music = new Set<string>();
+  for (const r of rows) {
+    if (r.episode_id === excludeEpisodeId) continue;
+    const d = r.data as AudioDirection | undefined;
+    for (const sc of d?.scenes ?? []) {
+      for (const l of sc.ambience_layers ?? []) ambience.add(l.prompt);
+      if (sc.music_cue) music.add(sc.music_cue.prompt);
+    }
+  }
+  return { ambience: [...ambience].slice(0, 12), music: [...music].slice(0, 3) };
+}
 
 /* ------------------------------------------------------------------ */
 /* Casting & pronunciation (after greenlight)                          */
@@ -111,7 +138,7 @@ registerHandler("audio.casting", async (ctx) => {
       const exists = await db.findOne("voice_auditions", { series_id: sid, character_id: role.characterId, voice_id: p.voice_id });
       let sampleKey = exists?.sample_key ?? null;
       if (!sampleKey) {
-        const out = await eleven(ctx, "tts", ttsCost(line.length), (k) => synthesizeSpeech(k, { text: line, voiceId: p.voice_id, model: settings.tts_model }), { characters: line.length });
+        const out = await eleven(ctx, "tts", ttsCost(line.length, settings.tts_model), (k) => synthesizeSpeech(k, { text: line, voiceId: p.voice_id, model: settings.tts_model }), { characters: line.length });
         sampleKey = `audio/${sid}/auditions/${role.characterId ?? "narrator"}-${p.voice_id}.mp3`;
         await getStorage().put(sampleKey, out.audio, "audio/mpeg");
       }
@@ -178,9 +205,14 @@ registerHandler("audio.direction", async (ctx) => {
   const sfx = String(ctx.step.params.sfx ?? "");
   const script = (await currentDeliverable<ScriptData>({ episode_id: ep.id }, "script"))!.data;
   const quotesPerScene = script.scenes.map((s) => ({ index: s.index, quotes: splitPerformance(s.text).filter((p) => p.kind === "quote").map((p) => `${p.quoteNumber}. ${p.text.slice(0, 120)}`) }));
+  const settings = await getStudioSettings();
+  const palette = await seriesSoundPalette(ep.series_id, ep.id);
+  const reuse = palette.ambience.length || palette.music.length
+    ? `\n\nThe series already has these sounds in its library – reuse a prompt word for word whenever it fits (reused sounds are free; new ones cost money):\nAmbience: ${palette.ambience.map((a) => `"${a}"`).join("; ") || "none"}\nMusic: ${palette.music.map((m) => `"${m}"`).join("; ") || "none"}`
+    : "";
   const res = await ctx.claude({
     context: await seriesContext(ep.series_id),
-    prompt: `Plan the audio for episode ${ep.number}, “${ep.title}”.\n1. Narrator direction (pace, warmth, how delivery should soften through the episode).\n2. For each scene: who speaks each numbered quote (character name, or "narrator" for quoted text that isn't speech), two to four natural ambience layers with levels relative to the voice (typically −20 to −30 dB), an optional delicate instrumental music cue (or null), and the scene intensity. Everything gets quieter and sparser as the episode progresses.\n\n${scriptText(script, { numbered: true })}\n\nQuotes by scene:\n${quotesPerScene.map((q) => `Scene ${q.index}:\n${q.quotes.join("\n") || "(none)"}`).join("\n")}`,
+    prompt: `Plan the audio for episode ${ep.number}, “${ep.title}”.\n1. Narrator direction (pace, warmth, how delivery should soften through the episode).\n2. For each scene: who speaks each numbered quote (character name, or "narrator" for quoted text that isn't speech), one or two natural ambience layers with levels relative to the voice (typically −20 to −30 dB), and the scene intensity. Reuse the same ambience prompt across scenes in the same place.\n${settings.episode_music ? "3. At most ONE delicate instrumental music cue for the whole episode: give the identical cue to the scenes that should carry it and null elsewhere." : "3. No music: set every music_cue to null."} Everything gets quieter and sparser as the episode progresses.${reuse}\n\n${scriptText(script, { numbered: true })}\n\nQuotes by scene:\n${quotesPerScene.map((q) => `Scene ${q.index}:\n${q.quotes.join("\n") || "(none)"}`).join("\n")}`,
     schema: AudioDirectionSchema,
   });
   await ctx.deliver({ kind: "audio_direction", key: "audio_direction", title: "Audio direction", data: res.data, reasoning: res.data.narrator_direction, model: res.model });
@@ -252,7 +284,7 @@ registerHandler("audio.scene", async (ctx) => {
         const out = await eleven(
           ctx,
           "tts",
-          ttsCost(seg.text.length),
+          ttsCost(seg.text.length, settings.tts_model),
           (k) =>
             synthesizeSpeech(k, {
               text: seg.text,
@@ -281,12 +313,14 @@ registerHandler("audio.scene", async (ctx) => {
     /* ---- Ambience and music (reused unless remixing with a new plan) ---- */
     const layerFiles: { file: string; gainDb: number }[] = [];
     const ambienceKeys: string[] = [];
-    for (const [i, layer] of plan.ambience_layers.slice(0, 4).entries()) {
+    for (const [i, layer] of plan.ambience_layers.slice(0, MAX_AMBIENCE_LAYERS).entries()) {
       let k = !remix ? (prev?.ambience_keys[i] ?? null) : null;
       if (!k) {
-        const audio = await eleven(ctx, "sfx", 30 * ELEVEN_PRICES.sfx_per_second_cents, (key) => soundEffect(key, { prompt: `${layer.prompt}. Seamless loop, gentle, no voices, no sudden sounds.`, model: settings.sfx_model, seconds: 30, loop: true }), { seconds: 30 });
-        k = `audio/${ep.series_id}/${ep.id}/scene-${idx}/ambience-${i}-${Date.now()}.mp3`;
-        await storage.put(k, audio, "audio/mpeg");
+        k = libraryKey(ep.series_id, "sfx", layer.prompt);
+        if (!(await storage.get(k, { start: 0, end: 0 }))) {
+          const audio = await eleven(ctx, "sfx", 30 * ELEVEN_PRICES.sfx_per_second_cents, (key) => soundEffect(key, { prompt: `${layer.prompt}. Seamless loop, gentle, no voices, no sudden sounds.`, model: settings.sfx_model, seconds: 30, loop: true }), { seconds: 30 });
+          await storage.put(k, audio, "audio/mpeg");
+        }
       }
       const f = path.join(dir, `amb_${i}.mp3`);
       fs.writeFileSync(f, (await storage.get(k))!.data);
@@ -295,13 +329,15 @@ registerHandler("audio.scene", async (ctx) => {
     }
     let musicKey: string | null = null;
     let music: { file: string; gainDb: number } | null = null;
-    if (plan.music_cue) {
+    if (plan.music_cue && settings.episode_music) {
       musicKey = !remix ? (prev?.music_key ?? null) : null;
-      const seconds = Math.min(180, Math.max(30, narrSec * 0.6));
+      const seconds = LIBRARY_MUSIC_SECONDS;
       if (!musicKey) {
-        const audio = await eleven(ctx, "music", (seconds / 60) * ELEVEN_PRICES.music_per_minute_cents, (key) => composeMusic(key, { prompt: `${plan.music_cue!.prompt}. Delicate, slow, soothing instrumental for a bedtime story; no percussion hits, no vocals.`, model: settings.music_model, seconds }), { seconds });
-        musicKey = `audio/${ep.series_id}/${ep.id}/scene-${idx}/music-${Date.now()}.mp3`;
-        await storage.put(musicKey, audio, "audio/mpeg");
+        musicKey = libraryKey(ep.series_id, "music", plan.music_cue.prompt);
+        if (!(await storage.get(musicKey, { start: 0, end: 0 }))) {
+          const audio = await eleven(ctx, "music", (seconds / 60) * ELEVEN_PRICES.music_per_minute_cents, (key) => composeMusic(key, { prompt: `${plan.music_cue!.prompt}. Delicate, slow, soothing instrumental for a bedtime story; no percussion hits, no vocals.`, model: settings.music_model, seconds }), { seconds });
+          await storage.put(musicKey, audio, "audio/mpeg");
+        }
       }
       const f = path.join(dir, "music.mp3");
       fs.writeFileSync(f, (await storage.get(musicKey))!.data);

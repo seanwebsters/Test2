@@ -144,7 +144,7 @@ export async function getAgentProfile(agent: AgentKey): Promise<AgentProfile> {
   if (saved) return saved;
   const def = AGENT_BY_KEY[agent];
   const settings = await getStudioSettings();
-  return { id: agent, instructions: def.instructions, model: settings.default_model, effort: def.effort, enabled: true, updated_at: nowIso() };
+  return { id: agent, instructions: def.instructions, model: def.model ?? settings.default_model, effort: def.effort, enabled: true, updated_at: nowIso() };
 }
 
 export async function callClaude<T = string>(call: ClaudeCall<T>): Promise<ClaudeResult<T>> {

@@ -95,8 +95,10 @@ describe("Sleep Stories Studio – end to end", () => {
     expect(loud.true_peak_dbtp).toBeLessThanOrEqual(-1);
     expect((await db.list("scene_renders", { where: { episode_id: ep.id } })).length).toBe(5);
     expect(providers.counts.tts).toBeGreaterThanOrEqual(5);
-    expect(providers.counts.sfx).toBe(5);
-    expect(providers.counts.music).toBe(1);
+    // Budget mode: the same ambience prompt is generated once and reused from the series library; music is off by default.
+    expect(providers.counts.sfx).toBe(1);
+    expect(providers.counts.music).toBe(0);
+    expect((await db.get("workflow_runs", epRun.id))!.cost_cents).toBeLessThanOrEqual(100);
     expect((await db.get("series_bibles", seriesId))!.data.timeline.length).toBe(1);
     const usage = await db.list("usage_records");
     expect(usage.some((u) => u.provider === "anthropic") && usage.some((u) => u.provider === "gemini") && usage.some((u) => u.provider === "elevenlabs")).toBe(true);

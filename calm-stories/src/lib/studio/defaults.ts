@@ -2,20 +2,26 @@ import type { StudioSettings, WritingGuidelines } from "./types";
 
 export const DEFAULT_STUDIO_SETTINGS: Omit<StudioSettings, "updated_at"> = {
   id: "global",
-  default_model: "claude-opus-5-5",
+  // Cost-optimised: agents default to Haiku 5.5; the Lead Writer and Creative Director use Sonnet 5.5.
+  default_model: "claude-haiku-5-5",
   // Nano Banana (Gemini image generation). Change here when Google ships a newer model.
   image_model: "gemini-2.5-flash-image",
   image_size: "",
   fal_image_endpoint: "fal-ai/nano-banana",
-  tts_model: "eleven_multilingual_v2",
+  // ElevenLabs Flash: about half the cost of Multilingual v2.
+  tts_model: "eleven_flash_v2_5",
   sfx_model: "eleven_text_to_sound_v2",
   music_model: "music_v1",
-  max_revision_rounds: 2,
+  max_revision_rounds: 1,
+  max_episode_minutes: 10,
+  cover_concepts: 1,
   max_parallel_steps: 4,
   max_concurrent_runs: 4,
-  default_episode_budget_cents: 1500,
+  default_episode_budget_cents: 100,
   default_series_budget_cents: 500,
   web_research: true,
+  // Music generation is the priciest audio item; off keeps episodes under ~$1.
+  episode_music: false,
   publish_roles: ["admin", "editor"],
   autopilot: true,
   autopilot_pipeline: 10,

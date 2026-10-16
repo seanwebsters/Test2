@@ -302,11 +302,16 @@ export interface StudioSettings {
   sfx_model: string;
   music_model: string;
   max_revision_rounds: number;
+  /** Cap on episode length (minutes) – narration is the main cost. */
+  max_episode_minutes: number;
+  /** Cover concepts per episode (1 = no extra image review). */
+  cover_concepts: number;
   max_parallel_steps: number;
   max_concurrent_runs: number;
   default_episode_budget_cents: number;
   default_series_budget_cents: number;
   web_research: boolean;
+  episode_music: boolean;
   /** Only these roles may press "Publish". Never the agents. */
   publish_roles: ("admin" | "editor")[];
   /** Autopilot: the Program Director invents and develops new series without a brief. */
