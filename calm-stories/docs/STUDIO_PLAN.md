@@ -88,3 +88,13 @@ The studio is built inside this app, so approved episodes publish straight into 
 | `ELEVENLABS_API_KEY` | voices, narration, pronunciation dictionaries, sound effects, music |
 | FFmpeg on the worker | mixing and mastering |
 | `DATA_BACKEND=supabase` (+ keys) and `STORAGE_BACKEND=r2`/`supabase` | production persistence |
+
+## Status
+
+All five phases are implemented:
+
+* **Phases 1–3 (engine, writing, art, audio):** covered by `tests/studio.test.ts`, an end-to-end run from brief to greenlight to episode to QC to human approval to published. It uses provider test doubles and real FFmpeg.
+* **Phase 4:** the `/studio` dashboard.
+* **Phase 5:** concurrent runs (bounded), release schedules commissioning episodes, and the Program Director reading real audience data.
+
+What has **not** been verified here is a live run against Anthropic, Google and ElevenLabs: this environment has no keys or network access to them. Connect the keys, then brief a series. If a provider's API differs from these adapters (for example a renamed model or field), the step will block or fail with that provider's error message, and you can resume once it's fixed.

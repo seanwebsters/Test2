@@ -88,3 +88,57 @@ body {
     display: none;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Studio – AI Team bedrooms. Animations mirror real workflow state.  */
+/* ------------------------------------------------------------------ */
+.agent-room * { transform-box: fill-box; transform-origin: center; }
+.agent-room .br-twinkle { animation: br-twinkle 3.5s ease-in-out infinite; }
+.agent-room .br-glow { animation: br-glow 5s ease-in-out infinite; }
+.activity-sleeping .br-blanket { animation: br-breathe 4.5s ease-in-out infinite; transform-origin: center bottom; }
+.activity-sleeping .br-person { animation: br-breathe-head 4.5s ease-in-out infinite; }
+.agent-room .br-z { animation: br-z 3s ease-in infinite; opacity: 0; }
+.activity-typing .br-hand-l { animation: br-type 0.35s ease-in-out infinite; }
+.activity-typing .br-hand-r { animation: br-type 0.35s ease-in-out infinite 0.17s; }
+.agent-room .br-screen { animation: br-screen 1.2s steps(2) infinite; }
+.agent-room .br-quill { animation: br-quill 0.6s ease-in-out infinite; transform-origin: left bottom; }
+.agent-room .br-page { animation: br-page 3.2s ease-in-out infinite; transform-origin: left center; }
+.agent-room .br-scan { animation: br-scan 2.6s ease-in-out infinite; }
+.agent-room .br-spin { animation: br-spin 1.6s linear infinite; }
+.agent-room .br-clap { animation: br-clap 1.4s ease-in-out infinite; transform-origin: left bottom; }
+.activity-reading .br-person { animation: br-nod 5s ease-in-out infinite; }
+.agent-room .br-eyes-down { transform: translateY(1px); }
+.agent-room .br-eyes-up { transform: translate(1px, -1.5px); }
+.agent-room .br-think { animation: br-float 3s ease-in-out infinite; }
+.agent-room .br-dot { animation: br-dot 1.2s ease-in-out infinite; }
+.agent-room .br-help { animation: br-pulse 1.6s ease-in-out infinite; }
+.agent-room .br-raise { animation: br-wave 1.2s ease-in-out infinite; }
+.agent-room .br-letter { animation: br-letter 2.4s ease-in-out infinite; }
+.agent-room .br-spark { animation: br-spark 1.4s ease-out infinite; }
+.agent-room .br-wave-l { animation: br-wave 0.8s ease-in-out infinite; }
+.agent-room .br-wave-r { animation: br-wave 0.8s ease-in-out infinite 0.4s; }
+
+@keyframes br-twinkle { 0%,100% { opacity: .25 } 50% { opacity: 1 } }
+@keyframes br-glow { 0%,100% { opacity: .85 } 50% { opacity: 1 } }
+@keyframes br-breathe { 0%,100% { transform: scaleY(1) } 50% { transform: scaleY(1.035) } }
+@keyframes br-breathe-head { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-0.8px) } }
+@keyframes br-z { 0% { opacity: 0; transform: translate(0, 4px) } 30% { opacity: .9 } 100% { opacity: 0; transform: translate(6px, -10px) } }
+@keyframes br-type { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-2.2px) } }
+@keyframes br-screen { 0% { opacity: .95 } 100% { opacity: .7 } }
+@keyframes br-quill { 0%,100% { transform: rotate(0) } 50% { transform: rotate(-8deg) translateX(-2px) } }
+@keyframes br-page { 0%,70%,100% { transform: scaleX(1) } 80% { transform: scaleX(-0.2) } 90% { transform: scaleX(1) } }
+@keyframes br-scan { 0%,100% { transform: translateX(0) } 50% { transform: translateX(-12px) } }
+@keyframes br-spin { to { transform: rotate(360deg) } }
+@keyframes br-clap { 0%,60%,100% { transform: rotate(0) } 70% { transform: rotate(-14deg) } 80% { transform: rotate(0) } }
+@keyframes br-nod { 0%,100% { transform: rotate(0) } 50% { transform: rotate(-2.5deg) } }
+@keyframes br-float { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-3px) } }
+@keyframes br-dot { 0%,100% { opacity: .25 } 50% { opacity: 1 } }
+@keyframes br-pulse { 0%,100% { opacity: 1; transform: scale(1) } 50% { opacity: .75; transform: scale(1.06) } }
+@keyframes br-wave { 0%,100% { transform: translateY(0) rotate(0) } 50% { transform: translateY(-4px) rotate(10deg) } }
+@keyframes br-letter { 0% { opacity: 0; transform: translate(0, 0) scale(.6) } 15% { opacity: 1; transform: translate(0, -2px) scale(1) } 85% { opacity: 1; transform: translate(110px, -30px) rotate(12deg) } 100% { opacity: 0; transform: translate(130px, -34px) rotate(16deg) } }
+@keyframes br-spark { 0% { opacity: 0; transform: scale(.3) } 30% { opacity: 1; transform: scale(1.2) } 100% { opacity: 0; transform: scale(.6) translateY(-8px) } }
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-room *, .agent-room { animation: none !important; }
+  .agent-room .br-z { opacity: .8; }
+}

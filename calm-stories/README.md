@@ -1,8 +1,15 @@
-# Calm Stories
+# Calm Stories + Sleep Stories Studio
 
-A working prototype of **Calm Stories**: a Pocket FM-style streaming home for serialized Sleep Stories. Listeners browse series, play episodes, save them to their library and pick up where they left off. Behind it, a crew of **production agents** makes the episodes: Claude plans and writes each one, **ElevenLabs** narrates it and creates the ambience, **Nano Banana** (Gemini) paints the artwork, and the finished episode lands in an editorial review queue. Calm staff approve and schedule releases.
+Two products on one platform:
 
-Listening is included with Calm Premium. There are no coins, micro-transactions or per-episode purchases.
+* **Sleep Stories Studio** (`/studio`) – an AI production company. A team of specialised agents develops original episodic sleep fiction from your brief and produces finished episodes:
+  * a series bible;
+  * multi-stage scripts;
+  * cinematic artwork with Nano Banana;
+  * narrated, scored and mastered audio with ElevenLabs and FFmpeg.
+
+  Humans keep creative control: you greenlight every series and approve every episode before it publishes.
+* **Calm Stories** (`/`) – the listener app where approved episodes are released: a Pocket FM-style streaming home with series pages, a persistent player, sleep timer, library and follows.
 
 ## Quick start
 
@@ -12,85 +19,79 @@ npm install
 npm run dev            # http://localhost:3000
 ```
 
-No accounts, keys or services are required: the app seeds a local database (`.data/db.json`) with 22 series and 119 episodes on first run. Without API keys each agent uses a clearly labelled offline stand-in, so the whole pipeline runs end to end. Add keys to `.env.local` to use the real providers:
+Sign in as **Calm Editorial** (administrator) and open **/studio**.
+
+Then connect the providers as server environment variables, e.g. in `.env.local`:
 
 ```bash
-ANTHROPIC_API_KEY=…    # Showrunner, Writer, Sleep Editor (Claude)
-ELEVENLABS_API_KEY=…   # Narrator (text-to-speech) + Sound Designer (sound effects)
-GEMINI_API_KEY=…       # Art Director (Nano Banana image generation)
+ANTHROPIC_API_KEY=…    # all writing, editorial, critique and image-review agents
+GEMINI_API_KEY=…       # Nano Banana artwork
+ELEVENLABS_API_KEY=…   # voices, narration, pronunciation, sound effects, music
+# FFmpeg must be installed (or FFMPEG_PATH set) for mixing and mastering
 ```
 
+There are no simulated stand-ins. If a key is missing, the agent that needs it stops, shows a raised hand in the AI Team room, and names the key it needs. Press **Resume** once it's connected.
+
 ```bash
-npm test               # automated tests (access rules, agent pipeline, upload → review → release)
+npm test               # unit + end-to-end tests (provider test doubles, real FFmpeg)
 npm run typecheck
 npm run build
 npm run db:reset       # wipe local data and re-seed on next start
 ```
 
-## Demo accounts
+## How a series gets made
 
-Open **Sign in** and choose a persona (the identity provider is a replaceable demo adapter):
+1. **Brief** (`/studio/series/new`): describe the series you want.
+2. **Development:**
+   * the Program Director researches the genre with web search and checks real catalogue performance;
+   * the Creative Director writes three original concepts;
+   * the Story Critic critiques them and recommends one;
+   * the team builds the identity and style rules, world, characters and relationships, and season plan;
+   * the Continuity Editor checks the bible and sends inconsistencies back for revision;
+   * the Art Director creates the visual identity, character portraits and three poster concepts (using the portraits as references). Claude reviews them and picks the strongest, and the title is set as clean vector type.
+3. **Greenlight** (`/studio/approvals`): you approve or pass.
+4. **Casting:** the Audio Director auditions voices from your ElevenLabs library and builds a pronunciation dictionary. Episode one is commissioned.
+5. **Each episode:**
+   * outline, then a scene plan whose intensity falls toward sleep;
+   * a scene-by-scene first draft;
+   * **six parallel editorial reviews** (character, romance, dialogue, continuity, sleep, independent critic), with quoted evidence and fixes;
+   * the Creative Director's synthesis, then targeted rewrites, looping up to the revision limit;
+   * a final script, with new canon written into the bible;
+   * cover concepts and review, plus an audio plan (who speaks each line, ambience layers, music cues) in parallel;
+   * multi-voice narration per scene, ambience and music, and an FFmpeg scene stem;
+   * a crossfaded master at −24 LUFS / −2 dBTP;
+   * a Quality Controller review that can send scenes back for re-voicing or remixing;
+   * **your approval**, then release at the scheduled time.
+6. **Schedules:** set episodes per week and release days on a greenlit series. The studio commissions each slot at least 36 hours ahead.
 
-| Persona | Access | Use it for |
-| --- | --- | --- |
-| Maya Chen | Premium listener | Browse, play, save, follow, resume |
-| Sam Free | Free account | Previews and the Premium prompt |
-| Calm Editorial | Administrator | The admin area: agents, review, calendar, moderation |
+## The studio dashboard
 
-## What's in it
+| Section | What it's for |
+| --- | --- |
+| Studio Overview | Active series, episodes in production, spend, approvals, provider status, live activity |
+| AI Team | Every agent as a tiny person in their own bedroom. Animations come from real workflow state; click an agent for their task, reasoning, outputs, feedback, history and next handoff |
+| Series | Studio originals with full bibles: identity, world, characters with portraits and voices, relationships, season plan, canon, bible history, release schedule, series guidelines |
+| Writers' Room | Outlines, scene plans with the intensity curve, every script version with word-level diffs, every critique and revision brief, human editing |
+| Art Studio | Posters, portraits, covers, environments and social/promo assets, with Art Director reviews; approve, reject or swap |
+| Audio Studio | Casting with audition playback, the pronunciation dictionary, scene stems with QA, re-voice or remix a single scene |
+| Production Pipeline | Each workflow's stages, step graph, handoffs, logs, costs and controls (pause, resume, cancel, retry) |
+| Approvals | Series greenlights, episodes to publish, artwork sign-off, blocked workflows |
+| Analytics | Real listening behaviour (sample data excluded), spend by provider and agent, editorial rounds |
+| Settings | Provider connections, models, budgets, revision limits, publishing permissions, every agent's instructions, house writing guidelines and benchmarks |
 
-**Listening app**
+## Demo accounts (listener app)
 
-* Home with Continue Listening, trending, new episodes, genres and recommendations.
-* Series pages with seasons, episode lists, follow and save.
-* A persistent player that keeps playing during navigation, with speed, sleep timer (gentle 30 s fade), and a limited autoplay.
-* My Library: saved series, collections, followed creators, listening history and new-episode updates.
-* Free preview episodes; everything else needs Calm Premium (mock entitlement).
+| Persona | Access |
+| --- | --- |
+| Maya Chen | Premium listener |
+| Sam Free | Free account (previews only) |
+| Calm Editorial | Administrator: studio, approvals, publishing |
 
-**Production agents**
-
-| Agent | Provider | Job |
-| --- | --- | --- |
-| Showrunner | Claude | Reads the story so far and the series direction, plans the next episode |
-| Writer | Claude | Writes the full Sleep Story script |
-| Sleep Editor | Rules + Claude | Checks length, unsettling words and pacing; softens anything jarring |
-| Narrator | ElevenLabs text-to-speech | Voices the script section by section (per-series voice) |
-| Sound Designer | ElevenLabs sound effects | Creates a seamless looping ambience bed |
-| Mixer | In-house + FFmpeg | Ducks ambience under the voice, fades, masters to −24 LUFS, runs audio QA |
-| Art Director | Nano Banana (Gemini) | Paints the episode artwork, and a series cover if there isn't one |
-| Publisher | Calm Stories | Files the episode in the review queue with automated checks |
-
-Each series can have a schedule (episodes per week, release days and hour, length, voice, art style, showrunner notes, budget). When it's on, the agents make each episode about a day before its release slot. Editors can also press *Produce next episode* at any time.
-
-**Admin (`/admin`, Calm staff only)**
-
-* **Overview:** catalogue stats, each series' agent schedule, and links to its production settings.
-* **Agents:** provider status, the crew, and every production run with live steps, logs, costs and pause / resume / cancel / retry.
-* **Series production:** the schedule and creative direction for one series.
-* **Add episode:** upload finished audio instead (MP3, WAV, M4A or AAC).
-* **Settings:** model ids (Claude, ElevenLabs, Nano Banana), default voice, budgets and concurrency.
-* **Review queue:** listen to the episode, read the script, see the artwork and automatic checks, then approve with a release time, request changes or reject.
-* **Calendar:** scheduled releases, with drag-and-drop rescheduling.
-* **Moderation:** listener reports, with dismiss or take-down.
-
-Agents never publish: an episode becomes public only after an editor approves it **and** its release time has passed. A 60 s in-process heartbeat (and Vercel Cron on `/api/cron/tick`) schedules production, runs queued jobs and releases due episodes; followers get a new-episode update.
-
-## What is real and what is sample data
-
-| Area | Default | In production |
-| --- | --- | --- |
-| Writing | Template stand-in, labelled "simulated" in the run log and review queue. | Claude (`claude-opus-5-5` by default), structured outputs for plans. |
-| Narration & ambience | Placeholder hum that follows the rhythm of the text, plus the series' in-house synthesised soundscape. Labelled "placeholder voice". | ElevenLabs text-to-speech and sound effects. |
-| Artwork | Procedural key art (one palette and scene per series). | Nano Banana episode art and series covers. |
-| Seeded catalogue audio | Every seeded episode plays a 3-minute **ambience sample** of its soundscape, labelled "Sample audio". | Agent-produced or uploaded episodes. |
-| Produced / uploaded audio | Real: stored in `.data/` and streamed with HTTP Range support. | Cloudflare R2 or Supabase Storage. |
-| Admin listening stats | Computed from real listening events, combined with seeded rows marked `is_sample` and labelled "Sample". | PostHog receives product events as well. |
-| Subscriptions | Mock entitlements per user. There is no billing. | Calm entitlement API adapter (`CALM_ENTITLEMENTS_URL`). |
-| Auth | Signed demo-session cookie with a persona switcher. | Supabase Auth adapter, or Calm identity. |
-| Database / storage | Local JSON store and filesystem. | Supabase Postgres (schema + RLS in `supabase/`), R2 or Supabase Storage. |
+The listener catalogue ships with 22 seeded series that play ambience samples labelled "Sample audio". Studio-made episodes play their real mastered audio.
 
 ## Documentation
 
-* [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): system design, the agent pipeline and job runner, access rules and the publishing flow.
-* [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md): connecting Claude, ElevenLabs, Nano Banana, Supabase, R2, PostHog, Calm identity and entitlements.
-* [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md): Vercel, environments, cron and production checklist.
+* [`docs/STUDIO_PLAN.md`](docs/STUDIO_PLAN.md): the implementation plan and phases.
+* [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): agents, workflow engine, data model, art and audio pipelines, access rules.
+* [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md): Claude, Nano Banana, ElevenLabs, FFmpeg, Supabase, R2, PostHog, Calm identity.
+* [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md): where to run workers, environments, cron, production checklist.

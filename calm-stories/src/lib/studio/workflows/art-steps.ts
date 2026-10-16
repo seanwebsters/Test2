@@ -225,3 +225,48 @@ registerHandler("art.cover_review", async (ctx) => {
   await db.update("episodes", ep.id, { artwork_url: chosen.variants["1600w"] ?? chosen.url, updated_at: nowIso() });
   return { summary: `Selected cover ${Math.max(1, review.selected_index)}${review.selected_index < 1 ? " (best available – flagged for your review)" : ""}.` };
 });
+
+/* ---------------- Environments and promotional assets ---------------- */
+
+registerHandler("art.environments", async (ctx) => {
+  const sid = ctx.run.series_id!;
+  const bible = await getBible(sid);
+  const locations = (bible.world?.recurring_locations ?? []).slice(0, 3);
+  if (!locations.length) throw new StepFailure("The bible has no recurring locations yet.");
+  for (const loc of locations) {
+    await ctx.ensureBudget(5);
+    const { cost_cents } = await generateArtwork({
+      meta: ctx.meta,
+      seriesId: sid,
+      kind: "environment",
+      aspectRatio: "16:9",
+      prompt: `Environment concept art for “${bible.identity?.title}”: ${loc.name}. ${loc.description} Sensory details: ${loc.sensory_details.join(", ")}. Wide establishing shot, no people. ${visualBrief(bible)} ${NO_TEXT}`,
+    });
+    await ctx.addCost(cost_cents);
+  }
+  return { summary: `${locations.length} environment paintings: ${locations.map((l) => l.name).join(", ")}.` };
+});
+
+registerHandler("art.social", async (ctx) => {
+  const db = getDb();
+  const sid = ctx.run.series_id!;
+  const bible = await getBible(sid);
+  const poster = (await db.list("artwork_assets", { where: { series_id: sid, kind: "poster" } })).find((a) => a.status === "selected" || a.status === "approved");
+  const refs = [...(poster ? [{ ...(await artworkForReview(poster, 768))!, label: "Series key art – match this look" }] : []), ...(await leadReferences(sid, 1))];
+  const made: string[] = [];
+  for (const [ratio, label] of [["1:1", "square social post"], ["9:16", "vertical story / reel cover"]] as const) {
+    await ctx.ensureBudget(5);
+    const { asset, cost_cents } = await generateArtwork({
+      meta: ctx.meta,
+      seriesId: sid,
+      kind: ratio === "1:1" ? "social" : "promo",
+      aspectRatio: ratio,
+      references: refs,
+      prompt: `Promotional ${label} for the audio series “${bible.identity?.title}”, consistent with the reference key art and characters. Leave clean space in the top third for the title. ${visualBrief(bible)} ${NO_TEXT}`,
+    });
+    await ctx.addCost(cost_cents);
+    await applyTitle(asset, { title: bible.identity?.title ?? "", footer: bible.identity?.tagline });
+    made.push(label);
+  }
+  return { summary: `Promo assets: ${made.join(", ")} (with typeset title).` };
+});

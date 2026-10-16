@@ -291,3 +291,16 @@ export const QcReportSchema = z.object({
   ),
 });
 export type QcReport = z.infer<typeof QcReportSchema>;
+
+export const ProposalsSchema = z.object({
+  summary: z.string().describe("What the audience data says, in two or three sentences"),
+  proposals: z.array(
+    z.object({
+      title: z.string().describe("Working title"),
+      brief: z.string().describe("A ready-to-use brief for the creative team"),
+      rationale: z.string(),
+      audience_evidence: z.string().describe("The specific catalogue numbers that support it, or 'no real data yet'"),
+    }),
+  ),
+});
+export type Proposals = z.infer<typeof ProposalsSchema>;

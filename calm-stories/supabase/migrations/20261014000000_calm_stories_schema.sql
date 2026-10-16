@@ -138,7 +138,7 @@ create table public.episodes (
 );
 create index on public.episodes (series_id, season_id, number);
 create index on public.episodes (status, release_at);
-alter table public.audio_assets add constraint audio_assets_episode_fk foreign key (episode_id) references public.episodes(id) on delete cascade;
+alter table public.audio_assets add constraint audio_assets_episode_fk foreign key (episode_id) references public.episodes(id) on delete cascade deferrable initially deferred;
 create index on public.audio_assets (episode_id, kind);
 
 -- ---------------------------------------------------------------------------
@@ -268,58 +268,31 @@ create table public.user_settings (
 );
 
 -- ---------------------------------------------------------------------------
--- Agent production
+-- Sleep Stories Studio (AI production company)
 -- ---------------------------------------------------------------------------
-create table public.production_workflows (
+create table public.production_workflows (       -- release schedules for greenlit series
   id text primary key,
   series_id text not null unique references public.series(id) on delete cascade,
   status text not null check (status in ('active', 'paused')),
   episodes_per_week int not null check (episodes_per_week between 1 and 7),
   release_days int[] not null,
   release_hour_utc int not null check (release_hour_utc between 0 and 23),
-  target_minutes int not null check (target_minutes between 1 and 60),
-  voice_id text,
-  art_style text not null default '',
-  story_notes text not null default '',
-  budget_cents int not null default 500,
+  target_minutes int not null,
+  budget_cents int not null default 1500,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
-create table public.production_jobs (
-  id text primary key,
-  series_id text not null references public.series(id) on delete cascade,
-  episode_id text references public.episodes(id) on delete set null,
-  workflow_id text references public.production_workflows(id) on delete set null,
-  status text not null check (status in ('queued', 'running', 'paused', 'succeeded', 'failed', 'cancelled')),
-  current_step text,
-  steps jsonb not null default '[]',
-  logs jsonb not null default '[]',
-  payload jsonb not null default '{}',
-  attempts int not null default 0,
-  max_attempts int not null default 3,
-  idempotency_key text unique,
-  cost_cents numeric not null default 0,
-  budget_cents numeric,
-  error text,
-  requested_by text references public.users(id),
-  created_at timestamptz not null default now(),
-  started_at timestamptz,
-  finished_at timestamptz,
-  updated_at timestamptz not null default now()
-);
-create index on public.production_jobs (status, created_at);
-create index on public.production_jobs (series_id, created_at desc);
 
 create table public.episode_scripts (
   id text primary key,
   episode_id text not null unique references public.episodes(id) on delete cascade,
   series_id text not null references public.series(id) on delete cascade,
   content text not null,
+  scenes jsonb not null default '[]',
   word_count int not null default 0,
+  version int not null default 1,
   provider text not null,
   model text not null,
-  simulated boolean not null default false,
   notes text[] not null default '{}',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -329,28 +302,285 @@ create table public.artwork_assets (
   id text primary key,
   series_id text not null references public.series(id) on delete cascade,
   episode_id text references public.episodes(id) on delete cascade,
-  kind text not null check (kind in ('cover', 'episode')),
+  character_id text,
+  run_id text,
+  kind text not null check (kind in ('poster', 'episode_cover', 'character_portrait', 'environment', 'promo', 'social')),
+  status text not null check (status in ('concept', 'selected', 'approved', 'rejected')),
   storage_key text not null,
   url text not null,
   mime_type text not null,
+  width int,
+  height int,
+  variants jsonb not null default '{}',
   provider text not null,
   model text not null,
   prompt text not null default '',
+  review jsonb,
   created_at timestamptz not null default now()
 );
-create index on public.artwork_assets (series_id);
+create index on public.artwork_assets (series_id, kind);
 
-create table public.agent_settings (
-  id text primary key check (id = 'global'),
-  writer_model text not null,
-  tts_model text not null,
-  default_voice_id text not null,
-  sfx_model text not null,
-  image_model text not null,
-  per_job_budget_cents int not null,
-  max_concurrent_jobs int not null,
+create table public.series_projects (
+  id text primary key,
+  brief text not null,
+  status text not null check (status in ('developing', 'awaiting_greenlight', 'greenlit', 'rejected', 'failed')),
+  series_id text references public.series(id) on delete set null,
+  run_id text,
+  created_by text not null references public.users(id),
+  decision_by text references public.users(id),
+  decision_notes text not null default '',
+  decided_at timestamptz,
+  created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create table public.series_bibles (
+  id text primary key references public.series(id) on delete cascade,
+  series_id text not null unique references public.series(id) on delete cascade,
+  version int not null,
+  data jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+create table public.bible_versions (
+  id text primary key,
+  series_id text not null references public.series(id) on delete cascade,
+  version int not null,
+  data jsonb not null,
+  reason text not null,
+  agent text not null,
+  run_id text,
+  created_at timestamptz not null default now(),
+  unique (series_id, version)
+);
+
+create table public.characters (
+  id text primary key,
+  series_id text not null references public.series(id) on delete cascade,
+  name text not null,
+  role text not null check (role in ('lead', 'love_interest', 'supporting', 'narrator')),
+  age text not null default '',
+  pronouns text not null default '',
+  appearance text not null default '',
+  visual_description text not null default '',
+  personality text not null default '',
+  desires text not null default '',
+  fears text not null default '',
+  flaws text not null default '',
+  history text not null default '',
+  motivations text not null default '',
+  speech_style text not null default '',
+  arc text not null default '',
+  voice_id text,
+  voice_name text,
+  portrait_asset_id text references public.artwork_assets(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index on public.characters (series_id);
+
+create table public.relationships (
+  id text primary key,
+  series_id text not null references public.series(id) on delete cascade,
+  a_name text not null,
+  b_name text not null,
+  kind text not null,
+  dynamic text not null default '',
+  chemistry text not null default '',
+  obstacles text[] not null default '{}',
+  milestones jsonb not null default '[]',
+  pacing text not null default '',
+  current_state text not null default '',
+  updated_at timestamptz not null default now()
+);
+
+create table public.season_plans (
+  id text primary key,
+  series_id text not null references public.series(id) on delete cascade,
+  season_number int not null,
+  title text not null,
+  arc text not null default '',
+  episodes jsonb not null default '[]',
+  updated_at timestamptz not null default now(),
+  unique (series_id, season_number)
+);
+
+create table public.workflow_runs (
+  id text primary key,
+  kind text not null check (kind in ('series_development', 'episode_production')),
+  status text not null check (status in ('running', 'paused', 'blocked', 'awaiting_approval', 'succeeded', 'failed', 'cancelled')),
+  series_id text references public.series(id) on delete set null,
+  project_id text references public.series_projects(id) on delete set null,
+  episode_id text references public.episodes(id) on delete set null,
+  title text not null,
+  params jsonb not null default '{}',
+  cost_cents numeric not null default 0,
+  budget_cents numeric not null,
+  idempotency_key text unique,
+  created_by text references public.users(id),
+  error text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  finished_at timestamptz
+);
+create index on public.workflow_runs (status, created_at);
+
+create table public.workflow_steps (
+  id text primary key,
+  run_id text not null references public.workflow_runs(id) on delete cascade,
+  key text not null,
+  type text not null,
+  agent text not null,
+  label text not null,
+  activity text not null check (activity in ('thinking', 'typing', 'reading')),
+  deps text[] not null default '{}',
+  params jsonb not null default '{}',
+  status text not null check (status in ('pending', 'running', 'waiting', 'succeeded', 'failed', 'skipped', 'blocked', 'awaiting_approval', 'cancelled')),
+  attempts int not null default 0,
+  not_before timestamptz,
+  started_at timestamptz,
+  finished_at timestamptz,
+  summary text,
+  error text,
+  needs text,
+  deliverable_ids text[] not null default '{}',
+  cost_cents numeric not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (run_id, key)
+);
+create index on public.workflow_steps (status);
+create index on public.workflow_steps (agent, updated_at desc);
+
+create table public.workflow_events (
+  id text primary key,
+  run_id text not null references public.workflow_runs(id) on delete cascade,
+  step_key text,
+  agent text,
+  to_agent text,
+  kind text not null check (kind in ('log', 'handoff', 'approval', 'completed', 'blocked')),
+  level text not null check (level in ('info', 'warn', 'error')),
+  message text not null,
+  created_at timestamptz not null default now()
+);
+create index on public.workflow_events (created_at desc);
+create index on public.workflow_events (run_id, created_at);
+
+create table public.deliverables (
+  id text primary key,
+  run_id text references public.workflow_runs(id) on delete set null,
+  step_id text,
+  series_id text references public.series(id) on delete cascade,
+  episode_id text references public.episodes(id) on delete cascade,
+  agent text not null,
+  kind text not null,
+  key text not null,
+  version int not null,
+  title text not null,
+  data jsonb,
+  reasoning text not null default '',
+  model text not null,
+  status text not null check (status in ('current', 'superseded', 'approved', 'rejected')),
+  edited_by text references public.users(id),
+  created_at timestamptz not null default now()
+);
+create index on public.deliverables (episode_id, key, version);
+create index on public.deliverables (series_id, key, version);
+create index on public.deliverables (agent, created_at desc);
+
+create table public.usage_records (
+  id text primary key,
+  run_id text,
+  step_id text,
+  series_id text,
+  agent text not null,
+  provider text not null check (provider in ('anthropic', 'gemini', 'elevenlabs')),
+  operation text not null,
+  model text not null,
+  input_tokens int not null default 0,
+  output_tokens int not null default 0,
+  cache_read_tokens int not null default 0,
+  cache_write_tokens int not null default 0,
+  characters int not null default 0,
+  seconds numeric not null default 0,
+  images int not null default 0,
+  cost_cents numeric not null default 0,
+  created_at timestamptz not null default now()
+);
+create index on public.usage_records (created_at);
+
+create table public.agent_profiles (
+  id text primary key,
+  instructions text not null,
+  model text not null,
+  effort text not null check (effort in ('low', 'medium', 'high', 'xhigh')),
+  enabled boolean not null default true,
+  updated_at timestamptz not null default now()
+);
+
+create table public.writing_guidelines (
+  id text primary key,                       -- 'global' or a series id
+  content text not null,
+  benchmarks jsonb not null default '[]',
+  updated_at timestamptz not null default now()
+);
+
+create table public.studio_settings (
+  id text primary key check (id = 'global'),
+  default_model text not null,
+  image_model text not null,
+  image_size text not null default '',
+  tts_model text not null,
+  sfx_model text not null,
+  music_model text not null,
+  max_revision_rounds int not null,
+  max_parallel_steps int not null,
+  max_concurrent_runs int not null,
+  default_episode_budget_cents int not null,
+  default_series_budget_cents int not null,
+  web_research boolean not null default true,
+  publish_roles text[] not null default '{admin,editor}',
+  updated_at timestamptz not null default now()
+);
+
+create table public.voice_auditions (
+  id text primary key,
+  series_id text not null references public.series(id) on delete cascade,
+  character_id text references public.characters(id) on delete cascade,
+  voice_id text not null,
+  voice_name text not null,
+  rationale text not null default '',
+  sample_key text,
+  selected boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create table public.pronunciations (
+  id text primary key,
+  series_id text not null references public.series(id) on delete cascade,
+  term text not null,
+  alias text not null,
+  notes text not null default '',
+  created_at timestamptz not null default now()
+);
+
+create table public.scene_renders (
+  id text primary key,
+  episode_id text not null references public.episodes(id) on delete cascade,
+  series_id text not null references public.series(id) on delete cascade,
+  scene_index int not null,
+  version int not null,
+  status text not null check (status in ('current', 'superseded')),
+  narration_key text,
+  ambience_keys text[] not null default '{}',
+  music_key text,
+  stem_key text,
+  duration_seconds int not null default 0,
+  plan jsonb,
+  qa jsonb,
+  created_at timestamptz not null default now()
+);
+create index on public.scene_renders (episode_id, scene_index);
 
 -- ---------------------------------------------------------------------------
 -- Helper functions for RLS
@@ -389,7 +619,9 @@ begin
     'users','user_roles','subscription_entitlements','creator_profiles','soundscapes','series','seasons',
     'audio_assets','episodes','publishing_schedules','editorial_reviews','content_reports','user_libraries',
     'series_follows','creator_follows','listening_progress','listening_events','notifications','user_settings',
-    'production_workflows','production_jobs','episode_scripts','artwork_assets','agent_settings'
+    'production_workflows','episode_scripts','artwork_assets','series_projects','series_bibles','bible_versions',
+    'characters','relationships','season_plans','workflow_runs','workflow_steps','workflow_events','deliverables',
+    'usage_records','agent_profiles','writing_guidelines','studio_settings','voice_auditions','pronunciations','scene_renders'
   ] loop
     execute format('alter table public.%I enable row level security', t);
   end loop;
@@ -421,12 +653,19 @@ create policy reviews_decide on public.editorial_reviews for update using (publi
 create policy reports_insert on public.content_reports for insert with check (reporter_id is null or reporter_id = public.app_user_id());
 create policy reports_read on public.content_reports for select using (public.is_editor());
 
--- Agent production: Calm staff only (agents run server-side with the service role)
-create policy workflows_staff on public.production_workflows for all using (public.is_editor()) with check (public.is_editor());
-create policy jobs_staff on public.production_jobs for select using (public.is_editor());
-create policy scripts_staff on public.episode_scripts for select using (public.is_editor());
-create policy artwork_read on public.artwork_assets for select using (public.series_is_public(series_id) or public.is_editor());
-create policy agent_settings_admin on public.agent_settings for all using (public.has_role('admin')) with check (public.has_role('admin'));
+-- Studio: Calm staff only (agents run server-side with the service role). Selected artwork of public series is public.
+do $$
+declare t text;
+begin
+  foreach t in array array['production_workflows','episode_scripts','series_projects','series_bibles','bible_versions','characters',
+    'relationships','season_plans','workflow_runs','workflow_steps','workflow_events','deliverables','usage_records',
+    'writing_guidelines','voice_auditions','pronunciations','scene_renders'] loop
+    execute format('create policy %I on public.%I for select using (public.is_editor())', t || '_staff', t);
+  end loop;
+end $$;
+create policy artwork_read on public.artwork_assets for select using ((status in ('selected', 'approved') and public.series_is_public(series_id)) or public.is_editor());
+create policy agent_profiles_admin on public.agent_profiles for all using (public.has_role('admin')) with check (public.has_role('admin'));
+create policy studio_settings_admin on public.studio_settings for all using (public.has_role('admin')) with check (public.has_role('admin'));
 
 -- Listener-owned data
 create policy library_own on public.user_libraries for all using (user_id = public.app_user_id()) with check (user_id = public.app_user_id());

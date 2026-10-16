@@ -11,6 +11,7 @@ import {
   ConceptCritiqueSchema,
   ConceptsSchema,
   GenreResearchSchema,
+  ProposalsSchema,
   RelationshipsSchema,
   SeasonPlanSchema,
   SeriesIdentitySchema,
@@ -436,4 +437,20 @@ registerHandler("series.kickoff", async (ctx) => {
   const { startEpisodeProduction } = await import("./episode");
   const { run } = await startEpisodeProduction({ seriesId: ctx.run.series_id!, episodeNumber: 1, userId: ctx.run.created_by });
   return { summary: `Episode one is in production (${run.id}).` };
+});
+
+/* ------------------------------------------------------------------ */
+/* Program Director proposals (audience-informed planning)             */
+/* ------------------------------------------------------------------ */
+
+registerHandler("program.proposals", async (ctx) => {
+  const db = getDb();
+  const projects = await db.list("series_projects");
+  const res = await ctx.claude({
+    context: await catalogueSummary(),
+    prompt: `Propose three new series for the network. Base them on the real audience data above (which series hold listeners, which complete, what is missing) and on gaps in the catalogue. Prioritise premium adult romantasy unless the data argues otherwise. Each proposal needs a brief the creative team can start from.\n\nAlready in development or made by the studio:\n${projects.map((p) => `- ${p.brief.slice(0, 160)}`).join("\n") || "- none"}`,
+    schema: ProposalsSchema,
+  });
+  await ctx.deliver({ kind: "proposals", key: "program_proposals", title: "Program Director proposals", data: res.data, reasoning: res.data.summary, model: res.model });
+  return { summary: res.data.proposals.map((p) => p.title).join(" · ") };
 });

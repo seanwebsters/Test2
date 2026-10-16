@@ -2,85 +2,135 @@
 
 ```
 src/
-  app/                    Next.js App Router pages and API routes
+  app/
+    studio/               Sleep Stories Studio dashboard (staff only)
     (listener)            /, /discover, /series/[slug], /listen/[id], /library, /profile, /settings
-    admin/                Calm Stories Admin (overview, agents, series production, upload, review, calendar, moderation, settings)
-    api/                  JSON routes – all wrapped by lib/api.route() for consistent errors
-  components/             Reusable UI (player, catalog cards, admin widgets)
+    admin/                Publishing operations: review queue, calendar, moderation, uploads
+    api/studio/           Studio actions (briefs, gates, runs, deliverables, art, casting, settings)
+    api/cron/tick         Heartbeat for serverless deployments
+  components/studio/      AgentBedroom (illustrated agents), TeamRoom, PipelineStrip, drawers, viewers
   lib/
-    types.ts              Domain model (snake_case = Postgres columns)
-    db/                   Database interface + LocalDatabase (JSON) + SupabaseDatabase
-    auth/                 policy.ts (pure rules), providers.ts (identity & entitlements), session.ts
-    agents/               production pipeline (8 agents), job runner, scheduler, offline stand-ins
-    ai/                   Claude adapter (official SDK) behind a small provider interface
-    providers/            ElevenLabs (speech + sound effects), Nano Banana (Gemini images)
-    services/             catalog, library, recommendations, editorial, review checks, releases
-    analytics/            event tracking (local + PostHog)
-    audio/                WAV/DSP, ambience synth, mixer, audio QA, FFmpeg
-    storage/              local / R2 / Supabase Storage + range-request serving
-    seed/                 prototype catalogue (data only – UI never imports it)
+    studio/
+      agents.ts           The 16-role team: instructions, effort, bedroom illustration parameters
+      schemas.ts          zod schemas for every typed handoff (JSON Schema for structured outputs)
+      llm.ts              Claude adapter: cached bible context, structured outputs, web search, vision, usage
+      engine.ts           Durable DAG workflow engine
+      bible.ts            Versioned series bible + context renderer + versioned deliverables
+      art.ts              Nano Banana generation, renditions (sharp), vector typography (opentype.js)
+      mixing.ts           FFmpeg scene mixes, masters, loudness measurement
+      team.ts             Live agent state for the AI Team room (derived, never random)
+      workflows/          series.ts · episode.ts · art-steps.ts · audio-steps.ts
+      scheduler.ts        Release schedules → commissioned episodes
+    providers/            elevenlabs.ts, nano-banana.ts (HTTP adapters)
+    db/                   Database interface: LocalDatabase (JSON) and SupabaseDatabase
 supabase/                 migration (schema, indexes, RLS) and generated seed.sql
-tests/                    Vitest suites
+tests/                    Vitest: policy, editorial flow, studio end-to-end
 ```
 
 ## Principles
 
-* **Database-driven.** Pages read only from the data layer. The seed is loaded into the database, never imported by components.
-* **Adapters at every boundary.** Database, identity, entitlements, storage, analytics and every AI provider sit behind an interface with a working local implementation.
-* **Honest simulation.** When a provider key is missing, its agent's output is flagged `simulated` all the way to the run log and the review queue.
-* **Policy in one place.** `lib/auth/policy.ts` holds pure functions (visibility, streaming) used by pages and API routes. Postgres RLS mirrors the same rules.
+* **No fake output.** Production code has no simulators. A missing credential raises `BlockedError(needs)`. The step parks as `blocked`, the agent raises its hand in the AI Team room, and the run resumes when you press Resume. Tests replace provider HTTP with schema-valid test doubles.
+* **Typed handoffs.** Every structured agent output is validated against a zod schema. The same definition generates the JSON Schema sent as `output_config.format`. Output that doesn't match fails the step, and it retries.
+* **Versioned memory.**
+  * Every deliverable (concepts, outlines, drafts, reviews, briefs, QC reports…) is stored with a version, agent, model and reasoning summary.
+  * The series bible is versioned on every change.
+  * Human edits become new versions credited to the Network Executive.
+* **Humans hold the gates.** Series greenlight and episode publish are approval steps. Agents cannot pass them, and the publish API checks the role permissions set in Settings.
 
-## Entitlements and roles
+## The team
 
-Subscription (`plan`) and staff role (`editor`, `admin`) are independent:
+| Agent | Main work |
+| --- | --- |
+| Network Executive (you) | Briefs, greenlights, approvals |
+| Program Director | Genre research (web search), catalogue/audience analysis, commissioning |
+| Creative Director | Concepts, identity and style rules, editorial synthesis, revision briefs |
+| Romance Architect | Relationship design; romance review |
+| Worldbuilder | World, cultures, magic, recurring locations |
+| Character Psychologist | Cast design; character review |
+| Series Architect | Season plans; episode outlines |
+| Lead Writer | Scene plans, scene-by-scene drafts, targeted rewrites |
+| Dialogue Editor | Dialogue review with replacement lines |
+| Sleep Editor | Sleep-shape review |
+| Continuity Editor | Bible consistency checks, script continuity review, canon updates |
+| Story Critic | Independent concept and script critique |
+| Art Director | Visual identity, portraits, posters, covers, environments, promo; image review (vision) |
+| Audio Director | Casting, pronunciation dictionary, per-scene audio plans |
+| Audio Producer | Narration, ambience, music, stems, master |
+| Quality Controller | Final production review with actionable revisions |
 
-| | Browse | Full listening | Library / follows | Admin |
-| --- | --- | --- | --- | --- |
-| Visitor / Free | ✓ | preview episodes | – | – |
-| Premium | ✓ | ✓ | ✓ | – |
-| Editor / admin | ✓ (incl. unreleased) | ✓ | with Premium | ✓ |
+Instructions, model and effort per agent are editable in Settings (`agent_profiles`). The house writing guidelines and benchmarks, plus optional per-series guidelines, are included in every writing agent's context.
 
-An episode is public only when its series is published **and** it is `published`, or `approved` with `release_at <= now`. Audio is served only through `/api/episodes/[id]/audio`, which checks entitlement on every request; staff preview uploads through `/api/admin/audio/[assetId]`.
+## Context and caching
 
-## Agent production
+`bible.ts → seriesContext()` renders the series bible into one stable document:
 
-`lib/agents/pipeline.ts` defines one job per episode, run by `lib/agents/runner.ts`:
+* identity and style rules, world, characters, relationships and season plan;
+* timeline, canon facts, open and resolved threads, and episodes so far;
+* the house guidelines.
 
-| # | Step | Agent | Provider | Output |
-| --- | --- | --- | --- | --- |
-| 1 | Plan the next episode | Showrunner | Claude, structured output | title, summary, beats, ambience prompt, art prompt; creates the draft episode |
-| 2 | Write the script | Writer | Claude (streamed) | ~120 words per target minute, `---` section breaks, `[pause]` marks → `episode_scripts` |
-| 3 | Sleep-suitability edit | Sleep Editor | rules + Claude | length / unsettling words / exclamations; softened by Claude or flagged for the editor |
-| 4 | Narrate | Narrator | ElevenLabs TTS (`pcm_22050`) | one stored WAV per section, with previous/next text for continuity |
-| 5 | Design the ambience | Sound Designer | ElevenLabs sound effects (looping) | 30 s seamless bed (falls back to the series soundscape synth) |
-| 6 | Mix, master and QA | Mixer | in-house mixer + FFmpeg | ducked mix, fades, −24 LUFS MP3, QA report → `audio_assets` (kind `produced`) |
-| 7 | Create artwork | Art Director | Nano Banana (Gemini `generateContent`, IMAGE modality) | 16:9 episode art and, if missing, a 3:4 series cover → `artwork_assets`, served by `/api/art/[id]` |
-| 8 | Send to editorial review | Publisher | — | episode `in_review` + `editorial_reviews` (source `agents`) with script, audio QA and artwork checks; editors notified |
+It is sent as a second system block with `cache_control: ephemeral`, so the many agent calls in a workflow reuse the cached prefix. Cache reads and writes are recorded in `usage_records`.
 
-Context for the writing agents is the series description, the series' showrunner notes and the last eight episode titles and summaries, so each episode continues the story.
+## Workflow engine
 
-The runner persists step state, logs and scratch state after every step. Paid outputs (each narrated section, the ambience, each image) are stored and recorded in the job state, so a retry or restart never pays for them twice. It also provides retries with backoff, a per-episode **budget** checked before every paid call, **idempotency keys** (`prod:{series}:{slot}` for scheduled runs), a concurrency limit (and one job per series), pause / resume / cancel / retry, and recovery of jobs orphaned by a restart.
+Runs (`workflow_runs`), steps (`workflow_steps`, one row each) and events (`workflow_events`) are persisted. Each tick:
 
-`lib/agents/scheduler.ts` turns each active `production_workflows` row (episodes per week, release days, UTC hour) into release slots at least 12 hours ahead and enqueues a job per slot with the slot as its requested release time.
+* starts every pending step whose dependencies have succeeded (parallel, bounded per run and globally);
+* recovers steps orphaned by a restart.
 
-## Publishing flow
+| Outcome | Step state |
+| --- | --- |
+| success | `succeeded`. Next agents get a **handoff** event, and the step may **add steps** (revision rounds, per-scene audio, gates) |
+| transient failure | `waiting` with exponential backoff, max 3 attempts |
+| provider 429 | `waiting` until `retry-after`; the attempt is not counted |
+| missing key / budget | `blocked` with `needs` (e.g. `ELEVENLABS_API_KEY`, `budget`) |
+| approval gate | `awaiting_approval`. A gate hook runs on your decision (greenlight → casting + episode one; changes requested → a revision chain) |
+| hard failure | `failed`. Retry from the Pipeline page |
+
+Runs also support pause, resume (optionally with a higher budget), cancel and idempotency keys (scheduled slots). The engine runs from the in-process heartbeat (30 s) and from `/api/cron/tick`. Each step is a pure function of persisted inputs, so the engine can be moved onto Trigger.dev or another durable runner by calling `tick()` from a scheduled task.
+
+## Writing pipeline (per episode)
 
 ```
-Agents (or an upload) → status in_review + editorial_review (automatic checks)
-  → approve (release time) → status approved + publishing_schedule
-  → releaseDueEpisodes() at release time → status published, followers notified
+outline ─▶ scene plan (rule-checked sleep shape) ─▶ draft (one call per scene, with prior scenes)
+   ─▶ reviews ×6 in parallel ─▶ Creative Director synthesis
+         ├─ revise → targeted scene rewrites ─▶ re-review (critic + reviewers who asked) ─▶ synthesis (≤ N rounds)
+         └─ approve → finalize (canon → bible) ─▶ covers ∥ audio direction ─▶ scenes ∥ ─▶ master ─▶ QC ─▶ approval
 ```
 
-* `services/editorial.ts` — `addUploadedEpisode` validates the file type and magic bytes (≤ 200 MB), stores it, creates the season if needed and numbers the episode; `decideReview`, `reschedule` and `resolveReport` back the admin pages.
-* `services/review-checks.ts` — audio present and at least 2 minutes, title/summary present and no duplicate episode number, release time sensible, series state.
-* `services/releases.ts` — publishes due approved episodes, marks schedules released, publishes the series on its first release and sends follower updates (respecting each listener's setting).
+Scene plans are rejected when intensity rises after the midpoint, when the last scene isn't the calmest, or when word targets miss the episode length. Reviews carry `issues[]` with severity, scene, quoted evidence, problem and suggestion; there are no scores.
 
-The heartbeat (`src/instrumentation-node.ts`, every 60 s), Vercel Cron (`/api/cron/tick`) and the admin's *Run scheduler now* button each schedule production, start queued jobs and release due episodes.
+## Art pipeline
 
-## Player
+* **Nano Banana:** `generateContent` with `responseModalities: ["IMAGE"]` and `imageConfig.aspectRatio` (optional `imageSize`). Character portraits are sent as **reference images** for posters, covers and promo assets.
+* **Storage and renditions:** originals are stored, and `sharp` produces 1600/800/400 px WebP renditions.
+* **Typography:** generated images never contain text. Titles are rendered as vector paths from Cormorant Garamond (opentype.js) over a gradient and composited, giving the `titled` rendition.
+* **Review:** Claude vision reviews each set of concepts and selects the strongest; reviews are stored on each asset.
 
-One `<audio>` element lives in the root layout (`PlayerProvider`), so playback continues across client-side navigation. Progress is saved to the server for signed-in listeners (and locally for visitors). The sleep timer fades out over 30 s and can stop at the end of an episode; autoplay stops after a configurable number of episodes.
+## Audio pipeline
 
-## Wellbeing
+* **Casting:** voices come from `GET /v1/voices`, the voices your account holds rights to. Claude proposes candidates per role, audition samples are rendered, and you can recast in the Audio Studio.
+* **Pronunciation:** Claude lists invented names, and an ElevenLabs dictionary is created from alias rules. It is applied to every narration request.
+* **Performance:** quotes are split deterministically; the Audio Director attributes each numbered quote to a speaker, and narration and dialogue get their cast voices. Consecutive segments use `previous_text` / `next_text` and `previous_request_ids` for natural joins.
+* **Sound:** each scene has two to four ElevenLabs looping sound-effect layers and an optional ElevenLabs music cue.
+* **Scene stems (FFmpeg):** narration is delayed for an ambience lead-in. Beds loop with fades and sit lower in calmer scenes, and side-chain compression ducks them under the voice.
+* **Master:** 2.5 s crossfades between scenes, `loudnorm I=-24:TP=-2`, `alimiter`, a 12 s fade-out, MP3 128k. Integrated loudness and true peak are measured and stored.
+* **Revisions:** QC can request re-voicing or remixing of specific scenes, or new covers. The Audio Studio can re-voice or remix one scene and re-master without touching the rest.
 
-There are no streaks or engagement nudges. Follower updates are opt-out, and the app makes no clinical claims.
+## Live agent states
+
+`team.ts` maps persisted state to poses:
+
+| Persisted state | Pose |
+| --- | --- |
+| running step (by its `activity`) | thinking, typing or reading |
+| `blocked` or `awaiting_approval` | asking for help |
+| handoff event < 12 s ago | handing off |
+| completion < 25 s ago | celebrating |
+| `waiting` | thinking |
+| otherwise | sleeping |
+
+The AI Team room polls every 3 s, and animations respect `prefers-reduced-motion`.
+
+## Access
+
+Staff pages and APIs require the editor or admin role; agent instructions and studio settings need admin. Unreleased content, studio data and concept art are staff-only, both in the app and under Postgres RLS. Selected artwork of published series is public.

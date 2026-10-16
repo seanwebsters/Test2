@@ -11,6 +11,7 @@ import { SiteFooter } from "@/components/layout/SiteFooter";
 import { PlayerProvider } from "@/components/player/PlayerProvider";
 import { PlayerBar } from "@/components/player/PlayerBar";
 import { getDb } from "@/lib/db";
+import { ListenerChrome } from "@/components/layout/ListenerChrome";
 
 export const metadata: Metadata = {
   title: { default: "Calm Stories — Immersive Sleep Stories", template: "%s · Calm Stories" },
@@ -39,12 +40,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             default_speed: settings?.default_speed ?? 1,
           }}
         >
-          <SiteHeader viewer={info} unread={unread} />
+          <ListenerChrome>
+            <SiteHeader viewer={info} unread={unread} />
+          </ListenerChrome>
           <main id="main" className="min-h-screen">
             {children}
           </main>
-          <SiteFooter />
-          <PlayerBar />
+          <ListenerChrome>
+            <SiteFooter />
+            <PlayerBar />
+          </ListenerChrome>
         </PlayerProvider>
       </body>
     </html>
