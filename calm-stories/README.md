@@ -27,7 +27,6 @@ Then connect the providers as server environment variables, e.g. in `.env.local`
 ANTHROPIC_API_KEY=…    # all writing, editorial, critique and image-review agents
 GEMINI_API_KEY=…       # Nano Banana artwork
 ELEVENLABS_API_KEY=…   # voices, narration, pronunciation, sound effects, music
-# FFmpeg must be installed (or FFMPEG_PATH set) for mixing and mastering
 ```
 
 There are no simulated stand-ins. If a key is missing, the agent that needs it stops, shows a raised hand in the AI Team room, and names the key it needs. Press **Resume** once it's connected.

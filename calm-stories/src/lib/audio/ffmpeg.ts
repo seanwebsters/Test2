@@ -1,4 +1,15 @@
 import { spawn, spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
+
+/** The FFmpeg binary bundled with the app (ffmpeg-static), so nothing needs installing. */
+function bundledFfmpeg(): string | null {
+  try {
+    const p = createRequire(import.meta.url)("ffmpeg-static") as string | null;
+    return p || null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Optional FFmpeg integration for transcoding and EBU R128 loudness
@@ -7,7 +18,7 @@ import { spawn, spawnSync } from "node:child_process";
  * loudness-normalised and encoded to MP3 for efficient streaming.
  */
 export function findFfmpeg(explicit?: string): string | null {
-  const candidates = [explicit, process.env.FFMPEG_PATH, "ffmpeg"].filter(Boolean) as string[];
+  const candidates = [explicit, process.env.FFMPEG_PATH, bundledFfmpeg(), "ffmpeg"].filter(Boolean) as string[];
   for (const c of candidates) {
     try {
       const r = spawnSync(c, ["-version"], { stdio: "ignore", timeout: 5000 });

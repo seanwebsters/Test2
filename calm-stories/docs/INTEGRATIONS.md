@@ -54,14 +54,14 @@ Models are set in Settings (`eleven_multilingual_v2`, `eleven_text_to_sound_v2`,
 
 ## FFmpeg – mixing and mastering
 
-Install FFmpeg on the machine that runs workflows, or set `FFMPEG_PATH`. It is used for:
+FFmpeg is bundled with the app (`ffmpeg-static`), so nothing needs installing – including on Vercel. Set `FFMPEG_PATH` only to use a different build. It is used for:
 
 * segment joins;
 * scene mixes (looping beds, fades, side-chain ducking);
 * crossfaded masters with `loudnorm` and `alimiter`;
 * loudness measurement.
 
-Without it, audio steps block with `needs = FFMPEG`.
+
 
 ## Supabase (database, auth, storage)
 

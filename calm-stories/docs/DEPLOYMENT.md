@@ -14,10 +14,10 @@
 
 ## Where the studio runs
 
-Studio workflows are long: a series takes roughly 10–20 minutes, and an episode 15–40 minutes, mostly waiting on the providers. They also need FFmpeg. Recommended setups:
+Studio workflows are long: a series takes roughly 10–20 minutes, and an episode 15–40 minutes, mostly waiting on the providers. FFmpeg is bundled. Recommended setups:
 
 * **Single server / VM / container (simplest):**
-  * Run `npm run build && npm start` with FFmpeg installed.
+  * Run `npm run build && npm start`.
   * The in-process heartbeat (every 30 s) advances workflows continuously.
   * Point `DATA_BACKEND` at Supabase and storage at R2.
 * **Vercel for the web plus a worker:**
@@ -35,7 +35,6 @@ Steps are idempotent and their state lives in the database, so several workers c
 - [ ] Licensed voices added to your ElevenLabs library before casting (the Audio Director only casts from your account's voices).
 - [ ] Budgets, revision limits and publishing roles set in *Studio → Settings*.
 - [ ] House writing guidelines and benchmarks reviewed in *Studio → Settings*.
-- [ ] FFmpeg installed on whatever runs workflows.
 - [ ] Raise the platform request-body limit if you upload large episode files (or switch the upload form to direct-to-storage uploads).
 - [ ] Rate limiting moved to a shared store (Redis or Upstash) if running multiple instances. The built-in limiter is per instance.
 - [ ] Replace the prototype content and rights policy (`/policies`) with Calm's legal text.

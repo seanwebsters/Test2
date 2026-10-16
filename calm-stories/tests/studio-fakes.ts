@@ -8,6 +8,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import sharp from "sharp";
+import ffmpegStatic from "ffmpeg-static";
+
+const ffmpegBin = (ffmpegStatic as unknown as string) || "ffmpeg";
 import type { TransportRequest, TransportResponse } from "@/lib/studio/llm";
 
 type Json = Record<string, unknown>;
@@ -126,7 +129,7 @@ export function fakeClaude(script: FakeScript) {
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "studio-fakes-"));
 function tone(seconds: number, freq: number, file: string): Buffer {
   const out = path.join(tmp, file);
-  if (!fs.existsSync(out)) execFileSync("ffmpeg", ["-loglevel", "error", "-y", "-f", "lavfi", "-i", `sine=frequency=${freq}:duration=${seconds}`, "-ar", "44100", "-ac", "1", "-b:a", "64k", out]);
+  if (!fs.existsSync(out)) execFileSync(ffmpegBin, ["-loglevel", "error", "-y", "-f", "lavfi", "-i", `sine=frequency=${freq}:duration=${seconds}`, "-ar", "44100", "-ac", "1", "-b:a", "64k", out]);
   return fs.readFileSync(out);
 }
 
