@@ -1,63 +1,104 @@
 import "server-only";
-import { decodePcm16 } from "@/lib/audio/wav";
 
 /**
- * ElevenLabs adapters: narration (text-to-speech) and ambience (text-to-sound
- * effects). Both request raw 22.05 kHz PCM so the in-house mixer can work on
- * it without FFmpeg.
+ * ElevenLabs API adapter: voice library, text-to-speech with request
+ * stitching and pronunciation dictionaries, sound effects and music.
  */
-const BASE = "https://api.elevenlabs.io/v1";
-export const ELEVEN_SAMPLE_RATE = 22050;
+const BASE = "https://api.elevenlabs.io";
 
-async function call(apiKey: string, path: string, body: unknown): Promise<Float32Array> {
+export class ElevenLabsError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly retryAfterMs: number | null = null,
+  ) {
+    super(message);
+  }
+}
+
+async function request(apiKey: string, path: string, init: { method?: string; body?: unknown; accept?: string } = {}) {
   const res = await fetch(`${BASE}${path}`, {
-    method: "POST",
-    headers: { "xi-api-key": apiKey, "content-type": "application/json" },
-    body: JSON.stringify(body),
+    method: init.method ?? (init.body ? "POST" : "GET"),
+    headers: { "xi-api-key": apiKey, ...(init.body ? { "content-type": "application/json" } : {}), ...(init.accept ? { accept: init.accept } : {}) },
+    body: init.body ? JSON.stringify(init.body) : undefined,
   });
-  if (!res.ok) throw new Error(`ElevenLabs error ${res.status}: ${(await res.text()).slice(0, 300)}`);
-  return decodePcm16(Buffer.from(await res.arrayBuffer()));
+  if (!res.ok) {
+    const retry = Number(res.headers.get("retry-after"));
+    throw new ElevenLabsError(`ElevenLabs ${res.status}: ${(await res.text()).slice(0, 300)}`, res.status, Number.isFinite(retry) && retry > 0 ? retry * 1000 : null);
+  }
+  return res;
 }
 
-/** Prepare narration markup for ElevenLabs (pauses become SSML-style breaks). */
-export function toSpeechText(text: string): string {
-  return text
-    .replace(/\*([^*]+)\*/g, "$1")
-    .replace(/^---$/gm, "")
-    .replace(/\[pause\]/g, '<break time="1.5s" />')
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+export interface ElevenVoice {
+  voice_id: string;
+  name: string;
+  category: string;
+  description: string | null;
+  labels: Record<string, string>;
+  preview_url: string | null;
 }
 
-export async function elevenLabsSpeech(
-  apiKey: string,
-  input: { text: string; voiceId: string; model: string; previousText?: string; nextText?: string },
-): Promise<{ samples: Float32Array; characters: number; cost_cents: number }> {
-  const text = toSpeechText(input.text);
-  const samples = await call(apiKey, `/text-to-speech/${encodeURIComponent(input.voiceId)}?output_format=pcm_22050`, {
-    text,
-    model_id: input.model,
-    // Slow, steady, intimate delivery for bedtime listening.
-    voice_settings: { stability: 0.7, similarity_boost: 0.75, style: 0.15, use_speaker_boost: true, speed: 0.9 },
-    previous_text: input.previousText,
-    next_text: input.nextText,
-  });
-  // Approximate list pricing for cost tracking (≈ $0.18 per 1k characters).
-  return { samples, characters: text.length, cost_cents: Math.round((text.length / 1000) * 18 * 100) / 100 };
+/** Voices available to this account (premade, library voices you added, your own clones/professional voices). */
+export async function listVoices(apiKey: string): Promise<ElevenVoice[]> {
+  const res = await request(apiKey, "/v1/voices");
+  const json = (await res.json()) as { voices: ElevenVoice[] };
+  return json.voices.map((v) => ({ voice_id: v.voice_id, name: v.name, category: v.category, description: v.description ?? null, labels: v.labels ?? {}, preview_url: v.preview_url ?? null }));
 }
 
-export async function elevenLabsSoundEffect(
-  apiKey: string,
-  input: { prompt: string; model: string; seconds?: number },
-): Promise<{ samples: Float32Array; cost_cents: number }> {
-  const seconds = Math.min(30, Math.max(5, input.seconds ?? 30));
-  const samples = await call(apiKey, `/sound-generation?output_format=pcm_22050`, {
-    text: input.prompt,
-    model_id: input.model,
-    duration_seconds: seconds,
-    loop: true,
-    prompt_influence: 0.4,
-  });
-  // Sound effects are billed per second of audio (≈ 40 credits/s); tracked as an estimate.
-  return { samples, cost_cents: Math.round(seconds * 0.4 * 100) / 100 };
+export interface SpeechInput {
+  text: string;
+  voiceId: string;
+  model: string;
+  previousText?: string;
+  nextText?: string;
+  previousRequestIds?: string[];
+  dictionary?: { id: string; versionId: string } | null;
+  settings?: { stability?: number; similarity_boost?: number; style?: number; speed?: number };
 }
+
+/** Text-to-speech as 44.1 kHz MP3. Returns the request id for stitching consecutive segments. */
+export async function synthesizeSpeech(apiKey: string, input: SpeechInput): Promise<{ audio: Buffer; requestId: string | null; characters: number }> {
+  const res = await request(apiKey, `/v1/text-to-speech/${encodeURIComponent(input.voiceId)}?output_format=mp3_44100_128`, {
+    accept: "audio/mpeg",
+    body: {
+      text: input.text,
+      model_id: input.model,
+      voice_settings: { stability: 0.62, similarity_boost: 0.78, style: 0.18, use_speaker_boost: true, speed: 0.92, ...input.settings },
+      previous_text: input.previousText || undefined,
+      next_text: input.nextText || undefined,
+      previous_request_ids: input.previousRequestIds?.length ? input.previousRequestIds.slice(-3) : undefined,
+      pronunciation_dictionary_locators: input.dictionary ? [{ pronunciation_dictionary_id: input.dictionary.id, version_id: input.dictionary.versionId }] : undefined,
+    },
+  });
+  return { audio: Buffer.from(await res.arrayBuffer()), requestId: res.headers.get("request-id"), characters: input.text.length };
+}
+
+/** Create a pronunciation dictionary from alias rules. */
+export async function createPronunciationDictionary(apiKey: string, name: string, rules: { term: string; alias: string }[]): Promise<{ id: string; versionId: string }> {
+  const res = await request(apiKey, "/v1/pronunciation-dictionaries/add-from-rules", {
+    body: { name, rules: rules.map((r) => ({ type: "alias", string_to_replace: r.term, alias: r.alias })) },
+  });
+  const json = (await res.json()) as { id: string; version_id: string };
+  return { id: json.id, versionId: json.version_id };
+}
+
+/** A sound effect / ambience bed (MP3), seamlessly loopable when `loop` is set. */
+export async function soundEffect(apiKey: string, input: { prompt: string; model: string; seconds: number; loop: boolean }): Promise<Buffer> {
+  const res = await request(apiKey, "/v1/sound-generation?output_format=mp3_44100_128", {
+    accept: "audio/mpeg",
+    body: { text: input.prompt, model_id: input.model, duration_seconds: Math.min(30, Math.max(1, input.seconds)), loop: input.loop, prompt_influence: 0.45 },
+  });
+  return Buffer.from(await res.arrayBuffer());
+}
+
+/** A music cue (MP3) from a text prompt. */
+export async function composeMusic(apiKey: string, input: { prompt: string; model: string; seconds: number }): Promise<Buffer> {
+  const res = await request(apiKey, "/v1/music?output_format=mp3_44100_128", {
+    accept: "audio/mpeg",
+    body: { prompt: input.prompt, model_id: input.model, music_length_ms: Math.round(Math.min(300, Math.max(10, input.seconds)) * 1000), force_instrumental: true },
+  });
+  return Buffer.from(await res.arrayBuffer());
+}
+
+/** Approximate list prices, for cost tracking only. */
+export const ELEVEN_PRICES = { tts_per_1k_chars_cents: 18, sfx_per_second_cents: 0.4, music_per_minute_cents: 50 };

@@ -13,7 +13,7 @@ const ORDER: TableName[] = [
   "users", "user_roles", "subscription_entitlements", "creator_profiles", "soundscapes", "series", "seasons",
   "audio_assets", "episodes", "publishing_schedules", "editorial_reviews", "content_reports", "user_libraries",
   "series_follows", "creator_follows", "listening_progress", "listening_events", "notifications", "user_settings",
-  "production_workflows", "agent_settings", "production_jobs", "episode_scripts", "artwork_assets",
+  "production_workflows", "episode_scripts", "artwork_assets",
 ];
 
 const snap = buildSeedSnapshot(new Date());

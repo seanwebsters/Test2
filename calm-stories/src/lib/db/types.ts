@@ -1,4 +1,5 @@
 import type * as T from "@/lib/types";
+import type * as S from "@/lib/studio/types";
 
 /** Every persisted table and the record type stored in it. */
 export interface Tables {
@@ -22,10 +23,25 @@ export interface Tables {
   notifications: T.Notification;
   user_settings: T.UserSettings;
   production_workflows: T.ProductionWorkflow;
-  production_jobs: T.ProductionJob;
   episode_scripts: T.EpisodeScript;
   artwork_assets: T.ArtworkAsset;
-  agent_settings: T.AgentSettings;
+  series_projects: S.SeriesProject;
+  series_bibles: S.BibleRecord;
+  bible_versions: S.BibleVersion;
+  characters: S.StudioCharacter;
+  relationships: S.StudioRelationship;
+  season_plans: S.SeasonPlan;
+  workflow_runs: S.WorkflowRun;
+  workflow_steps: S.WorkflowStep;
+  workflow_events: S.WorkflowEvent;
+  deliverables: S.Deliverable;
+  usage_records: S.UsageRecord;
+  agent_profiles: S.AgentProfile;
+  writing_guidelines: S.WritingGuidelines;
+  studio_settings: S.StudioSettings;
+  voice_auditions: S.VoiceAudition;
+  pronunciations: S.PronunciationEntry;
+  scene_renders: S.SceneRender;
 }
 
 export type TableName = keyof Tables;
@@ -51,10 +67,25 @@ export const TABLE_NAMES: TableName[] = [
   "notifications",
   "user_settings",
   "production_workflows",
-  "production_jobs",
   "episode_scripts",
   "artwork_assets",
-  "agent_settings",
+  "series_projects",
+  "series_bibles",
+  "bible_versions",
+  "characters",
+  "relationships",
+  "season_plans",
+  "workflow_runs",
+  "workflow_steps",
+  "workflow_events",
+  "deliverables",
+  "usage_records",
+  "agent_profiles",
+  "writing_guidelines",
+  "studio_settings",
+  "voice_auditions",
+  "pronunciations",
+  "scene_renders",
 ];
 
 /**

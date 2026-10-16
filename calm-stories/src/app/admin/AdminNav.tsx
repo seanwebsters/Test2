@@ -5,13 +5,11 @@ import { usePathname } from "next/navigation";
 import { cx } from "@/lib/util";
 
 const ITEMS = [
-  { href: "/admin", label: "Overview" },
-  { href: "/admin/agents", label: "Agents" },
+  { href: "/studio", label: "← Studio" },
   { href: "/admin/episodes/new", label: "Add episode" },
   { href: "/admin/review", label: "Review queue" },
   { href: "/admin/calendar", label: "Calendar" },
   { href: "/admin/moderation", label: "Moderation" },
-  { href: "/admin/settings", label: "Settings" },
 ];
 
 export function AdminNav() {

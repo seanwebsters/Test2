@@ -330,19 +330,6 @@ export interface UserSettings {
 /* Agent production                                                    */
 /* ------------------------------------------------------------------ */
 
-export type AgentKind = "showrunner" | "writer" | "sleep_editor" | "narrator" | "sound_designer" | "mixer" | "art_director" | "publisher";
-
-export const AGENTS: { kind: AgentKind; name: string; role: string; provider: string }[] = [
-  { kind: "showrunner", name: "Showrunner", role: "Reads the story so far and plans the next episode.", provider: "Claude" },
-  { kind: "writer", name: "Writer", role: "Writes the full Sleep Story script.", provider: "Claude" },
-  { kind: "sleep_editor", name: "Sleep Editor", role: "Checks length, pacing and calm; softens anything jarring.", provider: "Rules + Claude" },
-  { kind: "narrator", name: "Narrator", role: "Voices the script section by section.", provider: "ElevenLabs" },
-  { kind: "sound_designer", name: "Sound Designer", role: "Creates a looping ambience bed for the episode.", provider: "ElevenLabs Sound Effects" },
-  { kind: "mixer", name: "Mixer", role: "Mixes voice and ambience, masters and runs audio QA.", provider: "In-house + FFmpeg" },
-  { kind: "art_director", name: "Art Director", role: "Paints the episode artwork (and series cover if missing).", provider: "Nano Banana (Gemini)" },
-  { kind: "publisher", name: "Publisher", role: "Files the episode in the review queue with checks.", provider: "Calm Stories" },
-];
-
 export interface ProductionWorkflow {
   id: ID;
   series_id: ID;
@@ -352,60 +339,8 @@ export interface ProductionWorkflow {
   release_days: number[];
   release_hour_utc: number;
   target_minutes: number;
-  /** ElevenLabs voice ID; falls back to the global default. */
-  voice_id: string | null;
-  art_style: string;
-  /** Direction for the showrunner: tone, recurring characters, where the story is heading. */
-  story_notes: string;
   budget_cents: number;
   created_at: ISODate;
-  updated_at: ISODate;
-}
-
-export type StepStatus = "pending" | "running" | "succeeded" | "failed" | "skipped";
-
-export interface JobStepState {
-  id: string;
-  label: string;
-  agent: AgentKind;
-  status: StepStatus;
-  attempts: number;
-  started_at: ISODate | null;
-  finished_at: ISODate | null;
-  output_preview: string | null;
-  error: string | null;
-  cost_cents: number;
-  simulated: boolean;
-}
-
-export interface JobLog {
-  at: ISODate;
-  level: "info" | "warn" | "error";
-  step: string | null;
-  message: string;
-}
-
-export interface ProductionJob {
-  id: ID;
-  series_id: ID;
-  episode_id: ID | null;
-  workflow_id: ID | null;
-  status: "queued" | "running" | "paused" | "succeeded" | "failed" | "cancelled";
-  current_step: string | null;
-  steps: JobStepState[];
-  logs: JobLog[];
-  /** Inputs plus persisted scratch state shared between steps. */
-  payload: Record<string, unknown>;
-  attempts: number;
-  max_attempts: number;
-  idempotency_key: string | null;
-  cost_cents: number;
-  budget_cents: number | null;
-  error: string | null;
-  requested_by: ID | null;
-  created_at: ISODate;
-  started_at: ISODate | null;
-  finished_at: ISODate | null;
   updated_at: ISODate;
 }
 
@@ -413,40 +348,41 @@ export interface EpisodeScript {
   id: ID;
   episode_id: ID;
   series_id: ID;
+  /** Final approved script text (scenes joined with section breaks). */
   content: string;
+  scenes: { index: number; title: string; text: string }[];
   word_count: number;
+  version: number;
   provider: string;
   model: string;
-  simulated: boolean;
   notes: string[];
   created_at: ISODate;
   updated_at: ISODate;
 }
 
+export type ArtworkKind = "poster" | "episode_cover" | "character_portrait" | "environment" | "promo" | "social";
+
 export interface ArtworkAsset {
   id: ID;
   series_id: ID;
   episode_id: ID | null;
-  kind: "cover" | "episode";
+  character_id: ID | null;
+  run_id: ID | null;
+  kind: ArtworkKind;
+  /** concept → selected (by the Art Director's review) → approved/rejected (by a human). */
+  status: "concept" | "selected" | "approved" | "rejected";
   storage_key: string;
   url: string;
   mime_type: string;
+  width: number | null;
+  height: number | null;
+  /** Delivery renditions, e.g. { "1600w": "/api/art/…?v=1600w", "titled": … }. */
+  variants: Record<string, string>;
   provider: string;
   model: string;
   prompt: string;
+  review: { strengths: string[]; issues: { issue: string; suggestion: string }[]; consistency: string } | null;
   created_at: ISODate;
-}
-
-export interface AgentSettings {
-  id: "global";
-  writer_model: string;
-  tts_model: string;
-  default_voice_id: string;
-  sfx_model: string;
-  image_model: string;
-  per_job_budget_cents: number;
-  max_concurrent_jobs: number;
-  updated_at: ISODate;
 }
 
 export interface AudioQaIssue {

@@ -1,21 +1,21 @@
 const g = globalThis as unknown as { __calmHeartbeat?: NodeJS.Timeout };
 
-// Single-server heartbeat: schedule agent production for active workflows,
-// run queued jobs, and release approved episodes when their time arrives.
+// Single-server heartbeat: commission scheduled episodes, advance studio
+// workflows, and release approved episodes when their time arrives.
 if (process.env.DISABLE_HEARTBEAT !== "1" && !g.__calmHeartbeat) {
-  const tick = async () => {
+  const beat = async () => {
     try {
       const { releaseDueEpisodes } = await import("@/lib/services/releases");
-      const { runScheduledProduction, processQueue } = await import("@/lib/agents");
+      const { runScheduledProduction, tick } = await import("@/lib/studio");
       await runScheduledProduction();
-      await processQueue();
+      await tick();
       await releaseDueEpisodes();
     } catch (err) {
       console.error(JSON.stringify({ level: "error", scope: "heartbeat", message: String(err) }));
     }
   };
-  g.__calmHeartbeat = setInterval(tick, 60_000);
-  setTimeout(tick, 5_000);
+  g.__calmHeartbeat = setInterval(beat, 30_000);
+  setTimeout(beat, 5_000);
 }
 
 export {};

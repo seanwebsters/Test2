@@ -140,6 +140,15 @@ export async function decideReview(
     notes: input.notes ?? review.notes,
     decided_at: now,
   });
+  if (review.source === "agents") {
+    // Release the studio's human-approval gate for this episode.
+    const gate = (await db.list("workflow_steps", { where: { type: "ep.approval", status: "awaiting_approval" } })).find((s) => s.params.review_id === review.id);
+    if (gate) {
+      if (input.decision === "reject") await db.update("workflow_steps", gate.id, { params: { ...gate.params, no_revision: true } });
+      const { resolveGate } = await import("@/lib/studio");
+      await resolveGate(gate.run_id, gate.key, { approved: input.decision === "approve", userId: reviewerId, notes: input.decision === "changes_requested" ? (input.notes ?? "") : "" });
+    }
+  }
   return { ok: true };
 }
 

@@ -1,7 +1,6 @@
 import type * as T from "@/lib/types";
 import { emptySnapshot, type Snapshot } from "@/lib/db/local";
 import { hashString, prng } from "@/lib/util";
-import { DEFAULT_AGENT_SETTINGS } from "./defaults";
 import { SEED_ADMINS, SEED_CREATORS, SEED_LISTENERS, SEED_SERIES, SEED_SOUNDSCAPES } from "./content";
 
 const DAY = 86400000;
@@ -278,25 +277,6 @@ export function buildSeedSnapshot(now: Date): Snapshot {
     link: "/",
     read: false,
     created_at: iso(t0 - DAY),
-  });
-
-  /* ---------------- Agent production ---------------- */
-  s.agent_settings.push({ ...DEFAULT_AGENT_SETTINGS, updated_at: created });
-  // One example workflow, paused so nothing is produced until an editor turns it on.
-  s.production_workflows.push({
-    id: "wf_the-moonlit-kingdom",
-    series_id: seriesId("the-moonlit-kingdom"),
-    status: "paused",
-    episodes_per_week: 2,
-    release_days: [2, 5],
-    release_hour_utc: 20,
-    target_minutes: 20,
-    voice_id: null,
-    art_style: "Painterly moonlit fairytale, deep indigo and silver, soft glow, no text",
-    story_notes: "Unhurried, cosy court life in a kingdom where nothing bad ever happens. Keep recurring characters warm and familiar.",
-    budget_cents: 500,
-    created_at: created,
-    updated_at: created,
   });
 
   return s;

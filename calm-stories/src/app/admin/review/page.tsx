@@ -111,7 +111,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
                 <section aria-labelledby="script-h" className="card p-5">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <h3 id="script-h" className="font-medium">Script</h3>
-                    <span className="text-xs text-mist">{script.word_count.toLocaleString()} words · {script.simulated ? "simulated (Claude not connected)" : script.model}</span>
+                    <span className="text-xs text-mist">{script.word_count.toLocaleString()} words · {`v${script.version} · ${script.model}`}</span>
                   </div>
                   {script.notes.length > 0 && (
                     <ul className="mt-2 space-y-0.5 text-xs text-mist">{script.notes.map((n, i) => <li key={i}>• {n}</li>)}</ul>
