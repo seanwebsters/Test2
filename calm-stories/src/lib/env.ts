@@ -3,6 +3,9 @@
  * Server-only secrets are never read from client components.
  */
 import "server-only";
+import { randomBytes } from "node:crypto";
+
+let ephemeralSecret: string | null = null;
 
 function opt(name: string): string | undefined {
   const v = process.env[name];
@@ -15,12 +18,19 @@ export const env = {
     | "production"
     | "test",
   dataBackend: (opt("DATA_BACKEND") ?? "local") as "local" | "supabase",
-  dataDir: opt("DATA_DIR") ?? ".data",
+  // Serverless platforms (Vercel) only allow writes under /tmp.
+  dataDir: opt("DATA_DIR") ?? (process.env.VERCEL ? "/tmp/calm-stories" : ".data"),
   get sessionSecret(): string {
     const v = opt("SESSION_SECRET");
     if (v) return v;
     if (process.env.NODE_ENV === "production" && opt("APP_ENV") !== "development" && process.env.NEXT_PHASE !== "phase-production-build") {
-      throw new Error("SESSION_SECRET must be set in production.");
+      // Never fall back to a guessable secret in production. A random per-process
+      // secret keeps the app working, but sign-ins won't survive restarts.
+      if (!ephemeralSecret) {
+        ephemeralSecret = randomBytes(32).toString("hex");
+        console.warn(JSON.stringify({ level: "warn", scope: "env", message: "SESSION_SECRET is not set – using a temporary random secret. Set SESSION_SECRET so sign-ins persist." }));
+      }
+      return ephemeralSecret;
     }
     return "dev-only-insecure-session-secret-change-me";
   },
