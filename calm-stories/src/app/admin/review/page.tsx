@@ -7,7 +7,15 @@ import { ReviewDecision } from "./ReviewDecision";
 
 export const metadata = { title: "Review queue" };
 
-const CHECK_LABEL: Record<string, string> = { audio: "Audio file", metadata: "Title & description", release: "Release time", series: "Series status" };
+const CHECK_LABEL: Record<string, string> = {
+  audio: "Audio file",
+  metadata: "Title & description",
+  release: "Release time",
+  series: "Series status",
+  script: "Script",
+  audio_qa: "Audio QA",
+  artwork: "Artwork",
+};
 
 export default async function ReviewPage({ searchParams }: { searchParams: Promise<{ id?: string }> }) {
   if (!(await isStaff())) return null;
@@ -26,6 +34,8 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   const s = ep ? series.find((x) => x.id === ep.series_id) : null;
   const audio = ep?.audio_asset_id ? await db.get("audio_assets", ep.audio_asset_id) : null;
   const uploader = selected ? users.find((u) => u.id === selected.submitted_by) : null;
+  const script = ep ? await db.findOne("episode_scripts", { episode_id: ep.id }) : null;
+  const byAgents = selected?.source === "agents";
   const seasonNo = ep ? seasons.find((x) => x.id === ep.season_id)?.number : null;
 
   return (
@@ -70,9 +80,11 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
       {selected && ep && s ? (
         <article className="space-y-6">
           <div className="flex flex-wrap items-center gap-5">
-            <span className="relative h-36 w-28 overflow-hidden rounded-3xl ring-1 ring-white/10"><SceneArt spec={s.artwork} className="h-full w-full" /></span>
+            <span className={cx("relative h-36 overflow-hidden rounded-3xl ring-1 ring-white/10", ep.artwork_url ? "w-64" : "w-28")}>
+              <SceneArt spec={ep.artwork_url ? { ...s.artwork, image_url: ep.artwork_url } : s.artwork} className="h-full w-full" title={`${ep.title} artwork`} />
+            </span>
             <div className="min-w-0 flex-1">
-              <p className="text-xs text-mist">{s.title} · {s.is_official ? "Calm Original" : "Creator Original"} · uploaded by {uploader?.display_name ?? "Calm"}</p>
+              <p className="text-xs text-mist">{s.title} · {s.is_official ? "Calm Original" : "Creator Original"} · {byAgents ? <span className="text-lavender">produced by the agents{uploader ? ` for ${uploader.display_name}` : ""}</span> : <>uploaded by {uploader?.display_name ?? "Calm"}</>}</p>
               <h2 className="headline text-4xl">Season {seasonNo} · Episode {ep.number}: {ep.title}</h2>
               <p className="mt-1 max-w-2xl text-sm text-mist">{ep.summary || "No description."}</p>
               <p className="mt-2 text-xs text-mist">Requested release: {selected.requested_release_at ? formatDateTime(selected.requested_release_at) : "not specified"} · Status: {selected.status.replace("_", " ")}</p>
@@ -85,12 +97,31 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
                 {audio ? (
                   <>
                     <audio controls preload="none" src={`/api/admin/audio/${audio.id}`} className="mt-3 w-full" aria-label="Episode audio" />
-                    <p className="mt-2 text-xs text-mist">{formatDuration(audio.duration_seconds)} · {audio.mime_type}{audio.kind === "sample" ? " · prototype ambience sample" : ""}</p>
+                    <p className="mt-2 text-xs text-mist">
+                      {formatDuration(audio.duration_seconds)} · {audio.mime_type}
+                      {audio.kind === "sample" ? " · prototype ambience sample" : ""}
+                      {audio.kind === "produced" ? (audio.meta.simulated ? " · placeholder voice (ElevenLabs not connected)" : " · narrated by ElevenLabs") : ""}
+                    </p>
                   </>
                 ) : (
                   <p className="mt-2 text-sm text-mist">No audio attached.</p>
                 )}
               </section>
+              {script && (
+                <section aria-labelledby="script-h" className="card p-5">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <h3 id="script-h" className="font-medium">Script</h3>
+                    <span className="text-xs text-mist">{script.word_count.toLocaleString()} words · {script.simulated ? "simulated (Claude not connected)" : script.model}</span>
+                  </div>
+                  {script.notes.length > 0 && (
+                    <ul className="mt-2 space-y-0.5 text-xs text-mist">{script.notes.map((n, i) => <li key={i}>• {n}</li>)}</ul>
+                  )}
+                  <details className="mt-3">
+                    <summary className="cursor-pointer text-xs text-lavender">Read the script</summary>
+                    <div className="mt-3 max-h-[28rem] overflow-auto whitespace-pre-wrap rounded-2xl bg-night/60 p-4 font-serif text-base leading-relaxed text-white/90">{script.content}</div>
+                  </details>
+                </section>
+              )}
               <section aria-labelledby="checks-h" className="card p-5">
                 <h3 id="checks-h" className="font-medium">Automated checks</h3>
                 <p className="text-xs text-mist">These inform the editor – they never approve on their own.</p>

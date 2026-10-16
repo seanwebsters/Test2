@@ -86,6 +86,7 @@ export async function addUploadedEpisode(input: {
     release_at: null,
     published_at: null,
     audio_asset_id: assetId,
+    artwork_url: null,
     is_preview: number === 1 && input.seasonNumber === 1,
     created_at: now,
     updated_at: now,

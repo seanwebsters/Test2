@@ -14,6 +14,7 @@
     "db:seed-sql": "tsx scripts/export-seed-sql.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
     "@fontsource-variable/inter": "^5.2.8",
     "@fontsource/cormorant-garamond": "^5.2.6",
     "@supabase/supabase-js": "2.117.3",

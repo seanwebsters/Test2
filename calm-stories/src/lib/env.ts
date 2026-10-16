@@ -30,6 +30,13 @@ export const env = {
   supabaseAnonKey: opt("SUPABASE_ANON_KEY") ?? opt("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
   supabaseServiceRoleKey: opt("SUPABASE_SERVICE_ROLE_KEY"),
 
+  /** Writing agents (Claude). */
+  anthropicApiKey: opt("ANTHROPIC_API_KEY"),
+  /** Narration + ambience agents. */
+  elevenLabsApiKey: opt("ELEVENLABS_API_KEY"),
+  /** Art agent ("Nano Banana" – Gemini image generation). */
+  geminiApiKey: opt("GEMINI_API_KEY") ?? opt("GOOGLE_API_KEY"),
+
   storageBackend: (opt("STORAGE_BACKEND") ?? "local") as "local" | "r2" | "supabase",
   r2AccountId: opt("R2_ACCOUNT_ID"),
   r2AccessKeyId: opt("R2_ACCESS_KEY_ID"),

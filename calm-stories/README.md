@@ -1,6 +1,6 @@
 # Calm Stories
 
-A working prototype of **Calm Stories**: a Pocket FM-style streaming home for serialized Sleep Stories. Listeners browse series, play episodes, save them to their library and pick up where they left off. A small admin area lets the Calm editorial team add episodes, review them and schedule their release.
+A working prototype of **Calm Stories**: a Pocket FM-style streaming home for serialized Sleep Stories. Listeners browse series, play episodes, save them to their library and pick up where they left off. Behind it, a crew of **production agents** makes the episodes: Claude plans and writes each one, **ElevenLabs** narrates it and creates the ambience, **Nano Banana** (Gemini) paints the artwork, and the finished episode lands in an editorial review queue. Calm staff approve and schedule releases.
 
 Listening is included with Calm Premium. There are no coins, micro-transactions or per-episode purchases.
 
@@ -12,10 +12,16 @@ npm install
 npm run dev            # http://localhost:3000
 ```
 
-No accounts, keys or services are required: the app seeds a local database (`.data/db.json`) with 22 series and 119 episodes on first run.
+No accounts, keys or services are required: the app seeds a local database (`.data/db.json`) with 22 series and 119 episodes on first run. Without API keys each agent uses a clearly labelled offline stand-in, so the whole pipeline runs end to end. Add keys to `.env.local` to use the real providers:
 
 ```bash
-npm test               # automated tests (access rules, upload → review → release)
+ANTHROPIC_API_KEY=…    # Showrunner, Writer, Sleep Editor (Claude)
+ELEVENLABS_API_KEY=…   # Narrator (text-to-speech) + Sound Designer (sound effects)
+GEMINI_API_KEY=…       # Art Director (Nano Banana image generation)
+```
+
+```bash
+npm test               # automated tests (access rules, agent pipeline, upload → review → release)
 npm run typecheck
 npm run build
 npm run db:reset       # wipe local data and re-seed on next start
@@ -29,7 +35,7 @@ Open **Sign in** and choose a persona (the identity provider is a replaceable de
 | --- | --- | --- |
 | Maya Chen | Premium listener | Browse, play, save, follow, resume |
 | Sam Free | Free account | Previews and the Premium prompt |
-| Calm Editorial | Administrator | The admin area: add episodes, review, calendar, moderation |
+| Calm Editorial | Administrator | The admin area: agents, review, calendar, moderation |
 
 ## What's in it
 
@@ -41,23 +47,43 @@ Open **Sign in** and choose a persona (the identity provider is a replaceable de
 * My Library: saved series, collections, followed creators, listening history and new-episode updates.
 * Free preview episodes; everything else needs Calm Premium (mock entitlement).
 
+**Production agents**
+
+| Agent | Provider | Job |
+| --- | --- | --- |
+| Showrunner | Claude | Reads the story so far and the series direction, plans the next episode |
+| Writer | Claude | Writes the full Sleep Story script |
+| Sleep Editor | Rules + Claude | Checks length, unsettling words and pacing; softens anything jarring |
+| Narrator | ElevenLabs text-to-speech | Voices the script section by section (per-series voice) |
+| Sound Designer | ElevenLabs sound effects | Creates a seamless looping ambience bed |
+| Mixer | In-house + FFmpeg | Ducks ambience under the voice, fades, masters to −24 LUFS, runs audio QA |
+| Art Director | Nano Banana (Gemini) | Paints the episode artwork, and a series cover if there isn't one |
+| Publisher | Calm Stories | Files the episode in the review queue with automated checks |
+
+Each series can have a schedule (episodes per week, release days and hour, length, voice, art style, showrunner notes, budget). When it's on, the agents make each episode about a day before its release slot. Editors can also press *Produce next episode* at any time.
+
 **Admin (`/admin`, Calm staff only)**
 
-* **Overview:** catalogue stats, every series with an *Add episode* shortcut, and a manual release check.
-* **Add episode:** upload finished audio (MP3, WAV, M4A or AAC), set title, description, season and the requested release time.
-* **Review queue:** listen to the upload, see automatic checks (audio, metadata, release, series), then approve with a release time, request changes or reject.
+* **Overview:** catalogue stats, each series' agent schedule, and links to its production settings.
+* **Agents:** provider status, the crew, and every production run with live steps, logs, costs and pause / resume / cancel / retry.
+* **Series production:** the schedule and creative direction for one series.
+* **Add episode:** upload finished audio instead (MP3, WAV, M4A or AAC).
+* **Settings:** model ids (Claude, ElevenLabs, Nano Banana), default voice, budgets and concurrency.
+* **Review queue:** listen to the episode, read the script, see the artwork and automatic checks, then approve with a release time, request changes or reject.
 * **Calendar:** scheduled releases, with drag-and-drop rescheduling.
 * **Moderation:** listener reports, with dismiss or take-down.
 
-Nothing is published automatically: an episode becomes public only after it's approved **and** its release time has passed. Releases run on a 60 s in-process heartbeat and on Vercel Cron (`/api/cron/tick`), and followers get a new-episode update.
+Agents never publish: an episode becomes public only after an editor approves it **and** its release time has passed. A 60 s in-process heartbeat (and Vercel Cron on `/api/cron/tick`) schedules production, runs queued jobs and releases due episodes; followers get a new-episode update.
 
 ## What is real and what is sample data
 
 | Area | Default | In production |
 | --- | --- | --- |
-| Seeded catalogue audio | Every seeded episode plays a 3-minute **ambience sample** of its soundscape, labelled "Sample audio". | Uploaded episode audio. |
-| Uploaded audio | Real: stored in `.data/` and streamed with HTTP Range support. | Cloudflare R2 or Supabase Storage. |
-| Cover art | Procedural key art (one palette and scene per series). | Same, or artwork files. |
+| Writing | Template stand-in, labelled "simulated" in the run log and review queue. | Claude (`claude-opus-5-5` by default), structured outputs for plans. |
+| Narration & ambience | Placeholder hum that follows the rhythm of the text, plus the series' in-house synthesised soundscape. Labelled "placeholder voice". | ElevenLabs text-to-speech and sound effects. |
+| Artwork | Procedural key art (one palette and scene per series). | Nano Banana episode art and series covers. |
+| Seeded catalogue audio | Every seeded episode plays a 3-minute **ambience sample** of its soundscape, labelled "Sample audio". | Agent-produced or uploaded episodes. |
+| Produced / uploaded audio | Real: stored in `.data/` and streamed with HTTP Range support. | Cloudflare R2 or Supabase Storage. |
 | Admin listening stats | Computed from real listening events, combined with seeded rows marked `is_sample` and labelled "Sample". | PostHog receives product events as well. |
 | Subscriptions | Mock entitlements per user. There is no billing. | Calm entitlement API adapter (`CALM_ENTITLEMENTS_URL`). |
 | Auth | Signed demo-session cookie with a persona switcher. | Supabase Auth adapter, or Calm identity. |
@@ -65,6 +91,6 @@ Nothing is published automatically: an episode becomes public only after it's ap
 
 ## Documentation
 
-* [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): system design, data model, access rules and the publishing flow.
-* [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md): connecting Supabase, R2, PostHog, Calm identity and entitlements.
+* [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): system design, the agent pipeline and job runner, access rules and the publishing flow.
+* [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md): connecting Claude, ElevenLabs, Nano Banana, Supabase, R2, PostHog, Calm identity and entitlements.
 * [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md): Vercel, environments, cron and production checklist.

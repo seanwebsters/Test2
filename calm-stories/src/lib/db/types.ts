@@ -21,6 +21,11 @@ export interface Tables {
   listening_events: T.ListeningEvent;
   notifications: T.Notification;
   user_settings: T.UserSettings;
+  production_workflows: T.ProductionWorkflow;
+  production_jobs: T.ProductionJob;
+  episode_scripts: T.EpisodeScript;
+  artwork_assets: T.ArtworkAsset;
+  agent_settings: T.AgentSettings;
 }
 
 export type TableName = keyof Tables;
@@ -45,6 +50,11 @@ export const TABLE_NAMES: TableName[] = [
   "listening_events",
   "notifications",
   "user_settings",
+  "production_workflows",
+  "production_jobs",
+  "episode_scripts",
+  "artwork_assets",
+  "agent_settings",
 ];
 
 /**

@@ -109,7 +109,7 @@ create table public.audio_assets (
   owner_id text references public.users(id),
   series_id text references public.series(id) on delete cascade,
   episode_id text,
-  kind text not null check (kind in ('upload', 'sample')),
+  kind text not null check (kind in ('upload', 'sample', 'produced')),
   storage_key text not null,
   url text not null,
   mime_type text not null,
@@ -131,6 +131,7 @@ create table public.episodes (
   release_at timestamptz,
   published_at timestamptz,
   audio_asset_id text references public.audio_assets(id) on delete set null,
+  artwork_url text,
   is_preview boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -160,7 +161,7 @@ create table public.editorial_reviews (
   episode_id text not null references public.episodes(id) on delete cascade,
   series_id text not null references public.series(id) on delete cascade,
   submitted_by text not null references public.users(id),
-  source text not null check (source in ('upload')),
+  source text not null check (source in ('upload', 'agents')),
   status text not null check (status in ('pending', 'approved', 'rejected', 'changes_requested')),
   checks jsonb not null default '[]',
   requested_release_at timestamptz,
@@ -267,6 +268,91 @@ create table public.user_settings (
 );
 
 -- ---------------------------------------------------------------------------
+-- Agent production
+-- ---------------------------------------------------------------------------
+create table public.production_workflows (
+  id text primary key,
+  series_id text not null unique references public.series(id) on delete cascade,
+  status text not null check (status in ('active', 'paused')),
+  episodes_per_week int not null check (episodes_per_week between 1 and 7),
+  release_days int[] not null,
+  release_hour_utc int not null check (release_hour_utc between 0 and 23),
+  target_minutes int not null check (target_minutes between 1 and 60),
+  voice_id text,
+  art_style text not null default '',
+  story_notes text not null default '',
+  budget_cents int not null default 500,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table public.production_jobs (
+  id text primary key,
+  series_id text not null references public.series(id) on delete cascade,
+  episode_id text references public.episodes(id) on delete set null,
+  workflow_id text references public.production_workflows(id) on delete set null,
+  status text not null check (status in ('queued', 'running', 'paused', 'succeeded', 'failed', 'cancelled')),
+  current_step text,
+  steps jsonb not null default '[]',
+  logs jsonb not null default '[]',
+  payload jsonb not null default '{}',
+  attempts int not null default 0,
+  max_attempts int not null default 3,
+  idempotency_key text unique,
+  cost_cents numeric not null default 0,
+  budget_cents numeric,
+  error text,
+  requested_by text references public.users(id),
+  created_at timestamptz not null default now(),
+  started_at timestamptz,
+  finished_at timestamptz,
+  updated_at timestamptz not null default now()
+);
+create index on public.production_jobs (status, created_at);
+create index on public.production_jobs (series_id, created_at desc);
+
+create table public.episode_scripts (
+  id text primary key,
+  episode_id text not null unique references public.episodes(id) on delete cascade,
+  series_id text not null references public.series(id) on delete cascade,
+  content text not null,
+  word_count int not null default 0,
+  provider text not null,
+  model text not null,
+  simulated boolean not null default false,
+  notes text[] not null default '{}',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table public.artwork_assets (
+  id text primary key,
+  series_id text not null references public.series(id) on delete cascade,
+  episode_id text references public.episodes(id) on delete cascade,
+  kind text not null check (kind in ('cover', 'episode')),
+  storage_key text not null,
+  url text not null,
+  mime_type text not null,
+  provider text not null,
+  model text not null,
+  prompt text not null default '',
+  created_at timestamptz not null default now()
+);
+create index on public.artwork_assets (series_id);
+
+create table public.agent_settings (
+  id text primary key check (id = 'global'),
+  writer_model text not null,
+  tts_model text not null,
+  default_voice_id text not null,
+  sfx_model text not null,
+  image_model text not null,
+  per_job_budget_cents int not null,
+  max_concurrent_jobs int not null,
+  updated_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------------
 -- Helper functions for RLS
 -- ---------------------------------------------------------------------------
 create or replace function public.app_user_id() returns text
@@ -302,7 +388,8 @@ begin
   foreach t in array array[
     'users','user_roles','subscription_entitlements','creator_profiles','soundscapes','series','seasons',
     'audio_assets','episodes','publishing_schedules','editorial_reviews','content_reports','user_libraries',
-    'series_follows','creator_follows','listening_progress','listening_events','notifications','user_settings'
+    'series_follows','creator_follows','listening_progress','listening_events','notifications','user_settings',
+    'production_workflows','production_jobs','episode_scripts','artwork_assets','agent_settings'
   ] loop
     execute format('alter table public.%I enable row level security', t);
   end loop;
@@ -334,6 +421,13 @@ create policy reviews_decide on public.editorial_reviews for update using (publi
 create policy reports_insert on public.content_reports for insert with check (reporter_id is null or reporter_id = public.app_user_id());
 create policy reports_read on public.content_reports for select using (public.is_editor());
 
+-- Agent production: Calm staff only (agents run server-side with the service role)
+create policy workflows_staff on public.production_workflows for all using (public.is_editor()) with check (public.is_editor());
+create policy jobs_staff on public.production_jobs for select using (public.is_editor());
+create policy scripts_staff on public.episode_scripts for select using (public.is_editor());
+create policy artwork_read on public.artwork_assets for select using (public.series_is_public(series_id) or public.is_editor());
+create policy agent_settings_admin on public.agent_settings for all using (public.has_role('admin')) with check (public.has_role('admin'));
+
 -- Listener-owned data
 create policy library_own on public.user_libraries for all using (user_id = public.app_user_id()) with check (user_id = public.app_user_id());
 create policy series_follows_own on public.series_follows for all using (user_id = public.app_user_id()) with check (user_id = public.app_user_id());
@@ -345,5 +439,5 @@ create policy notifications_own on public.notifications for all using (user_id =
 create policy settings_own on public.user_settings for all using (id = public.app_user_id()) with check (id = public.app_user_id());
 
 
--- Storage bucket for uploaded episode audio.
+-- Storage bucket for episode audio and generated artwork.
 insert into storage.buckets (id, name, public) values ('calm-stories', 'calm-stories', false) on conflict (id) do nothing;

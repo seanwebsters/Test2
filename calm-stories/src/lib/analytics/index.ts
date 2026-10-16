@@ -17,6 +17,7 @@ export type AnalyticsEvent =
   | "creator_followed"
   | "episode_approved"
   | "episode_released"
+  | "episode_produced"
   | "subscription_upsell_viewed"
   | "subscription_entitlement_checked";
 

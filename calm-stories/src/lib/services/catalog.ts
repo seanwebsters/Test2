@@ -112,7 +112,7 @@ function toEpisodeCard(e: Episode, idx: CatalogIndex, progress?: ListeningProgre
     series_id: s.id,
     series_slug: s.slug,
     series_title: s.title,
-    artwork: s.artwork,
+    artwork: e.artwork_url ? { ...s.artwork, image_url: e.artwork_url } : s.artwork,
     duration_seconds: e.duration_seconds,
     release_at: e.release_at,
     progress: progress
@@ -371,7 +371,7 @@ export async function getPlayableEpisode(id: string, viewer: Viewer, now = new D
     series_slug: series.slug,
     series_title: series.title,
     creator_name: creator?.display_name ?? "",
-    artwork: series.artwork,
+    artwork: ep.artwork_url ? { ...series.artwork, image_url: ep.artwork_url } : series.artwork,
     duration_seconds: ep.duration_seconds,
     is_preview: ep.is_preview,
     is_public: isPublic,
