@@ -13,7 +13,7 @@ export const DEFAULT_STUDIO_SETTINGS: Omit<StudioSettings, "updated_at"> = {
   max_parallel_steps: 4,
   max_concurrent_runs: 4,
   default_episode_budget_cents: 1500,
-  default_series_budget_cents: 2500,
+  default_series_budget_cents: 500,
   web_research: true,
   publish_roles: ["admin", "editor"],
   autopilot: true,
