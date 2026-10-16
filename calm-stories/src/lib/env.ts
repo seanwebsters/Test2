@@ -35,6 +35,10 @@ export const env = {
     return "dev-only-insecure-session-secret-change-me";
   },
   authProvider: (opt("AUTH_PROVIDER") ?? "demo") as "demo" | "supabase",
+  /** Temporary: the footer "dev" link opens the studio without a login. Set DEV_ACCESS=off to disable. */
+  get devAccess(): boolean {
+    return opt("DEV_ACCESS") !== "off" && (opt("AUTH_PROVIDER") ?? "demo") === "demo";
+  },
 
   supabaseUrl: opt("SUPABASE_URL") ?? opt("NEXT_PUBLIC_SUPABASE_URL"),
   supabaseAnonKey: opt("SUPABASE_ANON_KEY") ?? opt("NEXT_PUBLIC_SUPABASE_ANON_KEY"),

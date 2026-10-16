@@ -6,6 +6,9 @@ import type { Plan } from "@/lib/types";
 import { verifyToken } from "./session-token";
 
 export const SESSION_COOKIE = "cs_session";
+/** Set by /dev: temporary open access to the studio as Calm Editorial (demo deployments only). */
+export const DEV_COOKIE = "cs_dev";
+export const DEV_USER_ID = "usr_calm-editor";
 
 /**
  * Identity provider boundary. Swap the demo provider for Calm's identity
@@ -22,7 +25,10 @@ export class DemoAuthProvider implements AuthProvider {
   readonly name = "demo";
   async resolveUserId(cookies: { get(name: string): { value: string } | undefined }) {
     const payload = verifyToken<{ uid: string }>(cookies.get(SESSION_COOKIE)?.value, env.sessionSecret);
-    return payload?.uid ?? null;
+    if (payload?.uid) return payload.uid;
+    // Temporary open dev access (footer "dev" link). Turn off with DEV_ACCESS=off.
+    if (env.devAccess && cookies.get(DEV_COOKIE)?.value === "1") return DEV_USER_ID;
+    return null;
   }
 }
 

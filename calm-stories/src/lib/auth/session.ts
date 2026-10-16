@@ -6,7 +6,7 @@ import { env } from "@/lib/env";
 import { forbidden, unauthorized } from "@/lib/errors";
 import type { Role } from "@/lib/types";
 import { ANONYMOUS, isAdmin, isEditor, type Viewer } from "./policy";
-import { getAuthProvider, getEntitlementProvider, SESSION_COOKIE } from "./providers";
+import { DEV_COOKIE, getAuthProvider, getEntitlementProvider, SESSION_COOKIE } from "./providers";
 import { signToken } from "./session-token";
 
 export async function loadViewer(userId: string | null): Promise<Viewer> {
@@ -59,4 +59,5 @@ export async function startDemoSession(userId: string) {
 export async function endSession() {
   const jar = await cookies();
   jar.delete(SESSION_COOKIE);
+  jar.delete(DEV_COOKIE);
 }

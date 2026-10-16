@@ -31,7 +31,10 @@ export function SiteFooter() {
           </ul>
         </div>
       </div>
-      <div className="border-t border-white/5 py-4 text-center text-xs text-mist/60">Prototype · Calm Stories</div>
+      <div className="border-t border-white/5 py-4 text-center text-xs text-mist/60">
+        Prototype · Calm Stories ·{" "}
+        <a href="/dev" className="text-mist/40 hover:text-white">dev</a>
+      </div>
     </footer>
   );
 }

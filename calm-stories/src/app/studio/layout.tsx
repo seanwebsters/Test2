@@ -16,6 +16,7 @@ export default async function StudioLayout({ children }: { children: React.React
         <h1 className="headline text-5xl">Sleep Stories Studio</h1>
         <p className="mt-4 text-mist">The production house is for Calm&rsquo;s creative team.</p>
         <Link href="/sign-in?next=/studio" className="btn-primary mt-6">Sign in</Link>
+        <p className="mt-6 text-xs"><a href="/dev" className="text-mist/50 hover:text-white">dev</a></p>
       </div>
     );
   }
