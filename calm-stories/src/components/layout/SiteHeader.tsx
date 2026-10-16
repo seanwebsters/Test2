@@ -11,7 +11,6 @@ import { cx } from "@/lib/util";
 const NAV = [
   { href: "/", label: "Home", match: (p: string) => p === "/" },
   { href: "/discover", label: "Series", match: (p: string) => p.startsWith("/discover") || p.startsWith("/series") },
-  { href: "/create", label: "Create", match: (p: string) => p.startsWith("/create") || p.startsWith("/studio") },
   { href: "/library", label: "My Library", match: (p: string) => p.startsWith("/library") },
 ];
 
@@ -150,9 +149,7 @@ export function SiteHeader({ viewer, unread }: { viewer: ViewerInfo; unread: num
                     <div className="my-1 h-px bg-white/10" />
                     {viewer.username && <MenuLink href={`/profile/${viewer.username}`}>Public profile</MenuLink>}
                     <MenuLink href="/library">My Library</MenuLink>
-                    {viewer.creator && <MenuLink href="/studio">Creator Studio</MenuLink>}
-                    {viewer.creator && <MenuLink href="/create">Calm Storymaker</MenuLink>}
-                    {viewer.admin && <MenuLink href="/admin">Calm Production Studio</MenuLink>}
+                    {viewer.editor && <MenuLink href="/admin">Calm Stories Admin</MenuLink>}
                     <MenuLink href="/settings">Settings</MenuLink>
                     <MenuLink href="/sign-in">Switch demo account</MenuLink>
                     <button role="menuitem" onClick={signOut} className="w-full rounded-xl px-3 py-2 text-left text-mist hover:bg-white/5 hover:text-white">
@@ -180,9 +177,9 @@ export function SiteHeader({ viewer, unread }: { viewer: ViewerInfo; unread: num
               {item.label}
             </Link>
           ))}
-          {viewer.admin && (
+          {viewer.editor && (
             <Link href="/admin" className="block rounded-xl px-3 py-2.5 text-mist">
-              Production Studio
+              Admin
             </Link>
           )}
         </nav>

@@ -1,9 +1,7 @@
 import type * as T from "@/lib/types";
 import { emptySnapshot, type Snapshot } from "@/lib/db/local";
-import { hashString, prng, slugify } from "@/lib/util";
-import { SEED_ADMINS, SEED_CREATORS, SEED_LISTENERS, SEED_SERIES, SEED_SOUNDSCAPES, SEED_VOICES } from "./content";
-import { SEED_BIBLES } from "./bibles";
-import { DEFAULT_AGENTS, DEFAULT_AI_SETTINGS } from "./defaults";
+import { hashString, prng } from "@/lib/util";
+import { SEED_ADMINS, SEED_CREATORS, SEED_LISTENERS, SEED_SERIES, SEED_SOUNDSCAPES } from "./content";
 
 const DAY = 86400000;
 
@@ -58,10 +56,7 @@ export function buildSeedSnapshot(now: Date): Snapshot {
 
   for (const c of SEED_CREATORS) {
     addUser(c.username, c.display_name, c.email, c.hue);
-    addRole(c.username, "creator");
-    // Creator permissions are separate from subscriptions: Hana and Sol
-    // create without holding Calm Premium.
-    addEntitlement(c.username, c.key === "hana" || c.key === "sol" ? "free" : "premium");
+    addEntitlement(c.username, "premium");
     s.creator_profiles.push({
       id: `crp_${c.username}`,
       user_id: userId(c.username),
@@ -84,21 +79,7 @@ export function buildSeedSnapshot(now: Date): Snapshot {
     addEntitlement(a.username, "premium");
   }
 
-  /* ---------------- Voices & soundscapes ---------------- */
-  for (const v of SEED_VOICES) {
-    s.voice_profiles.push({
-      id: `voice_${v.key}`,
-      name: v.name,
-      description: v.description,
-      provider: "elevenlabs",
-      provider_voice_id: v.provider_voice_id,
-      accent: v.accent,
-      tone: v.tone,
-      approved: true,
-      consent_record: "Placeholder – attach the voice actor's signed consent & licence before production use.",
-      created_at: created,
-    });
-  }
+  /* ---------------- Soundscapes (ambience samples) ---------------- */
   for (const sc of SEED_SOUNDSCAPES) {
     const id = `snd_${sc.slug}`;
     s.soundscapes.push({
@@ -117,14 +98,11 @@ export function buildSeedSnapshot(now: Date): Snapshot {
       series_id: null,
       episode_id: null,
       kind: "sample",
-      section_index: null,
       storage_key: `public/audio/samples/${sc.slug}.mp3`,
       url: `/audio/samples/${sc.slug}.mp3`,
       mime_type: "audio/mpeg",
       duration_seconds: 180,
       provider: "calm-synth",
-      simulated: true,
-      qa: null,
       meta: { note: "Ambience-only sample so playback is testable without generated narration." },
       created_at: created,
     });
@@ -150,10 +128,9 @@ export function buildSeedSnapshot(now: Date): Snapshot {
       status: "published",
       is_official: creator.is_official,
       artwork: { scene: def.scene, palette: def.palette, seed: hashString(def.slug) },
-      narrator_voice_id: `voice_${def.voice}`,
       soundscape_id: `snd_${def.soundscape}`,
       content_rating: "all-ages",
-      ai_disclosure: creator.is_official ? null : "Written with Calm Storymaker assistance and reviewed by the creator.",
+      ai_disclosure: null,
       trending_score: def.trending,
       popularity: def.popularity,
       created_at: iso(launched - 7 * DAY),
@@ -220,147 +197,7 @@ export function buildSeedSnapshot(now: Date): Snapshot {
       });
     });
 
-    /* Story bible (detailed for demo series, minimal elsewhere) */
-    const bible = SEED_BIBLES[def.slug];
-    s.story_bibles.push({
-      id: `bib_${def.slug}`,
-      series_id: sid,
-      world_name: bible?.world_name ?? def.title.replace(/^The /, ""),
-      geography: bible?.geography ?? "",
-      culture: bible?.culture ?? "",
-      history: bible?.history ?? "",
-      atmosphere: bible?.atmosphere ?? "",
-      rules: bible?.rules ?? [],
-      themes: bible?.themes ?? [],
-      established_facts: bible?.established_facts ?? [],
-      unresolved_threads: bible?.unresolved_threads ?? [],
-      creator_preferences: bible?.creator_preferences ?? [],
-      updated_at: iso(launched),
-    });
-    if (bible) {
-      const charIds = new Map<string, string>();
-      bible.characters.forEach((c, i) => {
-        const id = `chr_${def.slug}_${slugify(c.name)}`;
-        charIds.set(c.name, id);
-        s.characters.push({
-          id,
-          series_id: sid,
-          ...c,
-          portrait: portraitSpec(c.name, (creator.hue + i * 47) % 360),
-          created_at: iso(launched),
-          updated_at: iso(launched),
-        });
-      });
-      bible.relationships.forEach((r, i) => {
-        const a = charIds.get(r.a);
-        const b = charIds.get(r.b);
-        if (!a || !b) return;
-        s.character_relationships.push({
-          id: `rel_${def.slug}_${i}`,
-          series_id: sid,
-          character_a_id: a,
-          character_b_id: b,
-          kind: r.kind,
-          description: r.description,
-          created_at: iso(launched),
-        });
-      });
-      bible.locations.forEach((l) =>
-        s.locations.push({ id: `loc_${def.slug}_${slugify(l.name)}`, series_id: sid, ...l, created_at: iso(launched) }),
-      );
-      // Episode summaries become narrative memory.
-      s.episodes
-        .filter((e) => e.series_id === sid && e.status === "published")
-        .forEach((e) =>
-          s.narrative_events.push({
-            id: `nev_${e.id}`,
-            series_id: sid,
-            episode_id: e.id,
-            kind: "event",
-            summary: e.summary,
-            character_ids: [],
-            created_at: e.release_at ?? created,
-          }),
-        );
-    }
-
-    s.rights_declarations.push({
-      id: `rgt_${def.slug}`,
-      series_id: sid,
-      user_id: userId(creator.username),
-      original_work: true,
-      ai_assisted: !creator.is_official,
-      third_party_material: "None",
-      voice_consent: true,
-      accepted_terms_version: "2026-01",
-      created_at: iso(launched),
-    });
   }
-
-  /* ---------------- A draft in the creator's studio ---------------- */
-  const draftSeries: T.Series = {
-    id: seriesId("the-orchard-of-small-hours"),
-    slug: "the-orchard-of-small-hours",
-    creator_id: userId("iris-vale"),
-    title: "The Orchard of Small Hours",
-    tagline: "An orchard that only fruits between midnight and dawn.",
-    description: "A work-in-progress series: a night orchard, a beekeeper, and a moth who carries messages.",
-    genre: "Magical Worlds",
-    tags: ["orchard", "night", "draft"],
-    status: "draft",
-    is_official: false,
-    artwork: { scene: "garden", palette: ["#0d1630", "#2f3a62", "#ffc1d9", "#fff1c9"], seed: 4242 },
-    narrator_voice_id: "voice_suna",
-    soundscape_id: "snd_forest-night",
-    content_rating: "all-ages",
-    ai_disclosure: "Written with Calm Storymaker assistance.",
-    trending_score: 0,
-    popularity: 0,
-    created_at: iso(t0 - 3 * DAY),
-    updated_at: iso(t0 - DAY),
-    published_at: null,
-  };
-  s.series.push(draftSeries);
-  s.seasons.push({
-    id: "sea_the-orchard-of-small-hours_1",
-    series_id: draftSeries.id,
-    number: 1,
-    title: "Season One",
-    synopsis: "The beekeeper discovers the night orchard.",
-    arc: "",
-    created_at: draftSeries.created_at,
-  });
-  s.story_bibles.push({
-    id: "bib_the-orchard-of-small-hours",
-    series_id: draftSeries.id,
-    world_name: "Hollowmere Orchard",
-    geography: "A hillside orchard of silver-barked apple trees above a sleeping village.",
-    culture: "",
-    history: "",
-    atmosphere: "Moths, blossom, cool grass, beehives humming softly in the dark.",
-    rules: ["The trees only fruit between midnight and dawn."],
-    themes: ["Rest", "Small miracles"],
-    established_facts: [],
-    unresolved_threads: [],
-    creator_preferences: ["Very slow pacing", "No dialogue in the first episode"],
-    updated_at: draftSeries.updated_at,
-  });
-  s.episodes.push({
-    id: "ep_the-orchard-of-small-hours_1_1",
-    series_id: draftSeries.id,
-    season_id: "sea_the-orchard-of-small-hours_1",
-    number: 1,
-    title: "The Beekeeper's Lantern",
-    summary: "Odile walks up to the orchard at midnight to check on her bees.",
-    duration_seconds: 25 * 60,
-    status: "planned",
-    release_at: null,
-    published_at: null,
-    audio_asset_id: null,
-    is_preview: true,
-    created_at: draftSeries.created_at,
-    updated_at: draftSeries.updated_at,
-  });
 
   /* ---------------- Listener state for demo accounts ---------------- */
   const maya = userId("maya");
@@ -429,27 +266,6 @@ export function buildSeedSnapshot(now: Date): Snapshot {
       });
     }
   }
-
-  /* ---------------- Production engine configuration ---------------- */
-  s.agent_configurations.push(...DEFAULT_AGENTS.map((a) => ({ ...a, updated_at: created })));
-  s.ai_settings.push({ ...DEFAULT_AI_SETTINGS, updated_at: created });
-  s.production_workflows.push({
-    id: "wf_the-moonlit-kingdom",
-    series_id: seriesId("the-moonlit-kingdom"),
-    episodes_per_week: 3,
-    target_duration_minutes: 30,
-    writing_provider: "auto",
-    writing_model: "claude-opus-5-5",
-    narrator_voice_id: "voice_willow",
-    soundscape_id: "snd_soft-wind",
-    release_days: [1, 3, 5],
-    release_hour_utc: 20,
-    max_budget_cents: 2500,
-    approval_required: true,
-    status: "paused",
-    created_at: created,
-    updated_at: created,
-  });
 
   s.notifications.push({
     id: "ntf_maya_welcome",

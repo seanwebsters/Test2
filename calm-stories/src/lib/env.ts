@@ -30,10 +30,6 @@ export const env = {
   supabaseAnonKey: opt("SUPABASE_ANON_KEY") ?? opt("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
   supabaseServiceRoleKey: opt("SUPABASE_SERVICE_ROLE_KEY"),
 
-  anthropicApiKey: opt("ANTHROPIC_API_KEY"),
-  openaiApiKey: opt("OPENAI_API_KEY"),
-  elevenLabsApiKey: opt("ELEVENLABS_API_KEY"),
-
   storageBackend: (opt("STORAGE_BACKEND") ?? "local") as "local" | "r2" | "supabase",
   r2AccountId: opt("R2_ACCOUNT_ID"),
   r2AccessKeyId: opt("R2_ACCESS_KEY_ID"),
@@ -47,9 +43,6 @@ export const env = {
   posthogKey: opt("POSTHOG_KEY"),
   posthogHost: opt("POSTHOG_HOST") ?? "https://eu.i.posthog.com",
 
-  jobDriver: (opt("JOB_DRIVER") ?? "inline") as "inline" | "trigger",
-  triggerSecretKey: opt("TRIGGER_SECRET_KEY"),
-  triggerApiUrl: opt("TRIGGER_API_URL") ?? "https://api.trigger.dev",
   cronSecret: opt("CRON_SECRET"),
 };
 

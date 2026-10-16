@@ -17,7 +17,7 @@ export function ReviewDecision({ reviewId, requested, hasAudio }: { reviewId: st
   const [error, setError] = useState<string | null>(null);
   const decide = async (decision: "approve" | "reject" | "changes_requested") => {
     if (decision !== "approve" && !notes.trim()) {
-      setError("Add a note for the creator explaining what needs to change.");
+      setError("Add a note explaining what needs to change.");
       return;
     }
     setBusy(decision);
@@ -37,8 +37,8 @@ export function ReviewDecision({ reviewId, requested, hasAudio }: { reviewId: st
       <label className="block text-xs text-mist">Release at (your local time)
         <input type="datetime-local" className="input mt-1" value={when} onChange={(e) => setWhen(e.target.value)} />
       </label>
-      <label className="block text-xs text-mist">Notes to creator
-        <textarea rows={3} className="input mt-1" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Required for rejections and change requests" />
+      <label className="block text-xs text-mist">Notes
+        <textarea rows={3} className="input mt-1" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Required for rejections and change requests (internal note)" />
       </label>
       <div className="flex flex-wrap gap-2">
         <button className="btn-accent btn-sm" disabled={busy !== null || !hasAudio} onClick={() => decide("approve")}>{busy === "approve" ? "Approving…" : "Approve & schedule"}</button>

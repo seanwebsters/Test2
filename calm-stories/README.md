@@ -1,6 +1,6 @@
 # Calm Stories
 
-A working prototype of **Calm Stories** – a streaming home for serialized Sleep Stories, an AI creative partner for creators (**Calm Storymaker**) and an autonomous production system for Calm's editorial team (**Calm Production Studio**). All three run on one platform: one database, one audio pipeline, one publishing system.
+A working prototype of **Calm Stories**: a Pocket FM-style streaming home for serialized Sleep Stories. Listeners browse series, play episodes, save them to their library and pick up where they left off. A small admin area lets the Calm editorial team add episodes, review them and schedule their release.
 
 Listening is included with Calm Premium. There are no coins, micro-transactions or per-episode purchases.
 
@@ -12,16 +12,14 @@ npm install
 npm run dev            # http://localhost:3000
 ```
 
-No accounts, keys or services are required: the app seeds a local database (`.data/db.json`) with 22 series and 120+ episodes on first run, and every AI/audio feature falls back to a clearly labelled simulator.
+No accounts, keys or services are required: the app seeds a local database (`.data/db.json`) with 22 series and 119 episodes on first run.
 
 ```bash
-npm test               # 24 automated tests covering the critical journeys
+npm test               # automated tests (access rules, upload → review → release)
 npm run typecheck
 npm run build
 npm run db:reset       # wipe local data and re-seed on next start
 ```
-
-FFmpeg on the PATH (or `FFMPEG_PATH`) enables loudness-normalised MP3 output. Without it, audio is stored as WAV.
 
 ## Demo accounts
 
@@ -29,40 +27,44 @@ Open **Sign in** and choose a persona (the identity provider is a replaceable de
 
 | Persona | Access | Use it for |
 | --- | --- | --- |
-| Maya Chen | Premium listener | Journey A: browse, play, save, resume |
+| Maya Chen | Premium listener | Browse, play, save, follow, resume |
 | Sam Free | Free account | Previews and the Premium prompt |
-| Iris Vale | Creator + Premium | Journeys B, C and E (Storymaker → submit) |
-| Hana Okafor | Creator, no Premium | Shows that creator rights ≠ subscription |
-| Calm Editorial | Administrator | Journeys D and E (production engine, review, calendar) |
+| Calm Editorial | Administrator | The admin area: add episodes, review, calendar, moderation |
 
-## The five journeys
+## What's in it
 
-* **A – Listener:** Home → series page → play → save → leave and come back to "Continue Episode N". Playback continues during client-side navigation. Progress is saved to the server (and locally for visitors), and the sleep timer fades the audio out over 30 s.
-* **B – Creator:** `/create` → describe an idea → editable concept card → *Create this series* → "Build the world" → "Develop the characters" → "Plan a 6-episode season" → "Write episode 1" → edit the script in the editor (select text → Rewrite / Expand / More relaxing …) → *Produce Audio* → the draft is saved.
-* **C – Continuation:** open an existing series (e.g. *The Lantern Keeper's Daughter* as Iris) → review the World Bible → "Continue this story" → accept the proposal → write it → check continuity.
-* **D – Internal production:** as Calm Editorial, go to `/admin` → *The Moonlit Kingdom* → *Configure* → *Start production now*. Watch the 13 steps in `/admin/agents`, review the episode in `/admin/review`, then approve it with a release time.
-* **E – Publishing:** a creator declares rights and submits from *Publishing* → an editor approves in `/admin/review` → the episode goes public at its scheduled time (`/admin/calendar` supports drag-and-drop rescheduling).
+**Listening app**
 
-## What is real and what is simulated
+* Home with Continue Listening, trending, new episodes, genres and recommendations.
+* Series pages with seasons, episode lists, follow and save.
+* A persistent player that keeps playing during navigation, with speed, sleep timer (gentle 30 s fade), and a limited autoplay.
+* My Library: saved series, collections, followed creators, listening history and new-episode updates.
+* Free preview episodes; everything else needs Calm Premium (mock entitlement).
 
-| Area | Without credentials (default) | With credentials |
+**Admin (`/admin`, Calm staff only)**
+
+* **Overview:** catalogue stats, every series with an *Add episode* shortcut, and a manual release check.
+* **Add episode:** upload finished audio (MP3, WAV, M4A or AAC), set title, description, season and the requested release time.
+* **Review queue:** listen to the upload, see automatic checks (audio, metadata, release, series), then approve with a release time, request changes or reject.
+* **Calendar:** scheduled releases, with drag-and-drop rescheduling.
+* **Moderation:** listener reports, with dismiss or take-down.
+
+Nothing is published automatically: an episode becomes public only after it's approved **and** its release time has passed. Releases run on a 60 s in-process heartbeat and on Vercel Cron (`/api/cron/tick`), and followers get a new-episode update.
+
+## What is real and what is sample data
+
+| Area | Default | In production |
 | --- | --- | --- |
-| Writing (concepts, worlds, characters, outlines, scripts, rewrites, continuity) | Deterministic template **simulator**. Every output is labelled "Simulated" in the UI and flagged `simulated: true` in the data. | Anthropic Claude (official SDK, `claude-opus-5-5` by default) or OpenAI, with structured outputs and real tool calling. |
-| Narration | **Simulated placeholder voice**: a soft hum that follows the rhythm of the text, so pacing, mixing and QA are meaningful. Clearly labelled as a placeholder. A "Device voice" button previews real speech using the browser's speech engine. | ElevenLabs TTS, using only approved voices with recorded consent. |
-| Ambience & music | Real: synthesised in-house (rain, ocean, fire, thunder, wind, forest, stream, village, space, pad), so no licences are needed. | Same, or a generative provider plugged in behind the same interface. |
-| Mixing, mastering, QA | Real: TypeScript mixer (ducking, fades, normalisation, limiter) plus automated QA. FFmpeg adds `loudnorm` and MP3 output. | Same. |
-| Cover art | Real procedural key art (13 cinematic scene types, one palette per series), plus image uploads. | OpenAI Images, stored to object storage. |
-| Seeded catalogue audio | Every seeded episode plays a 3-minute **ambience sample** of its soundscape, labelled "Sample audio". | Replace with produced mixes. |
-| Analytics in dashboards | Computed from real listening events, combined with seeded rows marked `is_sample`. Labelled "Sample". | PostHog receives product events as well. |
+| Seeded catalogue audio | Every seeded episode plays a 3-minute **ambience sample** of its soundscape, labelled "Sample audio". | Uploaded episode audio. |
+| Uploaded audio | Real: stored in `.data/` and streamed with HTTP Range support. | Cloudflare R2 or Supabase Storage. |
+| Cover art | Procedural key art (one palette and scene per series). | Same, or artwork files. |
+| Admin listening stats | Computed from real listening events, combined with seeded rows marked `is_sample` and labelled "Sample". | PostHog receives product events as well. |
 | Subscriptions | Mock entitlements per user. There is no billing. | Calm entitlement API adapter (`CALM_ENTITLEMENTS_URL`). |
 | Auth | Signed demo-session cookie with a persona switcher. | Supabase Auth adapter, or Calm identity. |
-| Database / storage | Local JSON store and filesystem. | Supabase Postgres (schema + RLS in `supabase/`), Cloudflare R2 or Supabase Storage. |
-| Background jobs | In-process runner with a 60 s heartbeat. | Trigger.dev driver; Vercel Cron for `/api/cron/tick`. |
-
-Nothing ever claims a real AI generation, voice or publication that didn't happen. Agents can't publish: every episode passes editorial approval and is released only at its scheduled time.
+| Database / storage | Local JSON store and filesystem. | Supabase Postgres (schema + RLS in `supabase/`), R2 or Supabase Storage. |
 
 ## Documentation
 
-* [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): system design, data model, tool system, job engine and audio pipeline.
-* [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md): connecting Supabase, Anthropic, OpenAI, ElevenLabs, R2, PostHog, Trigger.dev, Calm identity and entitlements.
+* [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): system design, data model, access rules and the publishing flow.
+* [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md): connecting Supabase, R2, PostHog, Calm identity and entitlements.
 * [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md): Vercel, environments, cron and production checklist.

@@ -8,9 +8,7 @@ export const metadata = { title: "Sign in" };
 const PERSONAS: { username: string; role: string; blurb: string }[] = [
   { username: "maya", role: "Premium listener", blurb: "Full catalogue, library, follows and recommendations." },
   { username: "visitor-free", role: "Free account", blurb: "Signed in without Calm Premium – previews only." },
-  { username: "iris-vale", role: "Creator · Premium", blurb: "Community creator with published and draft series in Storymaker." },
-  { username: "hana-okafor", role: "Creator · Free", blurb: "Creator permissions without a Premium subscription." },
-  { username: "calm-editor", role: "Administrator", blurb: "Calm Production Studio: agents, editorial review and publishing." },
+  { username: "calm-editor", role: "Administrator", blurb: "Calm staff: add episodes, review queue, publishing calendar and moderation." },
 ];
 
 export default async function SignInPage({ searchParams }: { searchParams: Promise<{ next?: string; reason?: string }> }) {

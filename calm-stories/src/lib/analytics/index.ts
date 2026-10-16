@@ -15,9 +15,8 @@ export type AnalyticsEvent =
   | "series_saved"
   | "series_followed"
   | "creator_followed"
-  | "storymaker_tool_executed"
-  | "episode_submitted"
   | "episode_approved"
+  | "episode_released"
   | "subscription_upsell_viewed"
   | "subscription_entitlement_checked";
 

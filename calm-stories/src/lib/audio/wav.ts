@@ -54,7 +54,7 @@ export function decodeWav(buf: Buffer): { samples: Float32Array; sampleRate: num
   throw new Error("WAV has no data chunk");
 }
 
-/** Raw little-endian 16-bit PCM (e.g. ElevenLabs `pcm_22050`). */
+/** Raw little-endian 16-bit PCM . */
 export function decodePcm16(buf: Buffer): Float32Array {
   const out = new Float32Array(Math.floor(buf.length / 2));
   for (let i = 0; i < out.length; i++) out[i] = buf.readInt16LE(i * 2) / 0x8000;

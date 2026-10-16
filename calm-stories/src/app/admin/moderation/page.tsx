@@ -1,3 +1,4 @@
+import { isStaff } from "../staff";
 import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { AdminAction } from "@/components/admin/AdminAction";
@@ -14,13 +15,13 @@ const REASONS: Record<string, string> = {
 };
 
 export default async function ModerationPage() {
+  if (!(await isStaff())) return null;
   const db = getDb();
-  const [reports, series, episodes, profiles, rights] = await Promise.all([
+  const [reports, series, episodes, profiles] = await Promise.all([
     db.list("content_reports", { orderBy: { column: "created_at", ascending: false } }),
     db.list("series"),
     db.list("episodes"),
     db.list("creator_profiles"),
-    db.list("rights_declarations", { orderBy: { column: "created_at", ascending: false } }),
   ]);
   const label = (type: string, id: string) =>
     type === "series" ? series.find((s) => s.id === id)?.title : type === "episode" ? episodes.find((e) => e.id === id)?.title : profiles.find((p) => p.user_id === id)?.display_name;
@@ -28,7 +29,7 @@ export default async function ModerationPage() {
     type === "series" ? `/series/${series.find((s) => s.id === id)?.slug}` : type === "episode" ? `/listen/${id}` : `/profile/${profiles.find((p) => p.user_id === id)?.username}`;
   const open = reports.filter((r) => r.status === "open");
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
+    <div>
       <section aria-labelledby="reports-h">
         <h2 id="reports-h" className="headline text-3xl">Reports <span className="text-mist">({open.length} open)</span></h2>
         <p className="text-sm text-mist">Listener reports and copyright complaints. Takedowns remove content from the catalogue immediately.</p>
@@ -56,18 +57,6 @@ export default async function ModerationPage() {
           {reports.length === 0 && <li className="text-sm text-mist">No reports yet.</li>}
         </ul>
       </section>
-      <aside aria-labelledby="rights-h" className="space-y-3">
-        <h2 id="rights-h" className="headline text-2xl">Rights declarations</h2>
-        <ul className="space-y-2 text-xs">
-          {rights.slice(0, 20).map((r) => (
-            <li key={r.id} className="rounded-2xl bg-white/[0.03] p-3">
-              <div className="font-medium">{series.find((s) => s.id === r.series_id)?.title}</div>
-              <div className="text-mist">Original: {r.original_work ? "yes" : "no"} · AI-assisted: {r.ai_assisted ? "yes" : "no"} · Voice consent: {r.voice_consent ? "yes" : "no"}</div>
-              <div className="text-mist">Third-party: {r.third_party_material}</div>
-            </li>
-          ))}
-        </ul>
-      </aside>
     </div>
   );
 }

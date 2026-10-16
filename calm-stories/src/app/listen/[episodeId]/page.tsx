@@ -46,7 +46,6 @@ export default async function ListenPage({ params }: { params: Promise<{ episode
             allowed={access.allowed}
             hasAudio={ep.has_audio}
             isSample={ep.audio_is_sample}
-            simulated={ep.audio_simulated}
             resumeAt={progress && !progress.completed ? progress.position_seconds : null}
             isPublic={ep.is_public}
           />

@@ -99,27 +99,6 @@ export const SEED_SOUNDSCAPES: SeedSoundscape[] = [
   { slug: "night-village", name: "Nighttime Village", description: "Crickets, a far-off bell, the hush of a sleeping town.", layers: [{ kind: "village", gain: 0.7 }, { kind: "wind", gain: 0.2 }] },
 ];
 
-export interface SeedVoice {
-  key: string;
-  name: string;
-  description: string;
-  accent: string;
-  tone: string;
-  provider_voice_id: string;
-}
-
-/**
- * Voice catalogue. `provider_voice_id` values are placeholders until an
- * ElevenLabs workspace with licensed/consented voices is connected.
- */
-export const SEED_VOICES: SeedVoice[] = [
-  { key: "willow", name: "Willow", description: "Warm, unhurried and close.", accent: "British", tone: "warm", provider_voice_id: "REPLACE_WITH_LICENSED_VOICE_ID_1" },
-  { key: "ezra", name: "Ezra", description: "Low, steady and reassuring.", accent: "American", tone: "deep", provider_voice_id: "REPLACE_WITH_LICENSED_VOICE_ID_2" },
-  { key: "maren", name: "Maren", description: "Soft, bright, storybook clarity.", accent: "Irish", tone: "bright", provider_voice_id: "REPLACE_WITH_LICENSED_VOICE_ID_3" },
-  { key: "idris", name: "Idris", description: "Gentle baritone with a slow cadence.", accent: "Welsh", tone: "mellow", provider_voice_id: "REPLACE_WITH_LICENSED_VOICE_ID_4" },
-  { key: "suna", name: "Suna", description: "Calm, airy and quietly playful.", accent: "Australian", tone: "airy", provider_voice_id: "REPLACE_WITH_LICENSED_VOICE_ID_5" },
-];
-
 export interface SeedSeries {
   slug: string;
   title: string;
@@ -131,7 +110,6 @@ export interface SeedSeries {
   scene: SceneKind;
   palette: [string, string, string, string];
   soundscape: string;
-  voice: string;
   trending: number;
   popularity: number;
   /** Days ago that the series launched. */
@@ -152,7 +130,6 @@ export const SEED_SERIES: SeedSeries[] = [
     scene: "kingdom",
     palette: ["#0b1640", "#2a2f6b", "#c9b8ff", "#f6e7b8"],
     soundscape: "soft-wind",
-    voice: "willow",
     trending: 98,
     popularity: 97,
     launched_days_ago: 60,
@@ -195,7 +172,6 @@ export const SEED_SERIES: SeedSeries[] = [
     scene: "cabin",
     palette: ["#0c1b33", "#2c3f5e", "#f2c58a", "#ffe8c2"],
     soundscape: "fireplace",
-    voice: "maren",
     trending: 91,
     popularity: 88,
     launched_days_ago: 42,
@@ -226,7 +202,6 @@ export const SEED_SERIES: SeedSeries[] = [
     scene: "space",
     palette: ["#050b24", "#1d1f55", "#8bd3ff", "#ffd6f5"],
     soundscape: "space-ambience",
-    voice: "ezra",
     trending: 89,
     popularity: 90,
     launched_days_ago: 75,
@@ -258,7 +233,6 @@ export const SEED_SERIES: SeedSeries[] = [
     scene: "garden",
     palette: ["#0d1f2b", "#244a46", "#f5b8c8", "#e6f7c9"],
     soundscape: "forest-night",
-    voice: "maren",
     trending: 86,
     popularity: 93,
     launched_days_ago: 120,
@@ -289,7 +263,6 @@ export const SEED_SERIES: SeedSeries[] = [
     scene: "coast",
     palette: ["#0a1a33", "#27446b", "#ffcf9e", "#bfe3ff"],
     soundscape: "ocean-waves",
-    voice: "willow",
     trending: 84,
     popularity: 85,
     launched_days_ago: 35,
@@ -320,7 +293,6 @@ export const SEED_SERIES: SeedSeries[] = [
     scene: "library",
     palette: ["#120f2e", "#3a2b5e", "#f3c77a", "#ffe9b8"],
     soundscape: "fireplace",
-    voice: "idris",
     trending: 88,
     popularity: 91,
     launched_days_ago: 90,
@@ -352,7 +324,6 @@ export const SEED_SERIES: SeedSeries[] = [
     scene: "forest",
     palette: ["#071a1f", "#1b3b3a", "#ffc46b", "#d6ffe7"],
     soundscape: "forest-night",
-    voice: "suna",
     trending: 82,
     popularity: 74,
     launched_days_ago: 21,
@@ -382,7 +353,6 @@ export const SEED_SERIES: SeedSeries[] = [
     scene: "ocean",
     palette: ["#081428", "#1f3a5c", "#ffd59a", "#a8d8ff"],
     soundscape: "ocean-waves",
-    voice: "idris",
     trending: 70,
     popularity: 72,
     launched_days_ago: 50,
@@ -413,7 +383,6 @@ export const SEED_SERIES: SeedSeries[] = [
     scene: "space",
     palette: ["#060a1e", "#24224f", "#ffb38a", "#c7d8ff"],
     soundscape: "space-ambience",
-    voice: "ezra",
     trending: 77,
     popularity: 79,
     launched_days_ago: 100,
@@ -444,7 +413,6 @@ export const SEED_SERIES: SeedSeries[] = [
     scene: "village",
     palette: ["#0a1631", "#2b3f66", "#ffd28a", "#eaf2ff"],
     soundscape: "night-village",
-    voice: "idris",
     trending: 74,
     popularity: 81,
     launched_days_ago: 140,
@@ -474,7 +442,6 @@ export const SEED_SERIES: SeedSeries[] = [
     scene: "desert",
     palette: ["#0c1033", "#3c2c5c", "#ffcf87", "#ffe9c4"],
     soundscape: "soft-wind",
-    voice: "ezra",
     trending: 79,
     popularity: 58,
     launched_days_ago: 9,
@@ -503,7 +470,6 @@ export const SEED_SERIES: SeedSeries[] = [
     scene: "aurora",
     palette: ["#03101f", "#0e2f45", "#7dffc8", "#c7a6ff"],
     soundscape: "soft-wind",
-    voice: "maren",
     trending: 81,
     popularity: 77,
     launched_days_ago: 30,
@@ -533,7 +499,6 @@ export const SEED_SERIES: SeedSeries[] = [
     scene: "city",
     palette: ["#071230", "#1b2c5e", "#7fe0ff", "#ffc6e8"],
     soundscape: "gentle-rain",
-    voice: "idris",
     trending: 72,
     popularity: 70,
     launched_days_ago: 65,
@@ -563,7 +528,6 @@ export const SEED_SERIES: SeedSeries[] = [
     scene: "lake",
     palette: ["#0b1a36", "#2d4870", "#ffb48a", "#d2f0ff"],
     soundscape: "forest-night",
-    voice: "suna",
     trending: 68,
     popularity: 73,
     launched_days_ago: 80,
@@ -594,7 +558,6 @@ export const SEED_SERIES: SeedSeries[] = [
     scene: "village",
     palette: ["#140f2a", "#3b2d4f", "#ffbf73", "#fff0d1"],
     soundscape: "night-village",
-    voice: "willow",
     trending: 76,
     popularity: 69,
     launched_days_ago: 18,
@@ -624,7 +587,6 @@ export const SEED_SERIES: SeedSeries[] = [
     scene: "aurora",
     palette: ["#0c1838", "#3d4f84", "#ffd3e6", "#e8f1ff"],
     soundscape: "soft-wind",
-    voice: "maren",
     trending: 73,
     popularity: 66,
     launched_days_ago: 14,
@@ -653,7 +615,6 @@ export const SEED_SERIES: SeedSeries[] = [
     scene: "coast",
     palette: ["#0c1734", "#3b4a7a", "#ffc79e", "#ffe6c9"],
     soundscape: "ocean-waves",
-    voice: "suna",
     trending: 71,
     popularity: 64,
     launched_days_ago: 12,
@@ -682,7 +643,6 @@ export const SEED_SERIES: SeedSeries[] = [
     scene: "forest",
     palette: ["#081a24", "#1e3d3f", "#fff08a", "#d9ffd2"],
     soundscape: "forest-night",
-    voice: "willow",
     trending: 65,
     popularity: 61,
     launched_days_ago: 28,
@@ -711,7 +671,6 @@ export const SEED_SERIES: SeedSeries[] = [
     scene: "ocean",
     palette: ["#05122b", "#163a63", "#a9e4ff", "#ffe4f2"],
     soundscape: "ocean-waves",
-    voice: "suna",
     trending: 87,
     popularity: 84,
     launched_days_ago: 55,
@@ -742,7 +701,6 @@ export const SEED_SERIES: SeedSeries[] = [
     scene: "kingdom",
     palette: ["#060d26", "#1c2a57", "#e0d2ff", "#fff3d6"],
     soundscape: "night-village",
-    voice: "idris",
     trending: 62,
     popularity: 68,
     launched_days_ago: 110,
@@ -771,7 +729,6 @@ export const SEED_SERIES: SeedSeries[] = [
     scene: "lake",
     palette: ["#0a1830", "#284660", "#c9f0d2", "#ffe6c4"],
     soundscape: "gentle-rain",
-    voice: "maren",
     trending: 78,
     popularity: 55,
     launched_days_ago: 6,
@@ -799,7 +756,6 @@ export const SEED_SERIES: SeedSeries[] = [
     scene: "lake",
     palette: ["#0e1b2f", "#2f4a52", "#ffd9a0", "#e6ffe0"],
     soundscape: "forest-night",
-    voice: "maren",
     trending: 60,
     popularity: 52,
     launched_days_ago: 4,
@@ -817,7 +773,7 @@ export const SEED_SERIES: SeedSeries[] = [
   },
 ];
 
-/** Listener accounts used for demos (creators also log in via their own seed users). */
+/** Listener accounts used for demos. */
 export const SEED_LISTENERS = [
   { username: "maya", display_name: "Maya Chen", email: "maya@example.com", hue: 330, plan: "premium" as const },
   { username: "visitor-free", display_name: "Sam Free", email: "sam@example.com", hue: 120, plan: "free" as const },

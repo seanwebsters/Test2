@@ -5,7 +5,7 @@ import { getDb } from "@/lib/db";
 import { env } from "@/lib/env";
 import { forbidden, unauthorized } from "@/lib/errors";
 import type { Role } from "@/lib/types";
-import { ANONYMOUS, isAdmin, isEditor, canCreate, type Viewer } from "./policy";
+import { ANONYMOUS, isAdmin, isEditor, type Viewer } from "./policy";
 import { getAuthProvider, getEntitlementProvider, SESSION_COOKIE } from "./providers";
 import { signToken } from "./session-token";
 
@@ -30,12 +30,6 @@ export async function requireUser(): Promise<Viewer & { user: NonNullable<Viewer
   const v = await getViewer();
   if (!v.user) throw unauthorized();
   return v as Viewer & { user: NonNullable<Viewer["user"]> };
-}
-
-export async function requireCreator() {
-  const v = await requireUser();
-  if (!canCreate(v)) throw forbidden("Calm Storymaker is available to creator accounts.");
-  return v;
 }
 
 export async function requireAdmin() {

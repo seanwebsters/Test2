@@ -1,3 +1,4 @@
+import { isStaff } from "../staff";
 import { getDb } from "@/lib/db";
 import { Calendar, type CalItem } from "./Calendar";
 
@@ -6,6 +7,7 @@ export const metadata = { title: "Publishing calendar" };
 const DAY = 86400000;
 
 export default async function CalendarPage() {
+  if (!(await isStaff())) return null;
   const db = getDb();
   const [episodes, series, reviews] = await Promise.all([db.list("episodes"), db.list("series"), db.list("editorial_reviews", { where: { status: "pending" } })]);
   const start = new Date();

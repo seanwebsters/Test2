@@ -19,11 +19,7 @@ export default defineConfig({
       DATA_BACKEND: "local",
       STORAGE_BACKEND: "local",
       AUTH_PROVIDER: "demo",
-      ANTHROPIC_API_KEY: "",
-      OPENAI_API_KEY: "",
-      ELEVENLABS_API_KEY: "",
       POSTHOG_KEY: "",
-      JOB_DRIVER: "inline",
     },
   },
 });

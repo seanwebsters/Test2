@@ -10,7 +10,6 @@ export function ListenView({
   allowed,
   hasAudio,
   isSample,
-  simulated,
   resumeAt,
   isPublic,
 }: {
@@ -18,7 +17,6 @@ export function ListenView({
   allowed: boolean;
   hasAudio: boolean;
   isSample: boolean;
-  simulated: boolean;
   resumeAt: number | null;
   isPublic: boolean;
 }) {
@@ -71,11 +69,9 @@ export function ListenView({
           {p.fading && <p className="mt-3 text-center text-xs text-lavender">Fading out gently…</p>}
         </div>
       )}
-      {(isSample || simulated) && (
+      {isSample && (
         <p className="mt-4 text-xs text-mist">
-          {isSample
-            ? "Prototype sample: this plays a synthesised ambience bed for the series. Narrated audio is produced through the Production Studio once a voice provider is connected."
-            : "Narration in this file is simulated placeholder audio (no voice provider configured)."}
+          Prototype sample: this plays a synthesised ambience bed for the series. Narrated episodes are added by the Calm Stories team in the admin.
         </p>
       )}
     </div>

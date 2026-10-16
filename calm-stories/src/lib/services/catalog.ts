@@ -1,7 +1,7 @@
 import "server-only";
 import { getDb } from "@/lib/db";
 import type { Viewer } from "@/lib/auth/policy";
-import { canUseLibrary, canViewSeries, isEpisodePublic, canEditSeries, isEditor } from "@/lib/auth/policy";
+import { canUseLibrary, canViewSeries, isEpisodePublic, isEditor } from "@/lib/auth/policy";
 import type { ArtworkSpec, CreatorProfile, Episode, Genre, ListeningProgress, Season, Series } from "@/lib/types";
 import { GENRES } from "@/lib/types";
 import { recommendSeries } from "./recommendations";
@@ -186,7 +186,7 @@ export async function getHomeShelves(viewer: Viewer, now = new Date()): Promise<
   shelves.push({
     id: "creator-originals",
     title: "Creator Originals",
-    subtitle: "Made by the Calm Stories community with Storymaker",
+    subtitle: "Series from independent storytellers, reviewed by Calm",
     kind: "series",
     items: byPopular.filter((c) => !c.is_official),
   });
@@ -242,7 +242,6 @@ export interface SeriesDetail {
   following_creator: boolean;
   follower_count: number;
   related: SeriesCard[];
-  can_edit: boolean;
   is_public: boolean;
 }
 
@@ -250,7 +249,7 @@ export async function getSeriesDetail(slug: string, viewer: Viewer, now = new Da
   const db = getDb();
   const series = await db.findOne("series", { slug });
   if (!series || !canViewSeries(viewer, series)) return null;
-  const privileged = canEditSeries(viewer, series) || isEditor(viewer);
+  const privileged = isEditor(viewer);
   const [seasons, episodes, creator, progress] = await Promise.all([
     db.list("seasons", { where: { series_id: series.id }, orderBy: { column: "number" } }),
     db.list("episodes", { where: { series_id: series.id } }),
@@ -315,7 +314,6 @@ export async function getSeriesDetail(slug: string, viewer: Viewer, now = new Da
     following_creator: followingCreator,
     follower_count: followerCount,
     related,
-    can_edit: canEditSeries(viewer, series),
     is_public: series.status === "published",
   };
 }
@@ -340,7 +338,6 @@ export interface PlayableEpisode {
   is_public: boolean;
   has_audio: boolean;
   audio_is_sample: boolean;
-  audio_simulated: boolean;
   prev_id: string | null;
   next_id: string | null;
 }
@@ -352,7 +349,7 @@ export async function getPlayableEpisode(id: string, viewer: Viewer, now = new D
   const series = await db.get("series", ep.series_id);
   if (!series) return null;
   const isPublic = isEpisodePublic(ep, series, now);
-  const privileged = canEditSeries(viewer, series) || isEditor(viewer);
+  const privileged = isEditor(viewer);
   if (!isPublic && !privileged) return null;
   const [seasons, siblings, creator, asset] = await Promise.all([
     db.list("seasons", { where: { series_id: series.id } }),
@@ -380,7 +377,6 @@ export async function getPlayableEpisode(id: string, viewer: Viewer, now = new D
     is_public: isPublic,
     has_audio: Boolean(asset),
     audio_is_sample: asset?.kind === "sample",
-    audio_simulated: asset?.simulated ?? false,
     prev_id: i > 0 ? (ordered[i - 1]?.id ?? null) : null,
     next_id: i >= 0 ? (ordered[i + 1]?.id ?? null) : null,
   };

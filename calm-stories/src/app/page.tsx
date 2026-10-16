@@ -64,21 +64,6 @@ export default async function HomePage() {
         ))}
       </div>
 
-      <section className="mx-auto mt-24 max-w-[1400px] px-4 sm:px-8">
-        <div className="card relative overflow-hidden p-8 sm:p-12">
-          <SceneArt spec={{ scene: "library", palette: ["#120f2e", "#3a2b5e", "#f3c77a", "#ffe9b8"], seed: 77 }} className="absolute inset-0 -z-10 h-full w-full opacity-40" />
-          <div className="max-w-xl">
-            <p className="chip mb-4">Calm Storymaker</p>
-            <h2 className="headline text-4xl sm:text-5xl">Every great story starts somewhere.</h2>
-            <p className="mt-4 text-mist">
-              Build a world, meet your characters, write and produce a full Sleep Story series with an AI creative partner – then submit it to be featured on Calm.
-            </p>
-            <Link href="/create" className="btn-accent mt-6">
-              Open Storymaker
-            </Link>
-          </div>
-        </div>
-      </section>
     </>
   );
 }

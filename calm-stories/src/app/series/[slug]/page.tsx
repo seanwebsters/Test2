@@ -59,11 +59,6 @@ export default async function SeriesPage({ params }: { params: Promise<{ slug: s
             )}
             <ToggleAction endpoint="/api/library/save" payload={{ series_id: series.id }} initial={d.saved} onLabel="Saved" offLabel="Save to library" icon="bookmark" allowed={canSave && d.is_public} />
             <ToggleAction endpoint="/api/library/follow-series" payload={{ series_id: series.id }} initial={d.following} onLabel="Following" offLabel="Follow series" icon="bell" allowed={canSave && d.is_public} />
-            {d.can_edit && (
-              <Link href={`/studio/series/${series.id}`} className="btn-ghost">
-                Manage in Studio
-              </Link>
-            )}
           </div>
 
           {creator && (

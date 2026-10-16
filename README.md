@@ -30,4 +30,4 @@ Collect all stars, then reach the portal without touching slimes.
 
 ## Also in this repository: Calm Stories
 
-[`calm-stories/`](calm-stories/) contains a prototype of the Calm Stories platform. It includes a streaming app for serialized Sleep Stories, the Calm Storymaker AI creative studio and the Calm Production Studio. See [`calm-stories/README.md`](calm-stories/README.md).
+[`calm-stories/`](calm-stories/) contains a prototype of the Calm Stories platform. It is a Pocket FM-style streaming app for serialized Sleep Stories, with a small admin area for Calm's editorial team. See [`calm-stories/README.md`](calm-stories/README.md).

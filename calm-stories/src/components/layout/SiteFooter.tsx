@@ -9,7 +9,7 @@ export function SiteFooter() {
           <Logo />
           <p className="mt-4 max-w-sm text-sm text-mist">
             Original serialized Sleep Stories, included with Calm Premium. Calm Originals are produced by the Calm editorial team; Creator
-            Originals are made by our community and reviewed before publication.
+            Originals come from independent storytellers and are reviewed before publication.
           </p>
           <p className="mt-4 max-w-sm text-xs text-mist/70">
             Sleep Stories are designed for relaxation and entertainment. They are not a medical treatment and make no clinical claims.
@@ -24,11 +24,10 @@ export function SiteFooter() {
           </ul>
         </div>
         <div>
-          <h2 className="label">Create</h2>
+          <h2 className="label">About</h2>
           <ul className="space-y-2 text-sm text-mist">
-            <li><Link className="hover:text-white" href="/create">Calm Storymaker</Link></li>
-            <li><Link className="hover:text-white" href="/studio">Creator Studio</Link></li>
             <li><Link className="hover:text-white" href="/policies">Content & rights policy</Link></li>
+            <li><Link className="hover:text-white" href="/sign-in">Sign in</Link></li>
           </ul>
         </div>
       </div>

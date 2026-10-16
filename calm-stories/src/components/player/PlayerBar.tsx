@@ -63,8 +63,8 @@ export function PlayerBar() {
             </div>
             <SeekBar className="lg:hidden" />
             <div className="hidden items-center gap-1 lg:flex">
-              {(p.episode.audio_is_sample || p.episode.audio_simulated) && (
-                <span className="chip mr-2 normal-case tracking-normal" title="Ambience-only sample audio. Real narration is generated in the Production Studio.">
+              {p.episode.audio_is_sample && (
+                <span className="chip mr-2 normal-case tracking-normal" title="Ambience-only sample audio included with the prototype catalogue.">
                   Sample audio
                 </span>
               )}

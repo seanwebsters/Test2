@@ -10,10 +10,9 @@ import type { TableName } from "../src/lib/db/types";
 
 // Foreign-key-safe insert order.
 const ORDER: TableName[] = [
-  "users", "user_roles", "subscription_entitlements", "creator_profiles", "voice_profiles", "soundscapes", "series", "seasons",
-  "audio_assets", "episodes", "story_bibles", "characters", "character_relationships", "locations", "narrative_events",
-  "agent_configurations", "production_workflows", "publishing_schedules", "rights_declarations", "user_libraries",
-  "series_follows", "creator_follows", "listening_progress", "listening_events", "notifications", "user_settings", "ai_settings",
+  "users", "user_roles", "subscription_entitlements", "creator_profiles", "soundscapes", "series", "seasons",
+  "audio_assets", "episodes", "publishing_schedules", "editorial_reviews", "content_reports", "user_libraries",
+  "series_follows", "creator_follows", "listening_progress", "listening_events", "notifications", "user_settings",
 ];
 
 const snap = buildSeedSnapshot(new Date());
