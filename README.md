@@ -1,33 +1,5 @@
-# Fluffy Hopper
+# Calm Stories + Sleep Stories Studio
 
-A browser-based 2D platformer featuring a fluffy white character inspired by your provided image.
+All the code lives in [`calm-stories/`](calm-stories/). See [`calm-stories/README.md`](calm-stories/README.md) for setup.
 
-## Run locally
-
-```bash
-python3 -m http.server 8000
-```
-
-Then open <http://localhost:8000> on desktop or mobile.
-
-## Controls
-
-### Desktop
-- Move: `A` / `D` or arrow keys
-- Jump / double jump: `W`, `Space`, or `↑`
-- Restart after win/lose: `R`
-
-### Mobile
-- Use on-screen **left** and **right** buttons to move
-- Use on-screen **jump** button to jump/double-jump
-- Tap jump after win/lose to restart
-
-## Goal
-
-Collect all stars, then reach the portal without touching slimes.
-
----
-
-## Also in this repository: Calm Stories
-
-[`calm-stories/`](calm-stories/) contains a prototype of the Calm Stories platform. It is a Pocket FM-style streaming app for serialized Sleep Stories. Production agents write (Claude), narrate (ElevenLabs) and illustrate (Nano Banana) each episode for Calm's editors to review. See [`calm-stories/README.md`](calm-stories/README.md).
+**Deploying on Vercel:** set the project's Root Directory to `calm-stories`.
