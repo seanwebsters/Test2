@@ -11,14 +11,14 @@ export const DEFAULT_STUDIO_SETTINGS: Omit<StudioSettings, "updated_at"> = {
   music_model: "music_v1",
   max_revision_rounds: 2,
   max_parallel_steps: 4,
-  max_concurrent_runs: 2,
+  max_concurrent_runs: 4,
   default_episode_budget_cents: 1500,
   default_series_budget_cents: 2500,
   web_research: true,
   publish_roles: ["admin", "editor"],
   autopilot: true,
-  autopilot_pipeline: 1,
-  autopilot_interval_hours: 24,
+  autopilot_pipeline: 10,
+  autopilot_series_per_day: 10,
   autopilot_episodes_per_week: 2,
 };
 

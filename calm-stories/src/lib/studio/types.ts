@@ -311,8 +311,8 @@ export interface StudioSettings {
   autopilot: boolean;
   /** Keep this many studio series in development / awaiting greenlight at once. */
   autopilot_pipeline: number;
-  /** Minimum hours between new autopilot series. */
-  autopilot_interval_hours: number;
+  /** How many new series the Program Director commissions per day. */
+  autopilot_series_per_day: number;
   /** Episodes per week scheduled automatically for every greenlit series (0 = don't schedule). */
   autopilot_episodes_per_week: number;
   updated_at: ISODate;

@@ -28,7 +28,7 @@ export function StudioSettingsForm({ initial, canEdit }: { initial: StudioSettin
         <p className="mt-1 text-xs text-mist">The Program Director invents new series from audience data and catalogue gaps – no brief needed – and the team develops them up to your greenlight. Greenlit series get a release schedule automatically. Publishing still always needs your approval.</p>
         <div className="mt-3 grid gap-4 md:grid-cols-3">
           {num("autopilot_pipeline", "Series in development at once")}
-          {num("autopilot_interval_hours", "Hours between new series")}
+          {num("autopilot_series_per_day", "New series per day")}
           {num("autopilot_episodes_per_week", "Episodes per week for greenlit series", "0 = don't schedule automatically")}
         </div>
       </fieldset>

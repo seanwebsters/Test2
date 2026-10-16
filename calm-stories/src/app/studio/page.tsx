@@ -65,7 +65,7 @@ export default async function StudioOverview() {
         <span className="text-white">Autopilot {settings.autopilot ? "on" : "off"}</span>
         <span className="text-mist">
           {settings.autopilot
-            ? `The Program Director commissions a new series every ${settings.autopilot_interval_hours}h when fewer than ${settings.autopilot_pipeline} are in development; greenlit series get ${settings.autopilot_episodes_per_week} episode(s) a week. You only greenlight and approve.`
+            ? `The Program Director commissions ${settings.autopilot_series_per_day} new series a day (up to ${settings.autopilot_pipeline} in development at once); greenlit series get ${settings.autopilot_episodes_per_week} episode(s) a week. You only greenlight and approve.`
             : "Series start only from your briefs."}
         </span>
         <Link href="/studio/settings" className="ml-auto text-lavender">Change</Link>

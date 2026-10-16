@@ -491,8 +491,8 @@ async function systemUser(): Promise<string> {
 /**
  * Keep the development slate full: when fewer than `autopilot_pipeline` studio
  * series are in development or awaiting greenlight, ask the Program Director to
- * commission one. At most one autopilot commission is in flight at a time, and
- * they're spaced at least `autopilot_interval_hours` apart.
+ * commission one. At most one autopilot commission is in flight at a time, spread
+ * evenly so there are `autopilot_series_per_day` a day.
  */
 export async function runAutopilot(now = new Date()) {
   const db = getDb();
@@ -503,12 +503,12 @@ export async function runAutopilot(now = new Date()) {
   const autos = (await db.list("workflow_runs", { where: { kind: "series_development" } })).filter((r) => r.idempotency_key?.startsWith("autopilot:"));
   if (autos.some((r) => ["running", "blocked", "paused"].includes(r.status))) return null;
   const last = autos.sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0];
-  if (last && now.getTime() - new Date(last.created_at).getTime() < settings.autopilot_interval_hours * 3600_000) return null;
+  if (last && now.getTime() - new Date(last.created_at).getTime() < (24 / Math.max(1, settings.autopilot_series_per_day)) * 3600_000) return null;
   const { run } = await createRun({
     kind: "series_development",
     title: "Autopilot: Program Director commissions a new series",
     budget_cents: 200,
-    idempotency_key: `autopilot:${now.toISOString().slice(0, 13)}`,
+    idempotency_key: `autopilot:${now.toISOString().slice(0, 16)}`,
     created_by: await systemUser(),
     steps: [{ key: "commission", type: "program.autopilot", agent: "program_director", label: "Commission a new series from audience data", activity: "thinking", deps: [] }],
   });

@@ -20,8 +20,8 @@ const Body = z.object({
   web_research: z.boolean(),
   publish_roles: z.array(z.enum(["admin", "editor"])).min(1),
   autopilot: z.boolean(),
-  autopilot_pipeline: z.number().int().min(0).max(5),
-  autopilot_interval_hours: z.number().int().min(1).max(24 * 30),
+  autopilot_pipeline: z.number().int().min(0).max(50),
+  autopilot_series_per_day: z.number().int().min(1).max(48),
   autopilot_episodes_per_week: z.number().int().min(0).max(7),
 });
 

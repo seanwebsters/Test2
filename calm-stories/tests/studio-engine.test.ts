@@ -76,7 +76,8 @@ describe("autopilot", () => {
     const projects = await db.list("series_projects");
     expect(projects).toHaveLength(1);
     expect(projects[0]!.brief.length).toBeGreaterThan(5);
-    expect(await runAutopilot()).toBeNull(); // slate is full
+    expect(await runAutopilot()).toBeNull(); // 10 a day → next one in ~2.4h
+    expect(await runAutopilot(new Date(Date.now() + 2.5 * 3600_000))).not.toBeNull();
     // Greenlight → automatic release schedule.
     const dev = (await db.get("workflow_runs", projects[0]!.run_id!))!;
     await db.update("series_projects", projects[0]!.id, { series_id: "ser_the-moonlit-kingdom" });
