@@ -17,7 +17,7 @@ const Body = z.object({
   max_episode_minutes: z.number().int().min(3).max(90),
   cover_concepts: z.number().int().min(1).max(3),
   max_parallel_steps: z.number().int().min(1).max(12),
-  max_concurrent_runs: z.number().int().min(1).max(10),
+  max_concurrent_runs: z.number().int().min(1).max(40),
   default_episode_budget_cents: z.number().int().min(0).max(1_000_000),
   default_series_budget_cents: z.number().int().min(0).max(1_000_000),
   web_research: z.boolean(),

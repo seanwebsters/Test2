@@ -469,9 +469,12 @@ registerHandler("program.proposals", async (ctx) => {
 registerHandler("program.autopilot", async (ctx) => {
   const db = getDb();
   const projects = await db.list("series_projects");
+  // Several commissions run in parallel; each gets its own direction so they don't converge on the same idea.
+  const slot = Number(ctx.step.params.slot ?? 0);
+  const angle = AUTOPILOT_ANGLES[slot % AUTOPILOT_ANGLES.length]!;
   const res = await ctx.claude({
     context: await catalogueSummary(),
-    prompt: `You are commissioning the network's next original series on your own – nobody has given you a brief. Based on the real audience data above and the gaps in the catalogue, propose three options and put the strongest first. Prioritise premium adult romantasy unless the data argues otherwise. Each needs a brief the creative team can start from, and must be clearly different from what the studio has already made:\n${projects.map((p) => `- ${p.brief.slice(0, 160)}`).join("\n") || "- nothing yet"}`,
+    prompt: `You are commissioning the network's next original series on your own – nobody has given you a brief. Based on the real audience data above and the gaps in the catalogue, propose three options and put the strongest first. Prioritise premium adult romantasy unless the data argues otherwise. Other commissions are running at the same time, so for this one explore this direction: ${angle}. Each needs a brief the creative team can start from, and must be clearly different from what the studio has already made:\n${projects.map((p) => `- ${p.brief.slice(0, 160)}`).join("\n") || "- nothing yet"}`,
     schema: ProposalsSchema,
   });
   await ctx.deliver({ kind: "proposals", key: "program_proposals", title: "Program Director proposals (autopilot)", data: res.data, reasoning: res.data.summary, model: res.model });
@@ -488,29 +491,45 @@ async function systemUser(): Promise<string> {
   return admin.user_id;
 }
 
+const AUTOPILOT_ANGLES = [
+  "a cosy royal court or noble household, with intrigue that stays gentle",
+  "the sea: a coastal town, island archipelago or ship",
+  "deep winter in a northern land of snow, firelight and long nights",
+  "an old forest, fae bargains and hidden glades",
+  "a city of scholars: libraries, observatories, academies",
+  "desert nights, caravans and starlit oases",
+  "the sky: airships, cloud cities or mountain eyries",
+  "a river journey: barges, lock-keepers' cottages and market towns",
+  "a quiet mountain monastery, inn or hot-spring retreat",
+  "seasonal magic: harvest, orchards, vineyards and festivals",
+];
+
 /**
- * Keep the development slate full: when fewer than `autopilot_pipeline` studio
- * series are in development or awaiting greenlight, ask the Program Director to
- * commission one. At most one autopilot commission is in flight at a time, spread
- * evenly so there are `autopilot_series_per_day` a day.
+ * Keep the development slate full. Fills every free place in the pipeline at
+ * once (up to `autopilot_pipeline` series in development or awaiting
+ * greenlight), never commissioning more than `autopilot_series_per_day` in any
+ * 24 hours. Returns the commission runs started.
  */
 export async function runAutopilot(now = new Date()) {
   const db = getDb();
   const settings = await getStudioSettings();
-  if (!settings.autopilot || settings.autopilot_pipeline < 1) return null;
-  const active = (await db.list("series_projects", { where: { status: ["developing", "awaiting_greenlight"] } })).length;
-  if (active >= settings.autopilot_pipeline) return null;
+  if (!settings.autopilot || settings.autopilot_pipeline < 1) return [];
   const autos = (await db.list("workflow_runs", { where: { kind: "series_development" } })).filter((r) => r.idempotency_key?.startsWith("autopilot:"));
-  if (autos.some((r) => ["running", "blocked", "paused"].includes(r.status))) return null;
-  const last = autos.sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0];
-  if (last && now.getTime() - new Date(last.created_at).getTime() < (24 / Math.max(1, settings.autopilot_series_per_day)) * 3600_000) return null;
-  const { run } = await createRun({
-    kind: "series_development",
-    title: "Autopilot: Program Director commissions a new series",
-    budget_cents: 200,
-    idempotency_key: `autopilot:${now.toISOString().slice(0, 16)}`,
-    created_by: await systemUser(),
-    steps: [{ key: "commission", type: "program.autopilot", agent: "program_director", label: "Commission a new series from audience data", activity: "thinking", deps: [] }],
-  });
-  return run;
+  const commissioning = autos.filter((r) => ["running", "blocked", "paused"].includes(r.status)).length;
+  const active = (await db.list("series_projects", { where: { status: ["developing", "awaiting_greenlight"] } })).length;
+  const today = autos.filter((r) => now.getTime() - new Date(r.created_at).getTime() < 24 * 3600_000).length;
+  const slots = Math.min(settings.autopilot_pipeline - active - commissioning, settings.autopilot_series_per_day - today);
+  const runs = [];
+  for (let i = 0; i < slots; i++) {
+    const { run } = await createRun({
+      kind: "series_development",
+      title: "Autopilot: Program Director commissions a new series",
+      budget_cents: 200,
+      idempotency_key: `autopilot:${now.toISOString().slice(0, 16)}:${i}`,
+      created_by: await systemUser(),
+      steps: [{ key: "commission", type: "program.autopilot", agent: "program_director", label: "Commission a new series from audience data", activity: "thinking", deps: [], params: { slot: autos.length + i } }],
+    });
+    runs.push(run);
+  }
+  return runs;
 }

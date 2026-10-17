@@ -17,7 +17,8 @@ export const DEFAULT_STUDIO_SETTINGS: Omit<StudioSettings, "updated_at"> = {
   cover_concepts: 1,
   // Six editorial reviews, or five scenes plus the cover, run at once.
   max_parallel_steps: 8,
-  max_concurrent_runs: 6,
+  // Room for a full development slate plus episodes in production at the same time.
+  max_concurrent_runs: 20,
   default_episode_budget_cents: 100,
   default_series_budget_cents: 500,
   web_research: true,

@@ -63,21 +63,32 @@ describe("workflow engine guarantees", () => {
 });
 
 describe("autopilot", () => {
-  it("commissions and develops a new series without a brief, one at a time, and schedules greenlit series", async () => {
+  it("fills the development slate at once without a brief, within the daily limit, and schedules greenlit series", async () => {
     const { runAutopilot, resolveGate } = await import("@/lib/studio");
+    const { getStudioSettings } = await import("@/lib/studio/settings");
     const db = freshDb();
-    setClaudeTransport(fakeClaude({ calls: [], synthesisRounds: 0 }));
-    const run = await runAutopilot();
-    expect(run).not.toBeNull();
-    expect(await runAutopilot()).toBeNull(); // one in flight at a time
+    const calls: TransportRequest[] = [];
+    setClaudeTransport(fakeClaude({ calls, synthesisRounds: 0 }));
+    await getStudioSettings();
+    await db.update("studio_settings", "global", { autopilot_pipeline: 3, autopilot_series_per_day: 3 });
+    const runs = await runAutopilot();
+    expect(runs).toHaveLength(3); // all at once
+    expect(await runAutopilot()).toHaveLength(0); // slate full
     await drain({ maxTicks: 6 });
-    const st = (await db.findOne("workflow_steps", { run_id: run!.id, key: "commission" }))!;
-    expect(st.status, st.error ?? "").toBe("succeeded");
+    for (const run of runs) {
+      const st = (await db.findOne("workflow_steps", { run_id: run.id, key: "commission" }))!;
+      expect(st.status, st.error ?? "").toBe("succeeded");
+    }
     const projects = await db.list("series_projects");
-    expect(projects).toHaveLength(1);
+    expect(projects).toHaveLength(3);
     expect(projects[0]!.brief.length).toBeGreaterThan(5);
-    expect(await runAutopilot()).toBeNull(); // 10 a day → next one in ~2.4h
-    expect(await runAutopilot(new Date(Date.now() + 2.5 * 3600_000))).not.toBeNull();
+    // Each parallel commission was steered in a different direction.
+    const directions = new Set(calls.filter((c) => c.agent === "program_director" && !c.webSearch).map((c) => (c.content.find((x) => x.type === "text") as { text: string }).text.match(/explore this direction: ([^.]+)/)?.[1]).filter(Boolean));
+    expect(directions.size).toBe(3);
+    // Daily limit: even with free places, no more today.
+    for (const p of projects) await db.update("series_projects", p.id, { status: "rejected" });
+    expect(await runAutopilot()).toHaveLength(0);
+    expect(await runAutopilot(new Date(Date.now() + 25 * 3600_000))).toHaveLength(3);
     // Greenlight → automatic release schedule.
     const dev = (await db.get("workflow_runs", projects[0]!.run_id!))!;
     await db.update("series_projects", projects[0]!.id, { series_id: "ser_the-moonlit-kingdom" });
