@@ -69,6 +69,8 @@ describe("Sleep Stories Studio – end to end", () => {
     expect((await db.get("series_projects", project.id))!.status).toBe("greenlit");
     expect((await db.list("voice_auditions", { where: { series_id: seriesId } })).length).toBeGreaterThanOrEqual(3);
     expect(providers.counts.dictionaries).toBe(1);
+    // Every series gets exactly one selected narrator.
+    expect((await db.list("voice_auditions", { where: { series_id: seriesId, character_id: null, selected: true } })).length).toBe(1);
 
     const epRun = (await db.list("workflow_runs", { where: { kind: "episode_production", series_id: seriesId } }))[0]!;
     expect(epRun.status, JSON.stringify((await db.list("workflow_steps", { where: { run_id: epRun.id } })).filter((s) => s.error).map((s) => [s.key, s.error]))).toBe("awaiting_approval");

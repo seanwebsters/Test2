@@ -102,6 +102,22 @@ function voiceCard(v: ElevenVoice) {
   return `${v.voice_id} | ${v.name} | ${v.category} | ${[l.gender, l.age, l.accent, l.description, l.use_case].filter(Boolean).join(", ")} | ${v.description ?? ""}`.slice(0, 260);
 }
 
+const CALM = /\b(calm|calming|soothing|soft|gentle|warm|relax|relaxing|meditat\w*|sleep|asmr|narrat\w*|audiobook|storytell\w*|mellow|smooth|quiet|whisper\w*|velvety|low)\b/i;
+const NOT_CALM = /\b(energetic|excited|upbeat|loud|intense|aggressive|news|announcer|commercial|advert\w*|hyped|shouty|video ?games?|cartoon|animat\w*|childish)\b/i;
+
+/** Rank voices for a calm sleep-story narrator from their ElevenLabs labels. Used when Claude's picks aren't in the account. */
+export function calmNarratorCandidates(voices: ElevenVoice[], n = 3): ElevenVoice[] {
+  const score = (v: ElevenVoice) => {
+    const text = [v.name, v.description ?? "", ...Object.values(v.labels)].join(" ");
+    const calm = text.match(new RegExp(CALM.source, "gi"))?.length ?? 0;
+    return calm * 2 - (NOT_CALM.test(text) ? 5 : 0) + (/narrat|audiobook|meditat/i.test(v.labels.use_case ?? "") ? 3 : 0);
+  };
+  return [...voices].sort((a, b) => score(b) - score(a)).slice(0, n);
+}
+
+/** Narrator delivery: steadier and less theatrical than character voices, so it soothes. */
+export const NARRATOR_VOICE_SETTINGS = { stability: 0.78, similarity_boost: 0.75, style: 0.05 };
+
 registerHandler("audio.casting", async (ctx) => {
   const db = getDb();
   const sid = ctx.run.series_id!;
@@ -117,12 +133,18 @@ registerHandler("audio.casting", async (ctx) => {
   const chars = (await db.list("characters", { where: { series_id: sid } })).filter((c) => c.role !== "narrator");
   const res = await ctx.claude({
     context: await seriesContext(sid),
-    prompt: `Cast this series from the voices available in our ElevenLabs account (only these – they are the voices we hold rights to use). Pick a narrator who can carry a calm, intimate hour, and a voice for each speaking character (${chars.map((c) => c.name).join(", ")}). Give two or three candidates per role, best first, with reasons.\n\nVoices (id | name | category | labels | description):\n${voices.map(voiceCard).join("\n")}`,
+    prompt: `Cast this series from the voices available in our ElevenLabs account (only these – they are the voices we hold rights to use). Every series MUST have a narrator – they read all the prose and most of the episode, so they matter most. The narrator must be calming: warm, low, soft and unhurried, intimate rather than performed, the kind of voice that helps a listener fall asleep (prefer voices described as calm, soothing, gentle, warm, meditation, audiobook or narration; never energetic, upbeat, announcer, news, commercial or cartoon voices). Then choose a voice for each speaking character (${chars.map((c) => c.name).join(", ")}). Give two or three candidates per role, best first, with reasons.\n\nVoices (id | name | category | labels | description):\n${voices.map(voiceCard).join("\n")}`,
     schema: CastingSchema,
   });
   const valid = new Set(voices.map((v) => v.voice_id));
   const name = (id: string) => voices.find((v) => v.voice_id === id)?.name ?? id;
-  const roles = [{ characterId: null as string | null, label: "Narrator", line: "Settle in. The night is long, and there is nowhere you need to be.", candidates: res.data.narrator.candidates }];
+  // A narrator is mandatory: if none of Claude's picks exist in the account, fall back to the calmest voices we hold.
+  let narratorCandidates = res.data.narrator.candidates.filter((c) => valid.has(c.voice_id));
+  if (!narratorCandidates.length) {
+    narratorCandidates = calmNarratorCandidates(voices).map((v) => ({ voice_id: v.voice_id, rationale: "Calmest voice in the account by its ElevenLabs labels (fallback – the suggested voices weren't available)." }));
+    ctx.log("None of the suggested narrator voices are in the ElevenLabs account; auditioning the calmest available voices instead.", "warn");
+  }
+  const roles = [{ characterId: null as string | null, label: "Narrator", line: "Settle in. The night is long, and there is nowhere you need to be.", candidates: narratorCandidates }];
   for (const c of res.data.characters) {
     const ch = chars.find((x) => x.name.toLowerCase() === c.name.toLowerCase());
     if (ch) roles.push({ characterId: ch.id, label: ch.name, line: "", candidates: c.candidates });
@@ -149,9 +171,16 @@ registerHandler("audio.casting", async (ctx) => {
     }
     if (ch) await db.update("characters", ch.id, { voice_id: picks[0]!.voice_id, voice_name: name(picks[0]!.voice_id), updated_at: nowIso() });
   }
+  // Make sure exactly one narrator is selected (e.g. after re-casting, earlier auditions may exist unselected).
+  const narratorAuditions = await db.list("voice_auditions", { where: { series_id: sid, character_id: null } });
+  if (!narratorAuditions.length) throw new StepFailure("No narrator voice could be auditioned. Add a calm narration voice to your ElevenLabs library, then retry.");
+  if (!narratorAuditions.some((a) => a.selected)) {
+    const best = narratorAuditions.find((a) => a.voice_id === narratorCandidates[0]?.voice_id) ?? narratorAuditions[0]!;
+    await db.update("voice_auditions", best.id, { selected: true });
+  }
   await ctx.deliver({ kind: "casting", key: "casting", title: "Voice casting", data: res.data, reasoning: res.data.narrator.direction, model: res.model });
-  const narrator = res.data.narrator.candidates.find((c) => valid.has(c.voice_id));
-  return { summary: `Narrator: ${narrator ? name(narrator.voice_id) : "—"}. ${auditions} audition(s) recorded – change any choice in the Audio Studio.` };
+  const narrator = (await db.list("voice_auditions", { where: { series_id: sid, character_id: null, selected: true } }))[0]!;
+  return { summary: `Narrator: ${narrator.voice_name}. ${auditions} audition(s) recorded – change any choice in the Audio Studio.` };
 });
 
 registerHandler("audio.pronunciation", async (ctx) => {
@@ -212,7 +241,7 @@ registerHandler("audio.direction", async (ctx) => {
     : "";
   const res = await ctx.claude({
     context: await seriesContext(ep.series_id),
-    prompt: `Plan the audio for episode ${ep.number}, “${ep.title}”.\n1. Narrator direction (pace, warmth, how delivery should soften through the episode).\n2. For each scene: who speaks each numbered quote (character name, or "narrator" for quoted text that isn't speech), one or two natural ambience layers with levels relative to the voice (typically −20 to −30 dB), and the scene intensity. Reuse the same ambience prompt across scenes in the same place.\n${settings.episode_music ? "3. At most ONE delicate instrumental music cue for the whole episode: give the identical cue to the scenes that should carry it and null elsewhere." : "3. No music: set every music_cue to null."} Everything gets quieter and sparser as the episode progresses.${reuse}\n\n${scriptText(script, { numbered: true })}\n\nQuotes by scene:\n${quotesPerScene.map((q) => `Scene ${q.index}:\n${q.quotes.join("\n") || "(none)"}`).join("\n")}`,
+    prompt: `Plan the audio for episode ${ep.number}, “${ep.title}”.\n1. Narrator direction: the narrator reads all the prose and must sound calming throughout – warm, soft, unhurried and intimate, never dramatic; describe the pace, warmth and how delivery softens further through the episode.\n2. For each scene: who speaks each numbered quote (character name, or "narrator" for quoted text that isn't speech), one or two natural ambience layers with levels relative to the voice (typically −20 to −30 dB), and the scene intensity. Reuse the same ambience prompt across scenes in the same place.\n${settings.episode_music ? "3. At most ONE delicate instrumental music cue for the whole episode: give the identical cue to the scenes that should carry it and null elsewhere." : "3. No music: set every music_cue to null."} Everything gets quieter and sparser as the episode progresses.${reuse}\n\n${scriptText(script, { numbered: true })}\n\nQuotes by scene:\n${quotesPerScene.map((q) => `Scene ${q.index}:\n${q.quotes.join("\n") || "(none)"}`).join("\n")}`,
     schema: AudioDirectionSchema,
   });
   await ctx.deliver({ kind: "audio_direction", key: "audio_direction", title: "Audio direction", data: res.data, reasoning: res.data.narrator_direction, model: res.model });
@@ -294,7 +323,7 @@ registerHandler("audio.scene", async (ctx) => {
               nextText: segments[i + 1]?.text.slice(0, 400),
               previousRequestIds: reqIds.slice(-3),
               dictionary,
-              settings: { speed: 0.9 - (1 - plan.intensity) * 0.04 },
+              settings: { ...(seg.voiceId === narrator.voice_id ? NARRATOR_VOICE_SETTINGS : {}), speed: 0.9 - (1 - plan.intensity) * 0.04 },
             }),
           { characters: seg.text.length },
         );
@@ -432,7 +461,7 @@ registerHandler("qc.review", async (ctx) => {
   const pron = await db.list("pronunciations", { where: { series_id: ep.series_id } });
   const res = await ctx.claude({
     context: await seriesContext(ep.series_id),
-    prompt: `Final quality control for episode ${ep.number}, “${ep.title}” (round ${round}).\nCheck the finished production against the studio standard and the bible. Request specific actions only for real problems: "revoice_scene" (narration issue in a scene), "remix_scene" (sound/music balance in a scene), "regenerate_cover" (artwork problem); otherwise approve for human review.\n\nMaster: ${JSON.stringify(asset?.meta.loudness ?? {})} (target −24 LUFS, ≤ −2 dBTP), duration ${asset?.duration_seconds ?? 0}s.\nPer-scene QA:\n${JSON.stringify((asset?.meta.scenes as unknown[]) ?? [], null, 1).slice(0, 6000)}\n\nPronunciation dictionary: ${pron.map((p) => `${p.term} → ${p.alias}`).join("; ") || "none"}\nCover review: ${coverReview ? JSON.stringify(coverReview.data).slice(0, 2000) : "none"}\n\nFinal script (v${script?.version}):\n${script?.content.slice(0, 60000) ?? ""}`,
+    prompt: `Final quality control for episode ${ep.number}, “${ep.title}” (round ${round}).\nCheck the finished production against the studio standard and the bible. Every episode must be carried by one calm, soothing narrator voice; request "revoice_scene" if narration sounds rushed, dramatic or harsh. Request specific actions only for real problems: "revoice_scene" (narration issue in a scene), "remix_scene" (sound/music balance in a scene), "regenerate_cover" (artwork problem); otherwise approve for human review.\n\nMaster: ${JSON.stringify(asset?.meta.loudness ?? {})} (target −24 LUFS, ≤ −2 dBTP), duration ${asset?.duration_seconds ?? 0}s.\nPer-scene QA:\n${JSON.stringify((asset?.meta.scenes as unknown[]) ?? [], null, 1).slice(0, 6000)}\n\nPronunciation dictionary: ${pron.map((p) => `${p.term} → ${p.alias}`).join("; ") || "none"}\nCover review: ${coverReview ? JSON.stringify(coverReview.data).slice(0, 2000) : "none"}\n\nFinal script (v${script?.version}):\n${script?.content.slice(0, 60000) ?? ""}`,
     schema: QcReportSchema,
   });
   const qc: QcReport = res.data;

@@ -121,3 +121,38 @@ describe("fal.ai as the Nano Banana provider", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("narrator casting", () => {
+  it("falls back to the calmest voices when Claude's narrator picks aren't in the account", async () => {
+    const { calmNarratorCandidates } = await import("@/lib/studio/workflows/audio-steps");
+    const v = (id: string, description: string, labels: Record<string, string> = {}) => ({ voice_id: id, name: id, category: "premade", description, labels, preview_url: null });
+    const picks = calmNarratorCandidates([
+      v("hype", "energetic upbeat announcer"),
+      v("news", "clear news presenter", { use_case: "news" }),
+      v("sleepy", "soft, calm and soothing", { use_case: "meditation" }),
+      v("warm", "warm audiobook storyteller", { use_case: "narration" }),
+    ], 2);
+    expect(picks.map((p) => p.voice_id).sort()).toEqual(["sleepy", "warm"]);
+  });
+});
+
+describe("runUntil", () => {
+  it("advances chained stages in one call, starting each as soon as its inputs finish", async () => {
+    const db = freshDb();
+    const { registerHandler } = await import("@/lib/studio/engine");
+    const { runUntil } = await import("@/lib/studio");
+    const order: string[] = [];
+    registerHandler("test.step", async (ctx) => {
+      await new Promise((r) => setTimeout(r, ctx.step.key === "slow" ? 60 : 5));
+      order.push(ctx.step.key);
+      return { summary: ctx.step.key };
+    });
+    const step = (key: string, deps: string[]) => ({ key, type: "test.step", agent: "program_director" as const, label: key, activity: "thinking" as const, deps });
+    // a → b → c is a chain; "slow" runs alongside it and must not hold it up.
+    const { run } = await createRun({ kind: "series_development", title: "Chain", budget_cents: 100, created_by: "usr_calm-editor", steps: [step("a", []), step("slow", []), step("b", ["a"]), step("c", ["b"])] });
+    const started = await runUntil(Date.now() + 5_000);
+    expect(started).toBe(4);
+    expect((await db.get("workflow_runs", run.id))!.status).toBe("succeeded");
+    expect(order.indexOf("c")).toBeLessThan(order.indexOf("slow"));
+  });
+});

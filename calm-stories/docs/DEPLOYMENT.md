@@ -9,7 +9,7 @@
    * `DATA_BACKEND=supabase` and Supabase keys, because the local JSON store isn't suitable for serverless;
    * `STORAGE_BACKEND=r2` (or `supabase`);
    * `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` and `ELEVENLABS_API_KEY` for the studio;
-   * `CRON_SECRET`. `vercel.json` schedules `GET /api/cron/tick` every 5 minutes; it commissions scheduled episodes, advances studio workflows and releases due episodes. Vercel sends `Authorization: Bearer $CRON_SECRET`.
+   * `CRON_SECRET`. `vercel.json` schedules `GET /api/cron/tick` every 5 minutes; it commissions scheduled episodes, advances studio workflows and releases due episodes. Each call keeps working stage after stage (starting each step the moment its inputs finish) for `CRON_WORK_SECONDS` (default 240; keep it below your plan's function time limit). Vercel sends `Authorization: Bearer $CRON_SECRET`.
 3. Use separate Supabase projects (or branches) for development and production.
 
 ## Where the studio runs
@@ -22,7 +22,7 @@ Studio workflows are long: a series takes roughly 10–20 minutes, and an episod
   * Point `DATA_BACKEND` at Supabase and storage at R2.
 * **Vercel for the web plus a worker:**
   * Host the app on Vercel.
-  * Run a small worker (Fly.io, Render, Railway, a VM, or Trigger.dev) from the same repo and env. It calls `tick({ wait: true })` from `@/lib/studio` on a loop, or hits `/api/cron/tick`.
+  * Run a small worker (Fly.io, Render, Railway, a VM, or Trigger.dev) from the same repo and env. It calls `runUntil(Date.now() + 60_000)` from `@/lib/studio` on a loop, or hits `/api/cron/tick`.
   * Set `DISABLE_HEARTBEAT=1` on Vercel so only the worker runs agents.
 
 Steps are idempotent and their state lives in the database, so several workers can be added later. Concurrency is bounded by *Settings → Workflows at once / Parallel steps*.

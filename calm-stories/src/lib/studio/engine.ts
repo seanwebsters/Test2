@@ -187,9 +187,38 @@ export function kick() {
  * steps; pass `{ wait: true }` to await them (cron, tests).
  */
 export async function tick(opts: { wait?: boolean; now?: Date } = {}): Promise<number> {
+  const started = await startReadySteps(opts.now ?? new Date());
+  if (opts.wait) await Promise.all(started);
+  return started.length;
+}
+
+/**
+ * Keep the studio moving until `deadline`: whenever any step finishes, start
+ * whatever it unblocked straight away instead of waiting for the next tick.
+ * Serverless cron uses this so one invocation advances many stages.
+ * Returns the number of steps started.
+ */
+export async function runUntil(deadline: number): Promise<number> {
+  const inflight = new Set<Promise<void>>();
+  let total = 0;
+  while (Date.now() < deadline) {
+    const started = await startReadySteps(new Date());
+    total += started.length;
+    for (const p of started) {
+      inflight.add(p);
+      void p.catch(() => undefined).finally(() => inflight.delete(p));
+    }
+    if (!inflight.size) break;
+    // Wake when a step finishes (or every 15 s, for rate-limit waits that come due).
+    await Promise.race([...[...inflight].map((p) => p.catch(() => undefined)), new Promise((r) => setTimeout(r, 15_000))]);
+  }
+  await Promise.allSettled(inflight);
+  return total;
+}
+
+async function startReadySteps(now: Date): Promise<Promise<void>[]> {
   const db = getDb();
   const settings = await getStudioSettings();
-  const now = opts.now ?? new Date();
   const runs = await db.list("workflow_runs", { where: { status: ["running", "awaiting_approval", "blocked"] }, orderBy: { column: "created_at" } });
   const started: Promise<void>[] = [];
   let activeRuns = 0;
@@ -220,8 +249,7 @@ export async function tick(opts: { wait?: boolean; now?: Date } = {}): Promise<n
       started.push(executeStep(fresh, s));
     }
   }
-  if (opts.wait) await Promise.all(started);
-  return started.length;
+  return started;
 }
 
 /** Run ticks until nothing is ready (tests and cron). */
