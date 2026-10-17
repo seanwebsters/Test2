@@ -19,7 +19,8 @@ export const env = {
     | "test",
   dataBackend: (opt("DATA_BACKEND") ?? "local") as "local" | "supabase",
   // Serverless platforms (Vercel) only allow writes under /tmp.
-  dataDir: opt("DATA_DIR") ?? (process.env.VERCEL ? "/tmp/calm-stories" : ".data"),
+  // Railway volumes expose their mount path; Vercel only has a throwaway /tmp.
+  dataDir: opt("DATA_DIR") ?? opt("RAILWAY_VOLUME_MOUNT_PATH") ?? (process.env.VERCEL ? "/tmp/calm-stories" : ".data"),
   get sessionSecret(): string {
     const v = opt("SESSION_SECRET");
     if (v) return v;

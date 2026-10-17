@@ -60,6 +60,10 @@ Rough estimate for one episode:
 
 These are list-price estimates; the studio records each call's estimated cost in Analytics, so check your provider bills. Each series also costs about $0.50–$1 once, for development, portraits and posters.
 
+## Hosting
+
+Deploy on **Railway** with a volume attached so your series, episodes, audio and artwork are saved; see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md). On Vercel the built-in store lives in `/tmp` and is wiped regularly, so use Supabase there.
+
 ## How a series gets made
 
 1. **Brief** (`/studio/series/new`): describe the series you want.

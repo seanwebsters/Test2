@@ -1,0 +1,5 @@
+.git
+calm-stories/node_modules
+calm-stories/.next
+calm-stories/.data
+calm-stories/tsconfig.tsbuildinfo

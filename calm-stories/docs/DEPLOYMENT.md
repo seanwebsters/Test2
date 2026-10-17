@@ -1,5 +1,16 @@
 # Deployment
 
+## Railway (recommended: saves everything, runs continuously)
+
+The repo root has a `Dockerfile` and `railway.json`, so Railway builds it with no extra settings.
+
+1. In Railway, choose **New Project → Deploy from GitHub repo** and pick this repository.
+2. Right-click the service (or use **+ Create**), choose **Volume**, and attach it to the service. Any mount path works, for example `/data`. The app stores its database and all audio and artwork there (via `RAILWAY_VOLUME_MOUNT_PATH`), so redeploys and restarts keep everything.
+3. Under the service's **Variables**, add your keys (`ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY`, `FAL_KEY` or `GEMINI_API_KEY`) and a long random `SESSION_SECRET`.
+4. Under **Settings → Networking**, click **Generate Domain** to get a public URL.
+
+The built-in heartbeat advances workflows every 30 seconds and starts the next step as soon as one finishes, so no cron job is needed. Use one replica, because the local store is a single file on the volume.
+
 ## Vercel
 
 1. Import the repository and set the **Root Directory** to `calm-stories`.
