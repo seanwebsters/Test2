@@ -109,7 +109,13 @@ export async function seriesContext(seriesId: string, opts: { includeEpisodes?: 
 
 export async function saveDeliverable(d: Omit<Deliverable, "id" | "version" | "status" | "created_at" | "edited_by"> & { edited_by?: string | null }): Promise<Deliverable> {
   const db = getDb();
-  const where = d.episode_id ? { episode_id: d.episode_id, key: d.key } : { series_id: d.series_id, key: d.key, episode_id: null };
+  // Before a series exists (development), deliverables belong to their run – otherwise
+  // parallel developments would supersede each other's work.
+  const where = d.episode_id
+    ? { episode_id: d.episode_id, key: d.key }
+    : d.series_id
+      ? { series_id: d.series_id, key: d.key, episode_id: null }
+      : { run_id: d.run_id, series_id: null, key: d.key, episode_id: null };
   const prior = await db.list("deliverables", { where: where as never });
   for (const p of prior.filter((x) => x.status === "current")) await db.update("deliverables", p.id, { status: "superseded" });
   return db.insert("deliverables", {

@@ -52,6 +52,19 @@ export function claudeCostCents(model: string, u: ClaudeResult<unknown>["usage"]
   return Math.round(usd * 100 * 100) / 100;
 }
 
+/**
+ * Server-side refusal fallbacks (`fallbacks: "default"`) are accepted only by
+ * these models; sending them to others (e.g. Haiku) is rejected with a 400.
+ */
+export function supportsServerFallback(model: string): boolean {
+  return /^claude-(fable-5-1|opus-5-5|opus-5|sonnet-5-5)$/.test(model.replace(/-\d{8}$/, ""));
+}
+
+/** The dynamic-filtering web search tool needs Opus/Sonnet; other models use the basic variant. */
+export function webSearchToolType(model: string): string {
+  return /^claude-(fable-5|opus-|sonnet-(5|4-6))/.test(model) ? "web_search_20260209" : "web_search_20250305";
+}
+
 /* ------------------------------------------------------------------ */
 /* Transport (swappable in tests)                                      */
 /* ------------------------------------------------------------------ */
@@ -95,9 +108,8 @@ const anthropicTransport: ClaudeTransport = async (req) => {
           effort: req.effort as "low" | "medium" | "high",
           ...(req.jsonSchema ? { format: { type: "json_schema", schema: req.jsonSchema } } : {}),
         },
-        ...(req.webSearch ? { tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 6 }] } : {}),
-        betas: ["server-side-fallback-2026-07-01"],
-        ...({ fallbacks: "default" } as Record<string, unknown>),
+        ...(req.webSearch ? { tools: [{ type: webSearchToolType(req.model), name: "web_search", max_uses: 6 }] } : {}),
+        ...(supportsServerFallback(req.model) ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" } : {}),
       } as unknown as Anthropic.Beta.Messages.MessageCreateParamsStreaming);
       const msg = await stream.finalMessage();
       model = msg.model;

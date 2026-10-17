@@ -103,7 +103,8 @@ async function catalogueSummary(): Promise<string> {
 /** Context for the shared bible once the series exists; the brief and research before that. */
 async function devContext(ctx: StepContext): Promise<string> {
   const p = await project(ctx);
-  const research = await currentDeliverable({ series_id: p.series_id ?? undefined }, "genre_research");
+  // Before the series exists, only this run's research belongs to it.
+  const research = p.series_id ? await currentDeliverable({ series_id: p.series_id }, "genre_research") : null;
   const parts = [`# BRIEF FROM THE NETWORK EXECUTIVE\n${p.brief}`];
   const r = research ?? (await findRunDeliverable(ctx, "genre_research"));
   if (r) parts.push(`# GENRE RESEARCH\n${JSON.stringify(r.data, null, 1)}`);
@@ -516,8 +517,15 @@ export async function runAutopilot(now = new Date()) {
   if (!settings.autopilot || settings.autopilot_pipeline < 1) return [];
   const autos = (await db.list("workflow_runs", { where: { kind: "series_development" } })).filter((r) => r.idempotency_key?.startsWith("autopilot:"));
   const commissioning = autos.filter((r) => ["running", "blocked", "paused"].includes(r.status)).length;
-  const active = (await db.list("series_projects", { where: { status: ["developing", "awaiting_greenlight"] } })).length;
-  const today = autos.filter((r) => now.getTime() - new Date(r.created_at).getTime() < 24 * 3600_000).length;
+  // A project whose development run failed or was cancelled no longer holds a place in the slate.
+  let active = 0;
+  for (const p of await db.list("series_projects", { where: { status: ["developing", "awaiting_greenlight"] } })) {
+    const run = p.run_id ? await db.get("workflow_runs", p.run_id) : null;
+    if (run && ["failed", "cancelled"].includes(run.status)) await db.update("series_projects", p.id, { status: "failed", updated_at: nowIso() });
+    else active++;
+  }
+  // Failed or cancelled commissions don't use up the daily allowance.
+  const today = autos.filter((r) => !["failed", "cancelled"].includes(r.status) && now.getTime() - new Date(r.created_at).getTime() < 24 * 3600_000).length;
   const slots = Math.min(settings.autopilot_pipeline - active - commissioning, settings.autopilot_series_per_day - today);
   const runs = [];
   for (let i = 0; i < slots; i++) {

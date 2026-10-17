@@ -85,6 +85,15 @@ describe("autopilot", () => {
     // Each parallel commission was steered in a different direction.
     const directions = new Set(calls.filter((c) => c.agent === "program_director" && !c.webSearch).map((c) => (c.content.find((x) => x.type === "text") as { text: string }).text.match(/explore this direction: ([^.]+)/)?.[1]).filter(Boolean));
     expect(directions.size).toBe(3);
+    // A failed development frees its place and doesn't count towards today's limit.
+    const failedDev = await db.get("workflow_runs", projects[1]!.run_id!);
+    await db.update("workflow_runs", failedDev!.id, { status: "failed" });
+    for (const r of runs) await db.update("workflow_runs", r.id, { status: "failed" });
+    // Parallel developments don't trample each other's work.
+    expect((await db.list("workflow_steps")).filter((s) => s.status === "failed")).toHaveLength(0);
+    expect(await runAutopilot()).toHaveLength(1); // one place freed; the failed commissions don't count
+    expect((await db.get("series_projects", projects[1]!.id))!.status).toBe("failed");
+    for (const r of await db.list("workflow_runs", { where: { kind: "series_development" } })) if (r.idempotency_key?.startsWith("autopilot:")) await db.update("workflow_runs", r.id, { status: "succeeded" });
     // Daily limit: even with free places, no more today.
     for (const p of projects) await db.update("series_projects", p.id, { status: "rejected" });
     expect(await runAutopilot()).toHaveLength(0);
@@ -165,5 +174,16 @@ describe("runUntil", () => {
     expect(started).toBe(4);
     expect((await db.get("workflow_runs", run.id))!.status).toBe("succeeded");
     expect(order.indexOf("c")).toBeLessThan(order.indexOf("slow"));
+  });
+});
+
+describe("Claude request options per model", () => {
+  it("only sends refusal fallbacks and the newer web search tool to models that accept them", async () => {
+    const { supportsServerFallback, webSearchToolType } = await import("@/lib/studio/llm");
+    expect(supportsServerFallback("claude-haiku-5-5")).toBe(false);
+    expect(supportsServerFallback("claude-sonnet-5-5")).toBe(true);
+    expect(supportsServerFallback("claude-opus-5-5")).toBe(true);
+    expect(webSearchToolType("claude-haiku-5-5")).toBe("web_search_20250305");
+    expect(webSearchToolType("claude-sonnet-5-5")).toBe("web_search_20260209");
   });
 });
