@@ -116,7 +116,8 @@ export function scoreCareer(
 
 /** Exploratory compatibility indicator, not a scientific aptitude score. */
 export function toPercent(raw: number): number {
-  return Math.max(30, Math.min(97, Math.round(28 + raw * 82)));
+  const t = Math.max(0, Math.min(1, (raw - 0.3) / 0.65));
+  return Math.max(30, Math.min(97, Math.round(30 + 67 * Math.pow(t, 1.3))));
 }
 
 const MODE_PHRASES: Record<WorkMode, string> = {
