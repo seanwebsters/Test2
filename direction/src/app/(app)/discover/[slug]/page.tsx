@@ -8,7 +8,7 @@ import { MissionCard } from "@/components/mission/MissionCard";
 import { StartPathButton } from "@/components/path/PathActions";
 import { Pill, ProgressBar, SectionTitle } from "@/components/ui/primitives";
 import { getCategory } from "@/lib/content/categories";
-import { CAREERS, getCareer, ROUTE_LABELS } from "@/lib/content/careers";
+import { getCareer, ROUTE_LABELS } from "@/lib/content/careers";
 import { DIRECTORY_OPPORTUNITIES, OPPORTUNITY_TYPE_LABELS } from "@/lib/content/opportunities";
 import { requirePath } from "@/lib/content/paths";
 import { skillName } from "@/lib/content/skills";
@@ -16,9 +16,8 @@ import { rankCareers } from "@/lib/engine/matching";
 import { careerReadiness, skillPoints } from "@/lib/engine/skills";
 import { getSession } from "@/lib/server/page";
 
-export function generateStaticParams() {
-  return CAREERS.map((c) => ({ slug: c.slug }));
-}
+// Personalised (match, readiness, path state), so rendered per request.
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;

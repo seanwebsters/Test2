@@ -83,17 +83,19 @@ function CountUp({ to }: { to: number }) {
 }
 
 export function CelebrationProvider({ children }: { children: ReactNode }) {
-  const [queue, setQueue] = useState<Celebration[]>([]);
+  const [queue, setQueue] = useState<(Celebration & { id: number })[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const current = queue[0];
 
-  const celebrate = useCallback((c: Celebration) => setQueue((q) => [...q, c]), []);
+  const celebrate = useCallback((c: Celebration) => setQueue((q) => [...q, { ...c, id: Date.now() + Math.random() }]), []);
   const toast = useCallback((text: string, tone: "ok" | "error" = "ok") => {
     const id = Date.now() + Math.random();
     setToasts((t) => [...t, { id, text, tone }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3800);
   }, []);
-  const dismiss = () => setQueue((q) => q.slice(1));
+  // Dismiss by id so a click on an overlay that's animating out can't skip the next one.
+  const currentId = queue[0]?.id;
+  const dismiss = () => setQueue((q) => q.filter((x) => x.id !== currentId));
 
   const big = current && (current.kind !== "mission" || !!current.level || !!current.achievements?.length || !!current.rankUp);
 
@@ -115,14 +117,14 @@ export function CelebrationProvider({ children }: { children: ReactNode }) {
           ))}
         </AnimatePresence>
       </div>
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         {current && (
           <motion.div
-            key={`${current.kind}-${current.title}-${queue.length}`}
+            key={current.id}
             className="fixed inset-0 z-[60] grid place-items-center bg-navy/60 p-5 backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            exit={{ opacity: 0, pointerEvents: "none" }}
             onClick={dismiss}
             role="dialog"
             aria-modal="true"
