@@ -1,0 +1,202 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --nx-bg: #09090d;
+}
+
+html {
+  background: var(--nx-bg);
+  -webkit-tap-highlight-color: transparent;
+}
+body {
+  @apply bg-ink text-bone font-sans antialiased;
+  text-rendering: optimizeLegibility;
+}
+::selection { background: rgba(255, 106, 61, 0.4); }
+
+/* Display typefaces for universes */
+.ff-fraunces { font-family: "Fraunces Variable", Georgia, serif; font-optical-sizing: auto; }
+.ff-fredoka { font-family: "Fredoka Variable", system-ui, sans-serif; font-weight: 600; }
+.ff-chakra { font-family: "Chakra Petch", system-ui, sans-serif; font-weight: 700; font-style: italic; letter-spacing: 0.02em; }
+.ff-limelight { font-family: "Limelight", Georgia, serif; letter-spacing: 0.04em; }
+.ff-bungee { font-family: "Bungee", system-ui, sans-serif; }
+.ff-syne { font-family: "Syne Variable", system-ui, sans-serif; font-weight: 700; letter-spacing: 0.06em; }
+.ff-abril { font-family: "Abril Fatface", Georgia, serif; }
+.ff-vt323 { font-family: "VT323", ui-monospace, monospace; letter-spacing: 0.04em; }
+.ff-cormorant { font-family: "Cormorant Garamond", Georgia, serif; font-weight: 600; font-variant: small-caps; letter-spacing: 0.04em; }
+.ff-yeseva { font-family: "Yeseva One", Georgia, serif; }
+.ff-righteous { font-family: "Righteous", system-ui, sans-serif; }
+.ff-playfair { font-family: "Playfair Display Variable", Georgia, serif; font-weight: 700; letter-spacing: 0.02em; }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+
+.glass {
+  background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+  backdrop-filter: blur(18px) saturate(1.3);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  border: 1px solid rgba(255,255,255,0.09);
+}
+
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.07;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+}
+
+.focus-ring { @apply outline-none focus-visible:ring-2 focus-visible:ring-ember focus-visible:ring-offset-2 focus-visible:ring-offset-ink; }
+
+/* ------------------------------------------------------------------ */
+/* Procedural art motion: only inside .nx-animate (heroes, inspection, */
+/* animated variants) so grids of cards stay cheap.                    */
+/* ------------------------------------------------------------------ */
+@keyframes nx-drift { 0% { transform: translate(0,0); } 50% { transform: translate(6px,-10px); } 100% { transform: translate(0,0); } }
+@keyframes nx-twinkle { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
+@keyframes nx-sway { 0%,100% { transform: rotate(-1.2deg); } 50% { transform: rotate(1.2deg); } }
+@keyframes nx-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes nx-pulse { 0%,100% { opacity: .65; transform: scale(1); } 50% { opacity: 1; transform: scale(1.08); } }
+@keyframes nx-spin { to { transform: rotate(360deg); } }
+@keyframes nx-blink { 0%,40%,100% { opacity: 1; } 50%,90% { opacity: .15; } }
+@keyframes nx-roll { 0% { transform: translateY(-40px); } 100% { transform: translateY(560px); } }
+@keyframes nx-flicker { 0%,100% { opacity: 1; } 47% { opacity: 1; } 48% { opacity: .55; } 50% { opacity: 1; } 72% { opacity: .8; } }
+@keyframes nx-streak { 0% { transform: translateX(-30px); opacity: .4; } 50% { opacity: 1; } 100% { transform: translateX(40px); opacity: .4; } }
+@keyframes nx-wobble { 0%,100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
+@keyframes nx-steam { 0% { transform: translateY(0); opacity: .35; } 100% { transform: translateY(-30px); opacity: 0; } }
+@keyframes nx-wave { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(.6); } }
+
+.nx-animate .nx-drift { animation: nx-drift 9s ease-in-out infinite; }
+.nx-animate .nx-twinkle { animation: nx-twinkle 3.2s ease-in-out infinite; }
+.nx-animate .nx-sway { animation: nx-sway 6s ease-in-out infinite; transform-origin: 50% 0; transform-box: fill-box; }
+.nx-animate .nx-bob { animation: nx-bob 5s ease-in-out infinite; }
+.nx-animate .nx-pulse { animation: nx-pulse 3.5s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+.nx-animate .nx-spin-slow { animation: nx-spin 40s linear infinite; transform-origin: center; transform-box: fill-box; }
+.nx-animate .nx-blink { animation: nx-blink 1.6s steps(1) infinite; }
+.nx-animate .nx-roll { animation: nx-roll 4s linear infinite; }
+.nx-animate .nx-flicker { animation: nx-flicker 5s linear infinite; }
+.nx-animate .nx-streak { animation: nx-streak 1.8s ease-in-out infinite alternate; }
+.nx-animate .nx-wobble { animation: nx-wobble 2.4s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+.nx-animate .nx-steam { animation: nx-steam 3s ease-out infinite; }
+.nx-animate .nx-wave { animation: nx-wave 1.2s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+.nx-animate .nx-noise { animation: nx-flicker .4s steps(2) infinite; }
+
+/* ------------------------------------------------------------------ */
+/* Trading cards                                                        */
+/* ------------------------------------------------------------------ */
+.tcard {
+  --mx: 50%;
+  --my: 50%;
+  --rx: 0deg;
+  --ry: 0deg;
+  --frame: #b8bcc8;
+  --glow: rgba(184,188,200,0.35);
+  position: relative;
+  aspect-ratio: 5 / 7;
+  border-radius: 4.5% / 3.2%;
+  isolation: isolate;
+  container-type: inline-size;
+}
+.tcard-inner {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  background: #0b0b10;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 18px 40px -18px rgba(0,0,0,0.9);
+}
+.tcard-frame {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2.2cqw;
+  background: var(--frame);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.r-common { --frame: linear-gradient(160deg, #d9dce4, #8d919c 50%, #c9ccd5); --glow: rgba(184,188,200,0.25); }
+.r-uncommon { --frame: linear-gradient(160deg, #a8f0c8, #2f9d68 50%, #8ee3b5); --glow: rgba(95,211,154,0.4); }
+.r-rare { --frame: linear-gradient(160deg, #b5dbff, #2a6fd6 45%, #9fd0ff 60%, #3c84f0); --glow: rgba(79,163,255,0.55); }
+.r-epic { --frame: linear-gradient(160deg, #e3c6ff, #7b2fe0 40%, #d8a8ff 55%, #8a3cf0); --glow: rgba(176,107,255,0.6); }
+.r-legendary { --frame: linear-gradient(120deg, #fff1b8, #c98b16 25%, #ffe08a 45%, #a86d08 65%, #ffd05c 85%); --glow: rgba(255,194,71,0.7); }
+.r-mythic { --frame: conic-gradient(from var(--angle, 0deg), #ff5fd2, #ffb35f, #fff26b, #5fffb0, #5fd0ff, #a65fff, #ff5fd2); --glow: rgba(255,95,210,0.8); }
+
+@property --angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+@keyframes nx-angle { to { --angle: 360deg; } }
+.r-mythic .tcard-frame { animation: nx-angle 6s linear infinite; padding: 2.8cqw; }
+.r-legendary .tcard-frame { padding: 2.6cqw; }
+
+.tcard-glow {
+  position: absolute;
+  inset: -6%;
+  border-radius: 10%;
+  background: radial-gradient(closest-side, var(--glow), transparent 75%);
+  filter: blur(14px);
+  z-index: -1;
+  opacity: 0;
+  transition: opacity .4s ease;
+}
+.tcard:hover .tcard-glow, .tcard[data-glow="on"] .tcard-glow { opacity: 1; }
+.r-legendary .tcard-glow, .r-mythic .tcard-glow { opacity: .55; }
+
+/* Light sheen that follows the pointer on every card */
+.tcard-sheen {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background: radial-gradient(circle at var(--mx) var(--my), rgba(255,255,255,0.22), transparent 45%);
+  mix-blend-mode: soft-light;
+  opacity: 0;
+  transition: opacity .3s;
+}
+.tcard:hover .tcard-sheen, .tcard[data-interactive="on"] .tcard-sheen { opacity: 1; }
+
+/* Holographic foil */
+.holo {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(115deg, rgba(255,0,120,0.0) 0%, rgba(255,90,170,0.35) 6%, rgba(255,240,90,0.32) 12%, rgba(80,255,190,0.32) 18%, rgba(80,190,255,0.35) 24%, rgba(170,90,255,0.32) 30%, rgba(255,0,120,0.0) 36%),
+    radial-gradient(circle at var(--mx) var(--my), rgba(255,255,255,0.5), transparent 40%);
+  background-size: 300% 300%, 100% 100%;
+  background-position: calc(var(--mx) * 1.4) calc(var(--my) * 1.2), 0 0;
+  mix-blend-mode: color-dodge;
+  opacity: .55;
+  filter: saturate(1.4);
+}
+.holo-sparkle {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(255,255,255,0.9) 0.6px, transparent 1px);
+  background-size: 9px 9px;
+  mix-blend-mode: overlay;
+  opacity: .45;
+  -webkit-mask: radial-gradient(circle at var(--mx) var(--my), #000 0, transparent 55%);
+  mask: radial-gradient(circle at var(--mx) var(--my), #000 0, transparent 55%);
+}
+.v-secret .tcard-art { filter: invert(1) hue-rotate(180deg) sepia(.55) saturate(1.6) contrast(1.1); }
+.v-alt-art .tcard-art { filter: hue-rotate(var(--alt-hue, 140deg)) saturate(1.15); }
+
+/* Locked / silhouette cards */
+.tcard-locked .tcard-art { filter: brightness(.12) saturate(0) blur(1.5px) contrast(1.6); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+}
+html[data-reduced-motion="true"] *, html[data-reduced-motion="true"] *::before, html[data-reduced-motion="true"] *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+
+.skeleton { background: linear-gradient(90deg, rgba(255,255,255,0.04), rgba(255,255,255,0.09), rgba(255,255,255,0.04)); background-size: 200% 100%; @apply animate-shimmer; }
