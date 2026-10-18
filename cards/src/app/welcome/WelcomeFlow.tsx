@@ -25,9 +25,10 @@ const GENRE_ART: Record<string, string> = {
   adventure: "deep-blue", comedy: "oddly-alive", surreal: "afterlight", anime: "moon-market", creatures: "deep-blue", drama: "crownless",
 };
 
-export function WelcomeFlow({ universes, genres, initialGenres, starterClaimed, isGuest }: { universes: U[]; genres: { id: GenreId; label: string }[]; initialGenres: GenreId[]; starterClaimed: boolean; isGuest: boolean }) {
+export type { Step };
+export function WelcomeFlow({ universes, genres, initialGenres, starterClaimed, isGuest, startAt }: { universes: U[]; genres: { id: GenreId; label: string }[]; initialGenres: GenreId[]; starterClaimed: boolean; isGuest: boolean; startAt?: Step }) {
   const router = useRouter();
-  const [step, setStep] = useState<Step>(starterClaimed ? "follow" : "hello");
+  const [step, setStep] = useState<Step>(startAt ?? (starterClaimed ? "follow" : "hello"));
   const [picked, setPicked] = useState<GenreId[]>(initialGenres);
   const [choice, setChoice] = useState<U | undefined>();
   const [opened, setOpened] = useState<{ opening: PackOpening; faces: Record<string, CardFace> }>();
@@ -124,14 +125,14 @@ export function WelcomeFlow({ universes, genres, initialGenres, starterClaimed, 
             <p className="mt-2 text-bone-3">Choose one for your free starter pack. Five cards, one guaranteed Rare or better.</p>
             <div className="mt-8 grid gap-5 md:grid-cols-3">
               {recs.map((u) => (
-                <button key={u.id} onClick={() => { setChoice(u); setStep("pack"); }} className="focus-ring group relative aspect-[3/4] overflow-hidden rounded-3xl text-left shadow-card" style={{ background: u.palette.bg }}>
+                <button key={u.id} onClick={() => { setChoice(u); if (starterClaimed) router.push(`/universes/${u.slug}`); else setStep("pack"); }} className="focus-ring group relative aspect-[3/4] overflow-hidden rounded-3xl text-left shadow-card" style={{ background: u.palette.bg }}>
                   <div className="nx-animate absolute inset-0"><Art style={u.style} palette={u.palette} seed={u.seed} aspect="tall" sceneOnly className="h-full w-full transition duration-700 group-hover:scale-105" /></div>
                   <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
                   <div className="absolute inset-x-0 bottom-0 p-6">
                     <h3 className={`ff-${u.font} text-4xl leading-none`} style={{ color: u.palette.ink }}>{u.title}</h3>
                     <p className="mt-3 text-sm text-white/80">{u.premise}</p>
                     <p className="mt-3 text-[12px] font-semibold text-white/60">{fmt(u.followers)} followers</p>
-                    <span className={`${btn("light", "sm")} mt-4`}>Open my first pack</span>
+                    <span className={`${btn("light", "sm")} mt-4`}>{starterClaimed ? "Explore" : "Open my first pack"}</span>
                   </div>
                 </button>
               ))}
@@ -140,7 +141,7 @@ export function WelcomeFlow({ universes, genres, initialGenres, starterClaimed, 
               <summary className="cursor-pointer text-sm font-semibold text-bone-2">Or choose from every universe</summary>
               <div className="mt-4 flex flex-wrap gap-2">
                 {universes.map((u) => (
-                  <button key={u.id} onClick={() => { setChoice(u); setStep("pack"); }} className="rounded-full border border-white/10 px-4 py-2 text-sm hover:border-white/30">{u.title}</button>
+                  <button key={u.id} onClick={() => { setChoice(u); if (starterClaimed) router.push(`/universes/${u.slug}`); else setStep("pack"); }} className="rounded-full border border-white/10 px-4 py-2 text-sm hover:border-white/30">{u.title}</button>
                 ))}
               </div>
             </details>

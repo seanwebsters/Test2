@@ -7,7 +7,8 @@ import { pageCtx } from "@/lib/view/page";
 
 export const metadata = { title: "Welcome" };
 
-export default async function WelcomePage() {
+export default async function WelcomePage({ searchParams }: { searchParams: Promise<{ step?: string }> }) {
+  const { step } = await searchParams;
   const { state, user, at } = await pageCtx();
   const stats = universeStats(state, at);
   const universes = liveUniverses(state, at).map((u) => ({
@@ -18,5 +19,5 @@ export default async function WelcomePage() {
     followers: stats.get(u.id)!.shown.followers,
     following: state.follows.some((f) => f.userId === user.id && f.universeId === u.id),
   }));
-  return <WelcomeFlow universes={universes} genres={GENRES.map((g) => ({ id: g.id, label: g.label }))} initialGenres={user.genres} starterClaimed={user.starterClaimed} isGuest={user.isGuest} />;
+  return <WelcomeFlow universes={universes} genres={GENRES.map((g) => ({ id: g.id, label: g.label }))} initialGenres={user.genres} starterClaimed={user.starterClaimed} isGuest={user.isGuest} startAt={step === "genres" ? "genres" : undefined} />;
 }
