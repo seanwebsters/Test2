@@ -4,6 +4,7 @@ import { Art } from "@/components/art/Art";
 import { fmt } from "@/components/ui/Currency";
 import { FollowButton } from "@/components/ui/FollowButton";
 import { btn, chip, container } from "@/components/ui/styles";
+import { TrackView } from "@/components/universe/TrackView";
 import { UniverseTabs } from "@/components/universe/UniverseTabs";
 import { liveUniverseOr404 } from "@/lib/view/load";
 import { pageCtx } from "@/lib/view/page";
@@ -17,6 +18,7 @@ export default async function UniverseLayout({ children, params }: { children: R
   const pct = v.cards ? Math.round((v.owned / v.cards) * 100) : 0;
   return (
     <div style={{ ["--u-accent" as string]: u.style.palette.accent }}>
+      <TrackView universeId={u.id} />
       <section className="relative isolate overflow-hidden" style={{ background: u.style.palette.bg }}>
         <div className="nx-animate absolute inset-0 -z-10">
           {v.heroImageUrl ? (
