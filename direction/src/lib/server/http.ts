@@ -1,6 +1,6 @@
 import "server-only";
 import { NextResponse } from "next/server";
-import { ZodError, type ZodType } from "zod";
+import { ZodError, type ZodTypeAny, type output } from "zod";
 
 export class HttpError extends Error {
   constructor(
@@ -16,7 +16,7 @@ export function json<T>(data: T, init?: number | ResponseInit) {
   return NextResponse.json(data, typeof init === "number" ? { status: init } : init);
 }
 
-export async function parseBody<T>(req: Request, schema: ZodType<T>): Promise<T> {
+export async function parseBody<S extends ZodTypeAny>(req: Request, schema: S): Promise<output<S>> {
   let raw: unknown;
   try {
     raw = await req.json();

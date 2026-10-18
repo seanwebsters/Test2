@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Offline · DIRECTION</title>
+<style>
+  :root { --bg:#FBF8F3; --ink:#0E1B3D; --muted:#465274; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#091026; --ink:#F3F1EC; --muted:#B8C0D8; } }
+  body { margin:0; min-height:100vh; display:grid; place-items:center; background:var(--bg); color:var(--ink); font-family:system-ui,sans-serif; text-align:center; padding:24px; }
+  h1 { font-size:28px; margin:16px 0 8px; } p { color:var(--muted); max-width:320px; }
+  button { margin-top:20px; background:#0EAA9C; color:#fff; border:0; border-radius:16px; padding:12px 20px; font-weight:700; font-size:15px; }
+</style>
+</head>
+<body>
+  <div>
+    <img src="/icon.svg" width="64" height="64" alt="" />
+    <h1>You're offline</h1>
+    <p>Pip can't reach the internet right now. Your progress is safe — reconnect and pick up where you left off.</p>
+    <button onclick="location.reload()">Try again</button>
+  </div>
+</body>
+</html>
