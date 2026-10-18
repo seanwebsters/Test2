@@ -17,11 +17,12 @@ export interface UniverseStats {
   shown: { followers: number; collectors: number; packsOpened: number; growth: number };
 }
 
-const statsCache = new WeakMap<DbState, Map<string, UniverseStats>>();
+const statsCache = new WeakMap<DbState, { key: string; stats: Map<string, UniverseStats> }>();
 
 export function universeStats(state: DbState, at: number): Map<string, UniverseStats> {
+  const key = `${state.openings.length}|${state.follows.length}|${state.storyProgress.length}|${state.universes.length}|${Math.floor(at / 60_000)}`;
   const hit = statsCache.get(state);
-  if (hit) return hit;
+  if (hit && hit.key === key) return hit.stats;
   const idx = catalog(state);
   const out = new Map<string, UniverseStats>();
   const weekAgo = at - 7 * DAY_MS;
@@ -46,7 +47,7 @@ export function universeStats(state: DbState, at: number): Map<string, UniverseS
       },
     });
   }
-  statsCache.set(state, out);
+  statsCache.set(state, { key, stats: out });
   return out;
 }
 

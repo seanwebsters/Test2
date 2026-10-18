@@ -13,12 +13,17 @@ export interface CatalogIndex {
   characters: Map<string, { character: Character; universe: Universe }>;
 }
 
-const cache = new WeakMap<DbState, CatalogIndex>();
+const cache = new WeakMap<DbState, { key: string; idx: CatalogIndex }>();
+
+/** Content fingerprint: drafts are mutated inside transactions, so the object alone isn't a safe cache key. */
+const contentKey = (state: DbState) =>
+  `${state.seededAt}|${state.universes.map((u) => `${u.id}:${u.status}:${u.updatedAt}:${u.cards.length}:${u.episodes.length}`).join(",")}|${JSON.stringify(state.overrides)}`;
 
 /** All universes (any status) with Studio overrides applied. Memoised per committed state. */
 export function catalog(state: DbState): CatalogIndex {
+  const key = contentKey(state);
   const hit = cache.get(state);
-  if (hit) return hit;
+  if (hit && hit.key === key) return hit.idx;
   const epoch = Date.parse(state.seededAt);
   const universes = [...seedUniverses(), ...state.universes].map((u) => applyOverride(u, state));
   const idx: CatalogIndex = {
@@ -30,7 +35,7 @@ export function catalog(state: DbState): CatalogIndex {
     episodes: new Map(universes.flatMap((u) => u.episodes.map((e) => [e.id, e] as const))),
     characters: new Map(universes.flatMap((u) => u.characters.map((c) => [`${u.id}:${c.id}`, { character: c, universe: u }] as const))),
   };
-  cache.set(state, idx);
+  cache.set(state, { key, idx });
   return idx;
 }
 

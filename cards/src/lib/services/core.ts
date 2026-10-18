@@ -23,6 +23,13 @@ export function requireUser(draft: DbState, userId: string): User {
   return u;
 }
 
+/** Defence in depth: Studio mutations re-check the actor's role inside the transaction. */
+export function requireAdminUser(draft: DbState, userId: string): User {
+  const u = draft.users[userId];
+  if (!u || u.role !== "admin") throw new ServiceError("forbidden", "Administrator access required", 403);
+  return u;
+}
+
 export function wallet(draft: DbState, userId: string): Wallet {
   return (draft.wallets[userId] ??= { shards: 0, stardust: 0, tokens: {} });
 }
