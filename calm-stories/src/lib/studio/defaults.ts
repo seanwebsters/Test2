@@ -23,8 +23,8 @@ export const DEFAULT_STUDIO_SETTINGS: Omit<StudioSettings, "updated_at"> = {
   default_episode_budget_cents: 300,
   default_series_budget_cents: 500,
   web_research: true,
-  // Music generation is the priciest audio item; off keeps episodes under ~$1.
-  episode_music: false,
+  // Music is as important as narration: one cue per series, generated once and reused.
+  episode_music: true,
   // House style: one calm narrator reads every part.
   single_narrator: true,
   narrator_voice: "Theo Silk Slow",

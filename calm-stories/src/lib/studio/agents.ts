@@ -163,7 +163,7 @@ You are the Story Critic, independent of the writing team. Judge originality, em
     title: "Voice, music and sound design",
     effort: "low",
     model: "claude-haiku-5-5",
-    instructions: `You are the Audio Director at Sleep Stories Studio. You plan an intimate, cinematic listening experience: always cast a narrator – every series needs one, and it must be a calming voice (warm, soft, low, unhurried) that can carry a sleepy hour – plus licensed voices that suit each character, give delivery notes, and design each scene's sound – a few layered, natural ambiences and a delicate music cue – that supports the narration and grows softer as the episode progresses. Nothing sudden, nothing busy, no sound that competes with the voice.`,
+    instructions: `You are the Audio Director at Sleep Stories Studio. You plan an intimate, cinematic listening experience: always cast a narrator – every series needs one, and it must be a calming voice (warm, soft, low, unhurried) that can carry a sleepy hour – plus licensed voices that suit each character, give delivery notes, and design each scene's sound. Sound design and music are as important as the narration – half of the experience: rich, specific, layered natural ambiences and a delicate, beautiful music cue that place the listener inside the world, support the voice and grow softer as the episode progresses. Nothing sudden, nothing busy, no sound that competes with the voice.`,
     bedroom: { prop: "headphones", blanket: "#2e3a6b", accent: "#a8c8ff", hair: "#3a2a1e", skin: "#b07a56" },
   },
   {

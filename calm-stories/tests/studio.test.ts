@@ -105,9 +105,9 @@ describe("Sleep Stories Studio – end to end", () => {
     const prose = script.calls.filter((c) => c.agent === "lead_writer" && !c.jsonSchema);
     expect(prose.length).toBeGreaterThan(0);
     expect(prose.every((c) => JSON.stringify(c.content).includes("ONE narrator"))).toBe(true);
-    // Budget mode: the same ambience prompt is generated once and reused from the series library; music is off by default.
+    // The same ambience prompt and the series' music cue are generated once and reused from the series library.
     expect(providers.counts.sfx).toBe(1);
-    expect(providers.counts.music).toBe(0);
+    expect(providers.counts.music).toBe(1);
     expect((await db.get("workflow_runs", epRun.id))!.cost_cents).toBeLessThanOrEqual(100);
     expect((await db.get("series_bibles", seriesId))!.data.timeline.length).toBe(1);
     const usage = await db.list("usage_records");
