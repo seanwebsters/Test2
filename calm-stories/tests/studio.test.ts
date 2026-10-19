@@ -117,9 +117,18 @@ describe("Sleep Stories Studio – end to end", () => {
     const usage = await db.list("usage_records");
     expect(usage.some((u) => u.provider === "anthropic") && usage.some((u) => u.provider === "gemini") && usage.some((u) => u.provider === "elevenlabs")).toBe(true);
 
-    // Never published without a human.
-    const review = (await db.findOne("editorial_reviews", { episode_id: ep.id }))!;
-    expect(review.source).toBe("agents");
+    // Never published without a human – who can send it back for changes as many times as they like.
+    const pendingReview = async () => (await db.list("editorial_reviews", { where: { episode_id: ep.id, status: "pending" } }))[0];
+    for (const notes of ["Make the opening warmer.", "Now soften the last scene a little more."]) {
+      const r = (await pendingReview())!;
+      expect(r.source).toBe("agents");
+      await decideReview(r.id, "usr_calm-editor", { decision: "changes_requested", notes });
+      await drain();
+      expect((await db.get("workflow_runs", epRun.id))!.status).toBe("awaiting_approval");
+    }
+    const stepKeys = (await db.list("workflow_steps", { where: { run_id: epRun.id } })).map((s) => s.key);
+    expect(stepKeys).toEqual(expect.arrayContaining(["human_notes_1", "human_rewrite_1", "human_notes_2", "human_rewrite_2"]));
+    const review = (await pendingReview())!;
     await decideReview(review.id, "usr_calm-editor", { decision: "approve", release_at: new Date(Date.now() - 1000).toISOString() });
     expect((await db.get("episodes", ep.id))!.status).toBe("published");
     expect((await db.get("series", seriesId))!.status).toBe("published");

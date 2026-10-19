@@ -414,10 +414,12 @@ registerHandler("ep.approval", async (ctx) => {
 });
 
 /** Fired from decideReview when a human decides on an agent-produced episode. */
-registerGateHook("ep.approval", async (_run, step, decision) => {
+registerGateHook("ep.approval", async (run, step, decision) => {
   if (decision.approved || !decision.notes || step.params.no_revision) return;
   // Changes requested: turn the notes into a revision brief and run the rewrite → finalize → art/audio chain again.
-  const n = Number(step.params.human_round ?? 0) + 1;
+  // Rounds are unlimited – number each one after the rounds this run has already had.
+  const done = (await getDb().list("workflow_steps", { where: { run_id: run.id } })).filter((s) => /^human_notes_\d+$/.test(s.key)).length;
+  const n = done + 1;
   return [
     { key: `human_notes_${n}`, type: "ep.human_notes", agent: "creative_director", label: "Turn your notes into a revision brief", activity: "reading", deps: [step.key], params: { notes: decision.notes, round: n } },
     { key: `human_rewrite_${n}`, type: "ep.rewrite", agent: "lead_writer", label: "Rewrite to your notes", activity: "typing", deps: [`human_notes_${n}`], params: { round: `h${n}` } },
