@@ -9,6 +9,10 @@ import { isStaff } from "@/app/admin/staff";
 import { AgentEditor } from "./AgentEditor";
 import { GuidelinesEditor } from "./GuidelinesEditor";
 import { StudioSettingsForm } from "./StudioSettingsForm";
+import { AdminAction } from "@/components/admin/AdminAction";
+import { diskUsage } from "@/lib/services/disk";
+
+const gb = (b: number) => `${(b / 1e9).toFixed(b < 1e10 ? 2 : 1)} GB`;
 
 export const metadata = { title: "Settings" };
 
@@ -20,6 +24,26 @@ export default async function StudioSettingsPage() {
   return (
     <div className="space-y-10">
       <h1 className="font-serif text-5xl text-white">Settings</h1>
+      {(() => {
+        const d = diskUsage({ breakdown: true });
+        if (!d) return null;
+        const pct = Math.round((d.usedBytes / Math.max(1, d.totalBytes)) * 100);
+        return (
+          <section className="rounded-2xl border border-white/10 p-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <h2 className="font-serif text-2xl text-white">Storage</h2>
+                <p className="text-sm text-mist">
+                  Volume: <span className="text-white">{gb(d.usedBytes)} used of {gb(d.totalBytes)}</span> ({gb(d.freeBytes)} free).{" "}
+                  {Object.entries(d.byFolder).map(([k, v]) => `${k} ${gb(v)}`).join(" · ")}
+                </p>
+                <div className="mt-2 h-2 max-w-md rounded-full bg-white/10"><div className={cx("h-full rounded-full", pct > 90 ? "bg-rose-400" : "bg-lavender")} style={{ width: `${pct}%` }} /></div>
+              </div>
+              <AdminAction endpoint="/api/studio/storage" label="Free up space" pendingLabel="Tidying…" className="btn-ghost btn-sm" />
+            </div>
+          </section>
+        );
+      })()}
       <section>
         <h2 className="font-serif text-3xl text-white">Provider connections</h2>
         <p className="text-sm text-mist">Keys live only in server environment variables and are never shown or stored in the database.</p>

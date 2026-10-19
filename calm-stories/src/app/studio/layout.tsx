@@ -6,6 +6,7 @@ import { SceneArt } from "@/components/art/SceneArt";
 import { StudioNav } from "@/components/studio/StudioNav";
 import { AGENT_BY_KEY } from "@/lib/studio/agents";
 import { env } from "@/lib/env";
+import { diskUsage } from "@/lib/services/disk";
 import "@/lib/studio";
 
 export const metadata = { title: { default: "Sleep Stories Studio", template: "%s · Sleep Stories Studio" } };
@@ -86,6 +87,18 @@ export default async function StudioLayout({ children }: { children: React.React
           <Link href="/studio/approvals" className="ml-auto text-sm text-lavender">Approvals</Link>
           <Link href="/studio/team" className="text-sm text-mist">Team</Link>
         </div>
+        {(() => {
+          const d = diskUsage();
+          if (!d || (d.freeBytes > 300e6 && d.freeBytes / d.totalBytes > 0.08)) return null;
+          return (
+            <div className="mx-4 mt-4 rounded-2xl border border-rose-400/50 bg-rose-500/10 px-4 py-3 text-sm sm:mx-8 lg:mx-10" role="alert">
+              <div className="font-semibold text-rose-200">Disk almost full</div>
+              <p className="mt-1 text-rose-100/90">
+                Only {(d.freeBytes / 1e6).toFixed(0)} MB free of {(d.totalBytes / 1e9).toFixed(2)} GB on the studio&rsquo;s volume. If you resized the Railway volume, this is the size the app actually sees. Use <Link href="/studio/settings" className="underline">Settings → Free up space</Link>, or make the volume bigger in Railway.
+              </p>
+            </div>
+          );
+        })()}
         {env.storageWarning && (
           <div className="mx-4 mt-4 rounded-2xl border border-amber-300/50 bg-amber-400/10 px-4 py-3 text-sm sm:mx-8 lg:mx-10" role="alert">
             <div className="font-semibold text-amber-200">Not saving permanently</div>

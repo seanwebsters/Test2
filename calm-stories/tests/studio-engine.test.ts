@@ -323,3 +323,47 @@ describe("animated agents (test avatar)", () => {
     }
   });
 });
+
+describe("free up space", () => {
+  it("deletes only unused old files and compresses older WAV/PNG while keeping records working", async () => {
+    const fs = (await import("node:fs")).default;
+    const path = (await import("node:path")).default;
+    const sharp = (await import("sharp")).default;
+    const { env } = await import("@/lib/env");
+    const { getStorage } = await import("@/lib/storage");
+    const { runFfmpeg, withTmp } = await import("@/lib/studio/mixing");
+    const { freeUpSpace, diskUsage } = await import("@/lib/services/disk");
+    const db = freshDb();
+    const storage = getStorage();
+    const root = path.resolve(process.cwd(), env.dataDir, "storage");
+    const age = (key: string) => { const t = new Date(Date.now() - 5 * 3600_000); fs.utimesSync(path.join(root, key), t, t); };
+    // A WAV narration still used by a scene render.
+    const wav = await withTmp(async (dir) => { const f = path.join(dir, "n.wav"); await runFfmpeg(["-f", "lavfi", "-i", "sine=duration=2", "-ar", "44100", "-ac", "1", f]); return fs.readFileSync(f); });
+    await storage.put("audio/s1/e1/scene-1/narration-1.wav", wav, "audio/wav");
+    age("audio/s1/e1/scene-1/narration-1.wav");
+    const render = await db.insert("scene_renders", { id: "srn_1", episode_id: "e1", series_id: "s1", scene_index: 1, version: 1, status: "current", narration_key: "audio/s1/e1/scene-1/narration-1.wav", ambience_keys: [], music_key: null, stem_key: null, duration_seconds: 2, qa: null, created_at: new Date().toISOString() } as never);
+    // A PNG artwork original that's in use, and two orphans: one old (deleted), one fresh (kept – could be work in progress).
+    const png = await sharp({ create: { width: 32, height: 32, channels: 3, background: "#456" } }).png().toBuffer();
+    await storage.put("art/s1/art_1/original.png", png, "image/png");
+    const art = await db.insert("artwork_assets", { id: "art_1", series_id: "s1", episode_id: null, run_id: null, kind: "poster", status: "selected", prompt: "p", provider: "fal", model: "m", storage_key: "art/s1/art_1/original.png", mime_type: "image/png", url: "/api/art/art_1", variants: {}, width: 32, height: 32, review: null, created_at: new Date().toISOString() } as never);
+    await storage.put("audio/s1/old/stem-9.wav", wav, "audio/wav");
+    age("audio/s1/old/stem-9.wav");
+    await storage.put("audio/s1/new/stem-10.wav", wav, "audio/wav");
+    await storage.put("avatars/lead_writer/working.mp4", Buffer.from([1, 2, 3]), "video/mp4");
+    age("avatars/lead_writer/working.mp4");
+
+    const res = await freeUpSpace();
+    expect(res.deleted).toBe(1);
+    expect(await storage.get("audio/s1/old/stem-9.wav")).toBeNull();
+    expect(await storage.get("audio/s1/new/stem-10.wav")).not.toBeNull();
+    expect(await storage.get("avatars/lead_writer/working.mp4")).not.toBeNull();
+    const r = (await db.get("scene_renders", render.id))!;
+    expect(r.narration_key).toBe("audio/s1/e1/scene-1/narration-1.mp3");
+    expect(await storage.get(r.narration_key!)).not.toBeNull();
+    expect(await storage.get("audio/s1/e1/scene-1/narration-1.wav")).toBeNull();
+    const a = (await db.get("artwork_assets", art.id))!;
+    expect([a.storage_key, a.mime_type]).toEqual(["art/s1/art_1/original.jpg", "image/jpeg"]);
+    expect(await storage.get(a.storage_key)).not.toBeNull();
+    expect(diskUsage()!.totalBytes).toBeGreaterThan(0);
+  });
+});
