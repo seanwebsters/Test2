@@ -52,8 +52,24 @@ export class LocalDatabase implements Database {
     return this.data[table] as Tables[K][];
   }
 
+  private exitHooked = false;
+
   private schedulePersist() {
     if (!this.filePath) return;
+    if (!this.exitHooked) {
+      // Railway/Docker send SIGTERM on restart: write any pending change before exiting.
+      this.exitHooked = true;
+      const flush = () => {
+        if (this.flushTimer) clearTimeout(this.flushTimer);
+        this.flushTimer = null;
+        this.persistNow();
+      };
+      process.once("SIGTERM", () => {
+        flush();
+        process.exit(0);
+      });
+      process.once("beforeExit", flush);
+    }
     if (this.flushTimer) return;
     this.flushTimer = setTimeout(() => {
       this.flushTimer = null;

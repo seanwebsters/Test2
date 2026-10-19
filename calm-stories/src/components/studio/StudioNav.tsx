@@ -14,6 +14,7 @@ const NAV: { href: string; label: string; icon: string }[] = [
   { href: "/studio/audio", label: "Audio Studio", icon: "M4 18V6m4 12V9m4 9V4m4 14V8m4 10v-6" },
   { href: "/studio/pipeline", label: "Production Pipeline", icon: "M4 6h6v4H4zM14 14h6v4h-6zM10 8h4v8h0M14 8h6v4h-6z" },
   { href: "/studio/approvals", label: "Approvals", icon: "M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7zM8.5 12l2.5 2.5 4.5-5" },
+  { href: "/studio/releases", label: "Releases", icon: "M5 4h14v16H5zM8 2v4M16 2v4M5 9h14M9 13l2 2 4-4" },
   { href: "/studio/analytics", label: "Analytics", icon: "M4 20V10m6 10V4m6 16v-7m4 7H2" },
   { href: "/studio/settings", label: "Settings", icon: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7.4-3a7.4 7.4 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-2-1.2L14.5 3h-5l-.4 2.6a7.6 7.6 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6a7.4 7.4 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 0 0 2 1.2l.4 2.6h5l.4-2.6a7.6 7.6 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2Z" },
 ];
