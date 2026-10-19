@@ -224,16 +224,20 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
 
   // Photoreal backdrop (Nano Banana render of the empty office, made on the server with the fal key)
   const svgRef = useRef<SVGSVGElement>(null);
-  const [photo, setPhoto] = useState<string | null>(null);
+  const [photo, setPhoto] = useState<string | null>(null); // saved 3D office
+  const [draft, setDraft] = useState<{ url: string; prompt?: string } | null>(null); // unsaved render to review
   const [photoOn, setPhotoOn] = useState(true);
-  const [rendering, setRendering] = useState(false);
+  const [prompt, setPrompt] = useState("");
+  const [busy, setBusy] = useState<null | "generate" | "refine" | "save" | "discard">(null);
   const [renderErr, setRenderErr] = useState<string | null>(null);
   const [sprites, setSprites] = useState<{ done: string[]; status: string; total: number; v: number } | null>(null);
+  type Meta = { updated_at: string; prompt?: string } | null;
   const loadInfo = async () => {
     const res = await fetch("/api/studio/office-render?info=1").catch(() => null);
     if (!res?.ok) return null;
-    const info = (await res.json()) as { render: { updated_at: string } | null; people: { done: string[]; status: string; total: number; updated_at: string } | null };
-    if (info.render) setPhoto(`/api/studio/office-render?v=${encodeURIComponent(info.render.updated_at)}`);
+    const info = (await res.json()) as { saved: Meta; draft: Meta; people: { done: string[]; status: string; total: number; updated_at: string } | null };
+    setPhoto(info.saved ? `/api/studio/office-render?v=${encodeURIComponent(info.saved.updated_at)}` : null);
+    setDraft(info.draft ? { url: `/api/studio/office-render?draft=1&v=${encodeURIComponent(info.draft.updated_at)}`, prompt: info.draft.prompt } : null);
     if (info.people) setSprites({ ...info.people, v: Date.parse(info.people.updated_at) || 0 });
     return info;
   };
@@ -248,47 +252,65 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sprites?.status]);
+  const post = async (url: string, body: unknown) => {
+    const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    const json = (await res.json().catch(() => ({}))) as { error?: { message?: string } | string } & Record<string, unknown>;
+    if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : json.error?.message ?? `Request failed (${res.status}).`);
+    return json;
+  };
   async function makePeople(redo = false) {
-    const res = await fetch("/api/studio/office-render/people", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ redo }) });
-    const json = (await res.json().catch(() => ({}))) as { error?: { message?: string } | string; done?: string[]; status?: string; total?: number };
-    if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : json.error?.message ?? `Couldn't start the 3D team (${res.status}).`);
+    const json = (await post("/api/studio/office-render/people", { redo })) as { done?: string[]; status?: string; total?: number };
     setSprites({ done: json.done ?? [], status: json.status ?? "running", total: json.total ?? 0, v: Date.now() });
   }
-  async function makePhotoreal() {
+  /** A PNG snapshot of the empty office illustration (no people), padded to 16:9. */
+  async function snapshot(): Promise<string> {
     const svg = svgRef.current;
-    if (!svg) return;
-    setRendering(true);
+    if (!svg) throw new Error("The office isn't on screen.");
+    const clone = svg.cloneNode(true) as SVGSVGElement;
+    clone.querySelectorAll(".sims-person, .sims-name, .sims-bubble-wrap, .sims-photo").forEach((n) => n.remove());
+    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    clone.setAttribute("width", String(VW));
+    clone.setAttribute("height", String(VH));
+    const src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(clone))}`;
+    const img = new Image();
+    await new Promise<void>((ok, bad) => { img.onload = () => ok(); img.onerror = () => bad(new Error("Couldn't snapshot the office.")); img.src = src; });
+    const canvas = document.createElement("canvas");
+    canvas.width = 1600;
+    canvas.height = 900;
+    const ctx = canvas.getContext("2d")!;
+    ctx.fillStyle = "#0a1026";
+    ctx.fillRect(0, 0, 1600, 900);
+    const k = 900 / VH;
+    ctx.drawImage(img, (1600 - VW * k) / 2, 0, VW * k, 900);
+    return canvas.toDataURL("image/png");
+  }
+  async function act(kind: "generate" | "refine" | "save" | "discard") {
+    setBusy(kind);
     setRenderErr(null);
     try {
-      const clone = svg.cloneNode(true) as SVGSVGElement;
-      clone.querySelectorAll(".sims-person, .sims-name, .sims-bubble-wrap, .sims-photo").forEach((n) => n.remove());
-      clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-      clone.setAttribute("width", String(VW));
-      clone.setAttribute("height", String(VH));
-      const src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(clone))}`;
-      const img = new Image();
-      await new Promise<void>((ok, bad) => { img.onload = () => ok(); img.onerror = () => bad(new Error("Couldn't snapshot the office.")); img.src = src; });
-      const canvas = document.createElement("canvas");
-      canvas.width = 1600;
-      canvas.height = 900;
-      const ctx = canvas.getContext("2d")!;
-      ctx.fillStyle = "#0a1026";
-      ctx.fillRect(0, 0, 1600, 900);
-      const k = 900 / VH;
-      ctx.drawImage(img, (1600 - VW * k) / 2, 0, VW * k, 900);
-      const res = await fetch("/api/studio/office-render", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ snapshot: canvas.toDataURL("image/png") }) });
-      const json = (await res.json().catch(() => ({}))) as { error?: { message?: string } | string };
-      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : json.error?.message ?? `Render failed (${res.status}).`);
-      setPhoto(`/api/studio/office-render?v=${Date.now()}`);
+      if (kind === "generate") {
+        const wasIllustrated = !photoOn || !(draft || photo);
+        if (!wasIllustrated) setPhotoOn(false); // snapshot the layout, not the photo
+        await new Promise((r) => setTimeout(r, 50));
+        const snap = await snapshot();
+        await post("/api/studio/office-render", { action: "generate", snapshot: snap, prompt: prompt.trim() || undefined });
+      } else if (kind === "refine") {
+        await post("/api/studio/office-render", { action: "refine", prompt: prompt.trim() });
+      } else {
+        await post("/api/studio/office-render", { action: kind });
+        if (kind === "save" && !sprites?.done.length) await makePeople();
+      }
+      if (kind === "generate" || kind === "refine") setPrompt("");
+      await loadInfo();
       setPhotoOn(true);
-      if (!sprites?.done.length) await makePeople();
     } catch (err) {
       setRenderErr(err instanceof Error ? err.message : String(err));
     } finally {
-      setRendering(false);
+      setBusy(null);
     }
   }
-  const showPhoto = Boolean(photo && photoOn);
+  const backdrop = draft?.url ?? photo;
+  const showPhoto = Boolean(backdrop && photoOn);
   const PW = (VH * 16) / 9;
 
   const items: Drawable[] = [];
@@ -403,24 +425,56 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
 
   return (
     <div className="overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(ellipse_at_50%_40%,#1d2752_0%,#0a1026_75%)]">
-      <div className="flex flex-wrap items-center justify-end gap-2 border-b border-white/10 px-4 py-2 text-[12px]">
-        {renderErr && <span className="mr-auto text-rose-300">{renderErr}</span>}
-        {rendering && <span className="mr-auto text-mist">Rendering the 3D office with Nano Banana… (about 20–40s)</span>}
-        {!rendering && sprites?.status === "running" && <span className="mr-auto text-mist">Making the 3D team… {sprites.done.length}/{sprites.total}</span>}
-        {photo && (
-          <div className="flex overflow-hidden rounded-full border border-white/15">
-            <button onClick={() => setPhotoOn(false)} className={cx("px-3 py-1", !photoOn ? "bg-white/15 text-white" : "text-mist hover:text-white")}>Illustrated</button>
-            <button onClick={() => setPhotoOn(true)} className={cx("px-3 py-1", photoOn ? "bg-white/15 text-white" : "text-mist hover:text-white")}>3D</button>
-          </div>
-        )}
-        <button onClick={makePhotoreal} disabled={rendering} className="rounded-full border border-white/15 px-3 py-1 text-white/90 hover:bg-white/10 disabled:opacity-50">
-          {rendering ? "Rendering…" : photo ? "Re-render office" : "✨ Make it 3D"}
-        </button>
-        {photo && sprites?.status !== "running" && (
-          <button onClick={() => makePeople(Boolean(sprites?.done.length && sprites.done.length >= sprites.total)).catch((e) => setRenderErr(e instanceof Error ? e.message : String(e)))} className="rounded-full border border-white/15 px-3 py-1 text-white/90 hover:bg-white/10">
-            {sprites?.done.length ? (sprites.done.length >= sprites.total ? "Redo 3D team" : "Finish 3D team") : "Make 3D team"}
+      <div className="space-y-2 border-b border-white/10 px-4 py-3 text-[12px]">
+        <form
+          className="flex flex-wrap items-center gap-2"
+          onSubmit={(e) => { e.preventDefault(); if (!busy) void act(draft && prompt.trim() ? "refine" : "generate"); }}
+        >
+          <input
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder={draft ? "Describe a change to this draft… e.g. more plants, warmer lamps, add a Calm neon sign" : "Optional: describe the look… e.g. cosy dusk lighting, oak floors, lots of plants"}
+            className="min-w-[240px] flex-1 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-[13px] text-white placeholder:text-mist/70 focus:border-lavender/60 focus:outline-none"
+            maxLength={1500}
+            disabled={Boolean(busy)}
+          />
+          {draft && (
+            <button type="submit" disabled={Boolean(busy) || !prompt.trim()} className="rounded-full bg-lavender/90 px-3 py-1.5 font-medium text-[#0b1430] hover:bg-lavender disabled:opacity-40">
+              {busy === "refine" ? "Changing…" : "Change draft"}
+            </button>
+          )}
+          <button type={draft ? "button" : "submit"} onClick={draft ? () => void act("generate") : undefined} disabled={Boolean(busy)} className={cx("rounded-full px-3 py-1.5 disabled:opacity-40", draft ? "border border-white/15 text-white/90 hover:bg-white/10" : "bg-lavender/90 font-medium text-[#0b1430] hover:bg-lavender")}>
+            {busy === "generate" ? "Generating…" : draft || photo ? "New render" : "✨ Make it 3D"}
           </button>
-        )}
+          {draft && (
+            <>
+              <button type="button" onClick={() => void act("save")} disabled={Boolean(busy)} className="rounded-full bg-emerald-400/90 px-3 py-1.5 font-medium text-[#062016] hover:bg-emerald-300 disabled:opacity-40">
+                {busy === "save" ? "Saving…" : "Save"}
+              </button>
+              <button type="button" onClick={() => void act("discard")} disabled={Boolean(busy)} className="rounded-full border border-white/15 px-3 py-1.5 text-mist hover:bg-white/10 hover:text-white disabled:opacity-40">
+                Discard
+              </button>
+            </>
+          )}
+        </form>
+        <div className="flex flex-wrap items-center gap-2">
+          {renderErr ? <span className="mr-auto text-rose-300">{renderErr}</span>
+            : busy === "generate" || busy === "refine" ? <span className="mr-auto text-mist">Rendering with Nano Banana… (about 20–40s)</span>
+            : draft ? <span className="mr-auto text-amber-200">Draft – not saved yet.{draft.prompt ? ` “${short(draft.prompt, 60)}”` : ""} Keep changing it, then press Save.</span>
+            : sprites?.status === "running" ? <span className="mr-auto text-mist">Making the 3D team… {sprites.done.length}/{sprites.total}</span>
+            : <span className="mr-auto text-mist">{photo ? "Showing the saved 3D office." : "Type a style (optional) and press Make it 3D."}</span>}
+          {backdrop && (
+            <div className="flex overflow-hidden rounded-full border border-white/15">
+              <button onClick={() => setPhotoOn(false)} className={cx("px-3 py-1", !photoOn ? "bg-white/15 text-white" : "text-mist hover:text-white")}>Illustrated</button>
+              <button onClick={() => setPhotoOn(true)} className={cx("px-3 py-1", photoOn ? "bg-white/15 text-white" : "text-mist hover:text-white")}>3D</button>
+            </div>
+          )}
+          {photo && !draft && sprites?.status !== "running" && (
+            <button onClick={() => makePeople(Boolean(sprites?.done.length && sprites.done.length >= sprites.total)).catch((e) => setRenderErr(e instanceof Error ? e.message : String(e)))} className="rounded-full border border-white/15 px-3 py-1 text-white/90 hover:bg-white/10">
+              {sprites?.done.length ? (sprites.done.length >= sprites.total ? "Redo 3D team" : "Finish 3D team") : "Make 3D team"}
+            </button>
+          )}
+        </div>
       </div>
       <svg ref={svgRef} viewBox={`0 0 ${VW} ${VH}`} className="sims-office block w-full" role="img" aria-label="The AI team in the studio">
         <defs>
@@ -437,7 +491,7 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
           <filter id="simsSunBlur" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="6" /></filter>
           <linearGradient id="calmTee" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#60ade6" /><stop offset="1" stopColor="#6467e1" /></linearGradient>
         </defs>
-        {showPhoto && <image className="sims-photo" href={photo!} x={-(PW - VW) / 2} y={0} width={PW} height={VH} preserveAspectRatio="none" />}
+        {showPhoto && <image className="sims-photo" href={backdrop!} x={-(PW - VW) / 2} y={0} width={PW} height={VH} preserveAspectRatio="none" />}
         {!showPhoto && <>
         {/* walls */}
         <polygon points={pts(backLeft)} fill="url(#simsWallL)" />

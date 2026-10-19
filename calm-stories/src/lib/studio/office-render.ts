@@ -102,33 +102,76 @@ export async function startOfficePeople(redo = false): Promise<PeopleManifest> {
   return m;
 }
 
-export async function officeRender(): Promise<{ data: Buffer; updated_at: string } | null> {
-  const f = await getStorage().get(KEY);
-  if (!f) return null;
-  const meta = await getStorage().get(META);
-  const updated_at = meta ? (JSON.parse(meta.data.toString()) as { updated_at: string }).updated_at : "";
-  return { data: f.data, updated_at };
+type Which = "saved" | "draft";
+const FILE: Record<Which, { img: string; meta: string }> = {
+  saved: { img: KEY, meta: META },
+  draft: { img: "office/draft.jpg", meta: "office/draft.json" },
+};
+type RenderMeta = { updated_at: string; prompt?: string };
+
+export async function officeRender(which: Which = "saved"): Promise<{ data: Buffer } | null> {
+  const f = await getStorage().get(FILE[which].img);
+  return f ? { data: f.data } : null;
 }
 
-export async function officeRenderInfo(): Promise<{ updated_at: string } | null> {
-  const meta = await getStorage().get(META);
-  return meta ? (JSON.parse(meta.data.toString()) as { updated_at: string }) : null;
+async function readMeta(which: Which): Promise<RenderMeta | null> {
+  const meta = await getStorage().get(FILE[which].meta);
+  return meta ? (JSON.parse(meta.data.toString()) as RenderMeta) : null;
 }
 
-/** Render the empty office (a PNG snapshot of the illustration) as a photoreal image with Nano Banana on fal. */
-export async function makeOfficeRender(snapshot: Buffer): Promise<{ updated_at: string }> {
-  if (!env.falKey) throw new Error("Connect a FAL_KEY in Railway to make the photoreal office.");
-  const ref = await sharp(snapshot).flatten({ background: "#0a1026" }).png().toBuffer(); // validates it's an image
+export async function officeRenderInfo(): Promise<{ saved: RenderMeta | null; draft: RenderMeta | null }> {
+  return { saved: await readMeta("saved"), draft: await readMeta("draft") };
+}
+
+/**
+ * Make a draft render with Nano Banana on fal. From the layout (a PNG snapshot
+ * of the illustration) with the house style plus any extra instructions, or by
+ * editing the current draft with the typed instructions. Drafts only replace
+ * the saved office when someone presses Save.
+ */
+export async function makeOfficeRender(input: { snapshot?: Buffer; prompt?: string; from: "layout" | "draft" }): Promise<RenderMeta> {
+  if (!env.falKey) throw new Error("Connect a FAL_KEY in Railway to make the 3D office.");
+  const extra = input.prompt?.trim() ?? "";
+  let ref: Buffer;
+  let prompt: string;
+  if (input.from === "draft") {
+    const base = (await officeRender("draft")) ?? (await officeRender("saved"));
+    if (!base) throw new Error("There's no render to change yet – generate one first.");
+    if (!extra) throw new Error("Type what you'd like changed.");
+    ref = await sharp(base.data).png().toBuffer();
+    prompt = `Edit this isometric 3D office image: ${extra}. Keep the exact same camera angle, framing, room layout and the position of every desk, chair, sofa and wall; keep the same overall style and lighting unless asked to change it. Do not add people or characters. Keep the dark navy background outside the room.`;
+  } else {
+    if (!input.snapshot) throw new Error("Missing the office snapshot.");
+    ref = await sharp(input.snapshot).flatten({ background: "#0a1026" }).png().toBuffer(); // validates it's an image
+    prompt = extra ? `${PROMPT} Additional direction (follow this closely): ${extra}` : PROMPT;
+  }
   const settings = await getStudioSettings();
-  const img = await falNanoBanana(env.falKey, { prompt: PROMPT, endpoint: settings.fal_image_endpoint, aspectRatio: "16:9", references: [{ mimeType: "image/png", data: ref }] });
+  const img = await falNanoBanana(env.falKey, { prompt, endpoint: settings.fal_image_endpoint, aspectRatio: "16:9", references: [{ mimeType: "image/png", data: ref }] });
   const jpg = await sharp(img.data).resize({ width: 2400, withoutEnlargement: true }).jpeg({ quality: 88, mozjpeg: true }).toBuffer();
-  const updated_at = nowIso();
-  await getStorage().put(KEY, jpg, "image/jpeg");
-  await getStorage().put(META, Buffer.from(JSON.stringify({ updated_at, cost_cents: img.cost_cents })), "application/json");
-  return { updated_at };
+  const meta: RenderMeta = { updated_at: nowIso(), ...(extra ? { prompt: extra } : {}) };
+  await getStorage().put(FILE.draft.img, jpg, "image/jpeg");
+  await getStorage().put(FILE.draft.meta, Buffer.from(JSON.stringify({ ...meta, cost_cents: img.cost_cents })), "application/json");
+  return meta;
+}
+
+/** Promote the draft to the saved office everyone sees. */
+export async function saveOfficeDraft(): Promise<RenderMeta> {
+  const d = await officeRender("draft");
+  const meta = await readMeta("draft");
+  if (!d || !meta) throw new Error("There's no draft to save.");
+  await getStorage().put(FILE.saved.img, d.data, "image/jpeg");
+  await getStorage().put(FILE.saved.meta, Buffer.from(JSON.stringify({ ...meta, updated_at: nowIso() })), "application/json");
+  await discardOfficeDraft();
+  return (await readMeta("saved"))!;
+}
+
+export async function discardOfficeDraft(): Promise<void> {
+  await getStorage().remove(FILE.draft.img);
+  await getStorage().remove(FILE.draft.meta);
 }
 
 export async function clearOfficeRender(): Promise<void> {
   await getStorage().remove(KEY);
   await getStorage().remove(META);
+  await discardOfficeDraft();
 }
