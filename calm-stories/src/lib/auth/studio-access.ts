@@ -88,6 +88,7 @@ export const TEAM_ALLOWED_WRITES: string[] = [];
 /** Everything a team (view-only) visitor may open: the AI Team page and what it reads. */
 export function teamMayView(pathname: string): boolean {
   return (
+    pathname === "/office" ||
     pathname === "/studio/team" ||
     pathname === "/api/studio/team" ||
     pathname.startsWith("/api/studio/agents/") ||

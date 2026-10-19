@@ -3,14 +3,18 @@ import { env } from "@/lib/env";
 import { ACCESS_COOKIE, ACCESS_MAX_AGE, accessToken, readAccess, TEAM_ALLOWED_WRITES, teamMayView } from "@/lib/auth/studio-access";
 
 /**
- * Studio lock:
- *  - the AI Team page is the team's view-only window (open with the link, or
- *    behind STUDIO_TEAM_PASSWORD when that's set);
- *  - every other studio/admin page and API needs Sean's owner passcode;
+ * Site lock:
+ *  - the shared studio home (/office, also the front door at /) is the team's
+ *    view-only window (open with the link, or behind STUDIO_TEAM_PASSWORD);
+ *  - everything else – the full studio, admin and listener app ("dev") – needs
+ *    Sean's owner passcode; the public story feed for the app stays open;
  *  - team (view-only) visitors can't change anything;
  *  - the open /dev link and the cron trigger are closed (cron needs CRON_SECRET).
  * Redirects use the public host so they work behind Railway's proxy.
  */
+/** Open to everyone: the shared studio home's sign-in, the public story feed (for the app) and artwork it links to. */
+const PUBLIC = (p: string) => p === "/studio-login" || p === "/api/studio-login" || p.startsWith("/api/approved-stories") || p.startsWith("/api/art/");
+
 export function middleware(req: NextRequest) {
   if (!env.studioLocked) return NextResponse.next();
   const path = req.nextUrl.pathname;
@@ -25,12 +29,15 @@ export function middleware(req: NextRequest) {
     const ok = env.cronSecret && req.headers.get("authorization") === `Bearer ${env.cronSecret}`;
     return ok ? NextResponse.next() : json(401, "Unauthorized");
   }
+  if (PUBLIC(path)) return NextResponse.next();
 
   let role = readAccess(req.cookies.get(ACCESS_COOKIE)?.value);
+  // The site's front door is the shared studio home (Sean can still open the listener app with /?app=1).
+  if (path === "/" && !(role === "owner" && req.nextUrl.searchParams.has("app"))) return redirect("/office");
   const isApi = path.startsWith("/api/");
   const write = !["GET", "HEAD", "OPTIONS"].includes(req.method);
   const login = () => (isApi ? json(401, "Sean access only – enter the passcode first.") : redirect(`/studio-login?next=${encodeURIComponent(path + req.nextUrl.search)}`));
-  // Without a team password, the AI Team page is open: visitors get a view-only pass automatically.
+  // Without a team password, the studio home is open: visitors get a view-only pass automatically.
   if (!role && !env.studioTeamPassword && teamMayView(path) && !write) {
     const token = accessToken("team");
     const headers = new Headers(req.headers);
@@ -41,7 +48,7 @@ export function middleware(req: NextRequest) {
   }
   if (!role) return login();
   if (role === "team") {
-    if (!teamMayView(path)) return login(); // Sean access only
+    if (!teamMayView(path)) return login(); // everything else is "dev" – Sean access only
     if (write && !TEAM_ALLOWED_WRITES.includes(path)) return json(403, "View-only access – ask Sean to make changes.");
   }
   return NextResponse.next();
@@ -49,5 +56,6 @@ export function middleware(req: NextRequest) {
 
 export const config = {
   runtime: "nodejs",
-  matcher: ["/studio/:path*", "/studio", "/admin/:path*", "/admin", "/api/studio/:path*", "/api/admin/:path*", "/api/cron/:path*", "/dev"],
+  // Every page and API except Next's own assets and static files in /public.
+  matcher: ["/((?!_next/|favicon|brand/|.*\\.[a-zA-Z0-9]+$).*)"],
 };

@@ -251,7 +251,7 @@ function ReviewRoom({ review }: { review: ReviewItem[] }) {
   );
 }
 
-export function SimsOffice({ agents, onOpen, canEdit = true, review = [], legend = true }: { agents: AgentState[]; onOpen: (key: AgentKey) => void; canEdit?: boolean; review?: ReviewItem[]; legend?: boolean }) {
+export function SimsOffice({ agents, onOpen, canEdit = true, review = [], legend = true, bare = false }: { agents: AgentState[]; onOpen: (key: AgentKey) => void; canEdit?: boolean; review?: ReviewItem[]; legend?: boolean; bare?: boolean }) {
   const st = (k: AgentKey) => agents.find((a) => a.key === k);
   // Walking: when someone moves between desk and lounge, show the walk cycle for the trip.
   const prevAt = useRef<Partial<Record<AgentKey, boolean>>>({});
@@ -522,7 +522,7 @@ export function SimsOffice({ agents, onOpen, canEdit = true, review = [], legend
   const backRight = [iso(0, 0), iso(GX, 0), iso(GX, 0, wallH), iso(0, 0, wallH)] as [number, number][];
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-white/10" style={{ background: "linear-gradient(180deg, #7d93ea 0%, #a39be6 34%, #d5b0dd 60%, #b4b7ec 82%, #8fa6ee 100%)" }}>
+    <div className={bare ? "" : "overflow-hidden rounded-3xl border border-white/10"} style={bare ? undefined : { background: "linear-gradient(180deg, #7d93ea 0%, #a39be6 34%, #d5b0dd 60%, #b4b7ec 82%, #8fa6ee 100%)" }}>
       {canEdit && (
       <div className="space-y-2 border-b border-white/10 px-4 py-3 text-[12px]">
         <form

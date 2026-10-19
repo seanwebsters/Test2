@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { cx } from "@/lib/util";
 
 const NAV: { href: string; label: string; icon: string }[] = [
-  { href: "/studio/team", label: "AI Team", icon: "M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM2 20c0-3 3-5 6-5s6 2 6 5M14 15c3 0 8 1 8 5" },
+  { href: "/office", label: "AI Team", icon: "M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM2 20c0-3 3-5 6-5s6 2 6 5M14 15c3 0 8 1 8 5" },
   { href: "/studio", label: "Studio Overview", icon: "M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" },
   { href: "/studio/now", label: "Now", icon: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-13v4l3 2" },
   { href: "/studio/series", label: "Series", icon: "M4 5h16v14H4zM4 9h16M9 5v14" },

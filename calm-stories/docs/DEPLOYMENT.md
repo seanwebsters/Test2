@@ -59,8 +59,8 @@ Steps are idempotent and their state lives in the database, so several workers c
 
 The studio is always locked:
 
-* **AI Team page** (`/studio/team`): the team's view-only window. Open to anyone with the link, unless `STUDIO_TEAM_PASSWORD` is set, in which case that code is needed. Nothing on it can be changed.
-* **Everything else** (all other studio and admin pages and APIs): Sean access only, behind the owner passcode. The passcode is built in and stored only as a slow salted hash. Set `STUDIO_OWNER_PASSWORD` in Railway to replace it.
+* **Studio home** (`/office`, which is also where the site's front door `/` goes): the team's view-only window, with the live 3D office, inbox and recent activity. Open to anyone with the link, unless `STUDIO_TEAM_PASSWORD` is set, in which case that code is needed. Nothing on it can be changed.
+* **Everything else ("Dev")**: the full studio, admin and listener app (`/?app=1`) are Sean access only, behind the owner passcode. The public story feed `/api/approved-stories` and artwork stay open for the app. The passcode is built in and stored only as a slow salted hash. Set `STUDIO_OWNER_PASSWORD` in Railway to replace it.
 * The 3D office is edited at `/studio/office-editor` (Settings → Edit the 3D office), which is owner only.
 
 Cookies are signed with `SESSION_SECRET`, or else a random key kept on the data volume. `STUDIO_LOCK=off` turns the lock off, for local development only.

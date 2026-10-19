@@ -90,7 +90,7 @@ export default async function StudioLayout({ children }: { children: React.React
           ) : (
             <p className="px-2 text-xs text-mist">Nothing in production. Start a new series or commission an episode.</p>
           )}
-          <Link href="/" className="mt-4 block px-2 text-xs text-mist hover:text-white">← Listener app</Link>
+          <a href="/?app=1" className="mt-4 block px-2 text-xs text-mist hover:text-white">← Listener app</a>
         </div>
       </aside>
       <div className="min-w-0 flex-1">
