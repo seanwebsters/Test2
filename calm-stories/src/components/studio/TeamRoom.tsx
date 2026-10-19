@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AGENTS } from "@/lib/studio/agents";
 import type { AgentState } from "@/lib/studio/team";
 import { AgentAvatar, type AvatarClips } from "./AgentAvatar";
+import { StudioOffice } from "./StudioOffice";
 import { AgentDrawer } from "./AgentDrawer";
 import { cx } from "@/lib/util";
 
@@ -21,6 +22,7 @@ const ACTIVITY_LABEL: Record<string, string> = {
 export function TeamRoom({ initial, compact, clips }: { initial: AgentState[]; compact?: boolean; clips?: Record<string, AvatarClips> }) {
   const [agents, setAgents] = useState(initial);
   const [open, setOpen] = useState<string | null>(null);
+  const [view, setView] = useState<"office" | "rooms">(compact ? "rooms" : "office");
   useEffect(() => {
     let alive = true;
     const poll = async () => {
@@ -38,8 +40,26 @@ export function TeamRoom({ initial, compact, clips }: { initial: AgentState[]; c
     };
   }, []);
   const shown = compact ? AGENTS.filter((a) => !a.human).slice(0, 8) : AGENTS;
+  const toggle = !compact && (
+    <div className="mb-3 inline-flex rounded-full border border-white/15 p-0.5 text-sm" role="tablist" aria-label="Team view">
+      {(["office", "rooms"] as const).map((v) => (
+        <button key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)} className={cx("rounded-full px-3 py-1", view === v ? "bg-lavender/20 text-white" : "text-mist hover:text-white")}>
+          {v === "office" ? "Office" : "Rooms"}
+        </button>
+      ))}
+    </div>
+  );
+  if (view === "office")
+    return (
+      <>
+        {toggle}
+        <StudioOffice agents={agents} onOpen={(k) => setOpen(k)} />
+        {open && <AgentDrawer agentKey={open} onClose={() => setOpen(null)} />}
+      </>
+    );
   return (
     <>
+      {toggle}
       <ul className={cx("grid gap-4", compact ? "sm:grid-cols-2 xl:grid-cols-4" : "sm:grid-cols-2 xl:grid-cols-4")}>
         {shown.map((def) => {
           const st = agents.find((a) => a.key === def.key);

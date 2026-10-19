@@ -142,3 +142,33 @@ body {
   .agent-room *, .agent-room { animation: none !important; }
   .agent-room .br-z { opacity: .8; }
 }
+
+/* ---------- AI Team office ---------- */
+.studio-office .office-room-label { font: 600 11px/1 var(--font-sans, system-ui); letter-spacing: 0.18em; fill: #a99bf4; opacity: 0.55; }
+.studio-office .office-name { font: 600 11px/1 var(--font-sans, system-ui); }
+.studio-office .office-bubble-text { font: 500 11px/1 var(--font-sans, system-ui); fill: #0b1430; }
+.studio-office .office-person { cursor: pointer; transition: transform 1.6s cubic-bezier(0.45, 0, 0.2, 1); }
+.studio-office .office-person:focus { outline: none; }
+.studio-office .office-person:focus-visible .office-name { text-decoration: underline; }
+.studio-office * { transform-box: fill-box; transform-origin: center; }
+.studio-office .office-person { transform-box: view-box; transform-origin: 0 0; }
+.studio-office .office-type { animation: office-type 0.5s ease-in-out infinite alternate; }
+.studio-office .office-type-2 { animation-delay: 0.25s; }
+.studio-office .office-breathe { animation: office-breathe 4s ease-in-out infinite; }
+.studio-office .office-z { animation: office-z 3s ease-in infinite; opacity: 0; }
+.studio-office .office-pulse { animation: office-pulse 1.8s ease-out infinite; }
+.studio-office .office-glow { animation: office-glow 5s ease-in-out infinite; }
+.studio-office .office-screen { animation: office-screen 1.4s steps(2) infinite; }
+.studio-office .office-twinkle { animation: office-twinkle 3.5s ease-in-out infinite; }
+.studio-office .office-fire { animation: office-fire 0.9s ease-in-out infinite alternate; }
+.studio-office .office-bubble { animation: office-bubble 0.5s ease-out both; }
+@keyframes office-type { from { transform: translateY(0); } to { transform: translateY(-3px); } }
+@keyframes office-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+@keyframes office-z { 0% { opacity: 0; transform: translate(0, 0); } 30% { opacity: 0.9; } 100% { opacity: 0; transform: translate(8px, -14px); } }
+@keyframes office-pulse { from { transform: scale(0.8); opacity: 0.9; } to { transform: scale(1.4); opacity: 0; } }
+@keyframes office-glow { 0%, 100% { opacity: 0.85; } 50% { opacity: 1; } }
+@keyframes office-screen { 50% { opacity: 0.75; } }
+@keyframes office-twinkle { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+@keyframes office-fire { from { opacity: 0.7; transform: scaleY(0.92); } to { opacity: 1; transform: scaleY(1.05); } }
+@keyframes office-bubble { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .studio-office * { animation: none !important; transition: none !important; } }
