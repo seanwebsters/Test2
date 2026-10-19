@@ -28,13 +28,13 @@ const pts = (p: [number, number][]) => p.map(([x, y]) => `${x.toFixed(1)},${y.to
 
 type Zone = { gx: number; gy: number; w: number; d: number; label: string; floor: string; alt: string };
 const ZONES: Zone[] = [
-  { gx: 0, gy: 0, w: 6, d: 7, label: "Your office", floor: "#4a5288", alt: "#4f578e" },
-  { gx: 6, gy: 0, w: 10, d: 7, label: "Development", floor: "#454d82", alt: "#4a5288" },
-  { gx: 16, gy: 0, w: 8, d: 7, label: "Story table", floor: "#4a5288", alt: "#4f578e" },
-  { gx: 0, gy: 7, w: 6, d: 5, label: "Quality gate", floor: "#454d82", alt: "#4a5288" },
-  { gx: 6, gy: 7, w: 10, d: 5, label: "Writers' room", floor: "#484f85", alt: "#4d558b" },
-  { gx: 16, gy: 7, w: 8, d: 5, label: "Art & sound", floor: "#4a5288", alt: "#4f578e" },
-  { gx: 0, gy: 12, w: 24, d: 6, label: "Lounge", floor: "#7a6250", alt: "#816855" },
+  { gx: 0, gy: 0, w: 6, d: 7, label: "Your office", floor: "#f2f3f7", alt: "#eaecf2" },
+  { gx: 6, gy: 0, w: 10, d: 7, label: "Development", floor: "#f2f3f7", alt: "#eaecf2" },
+  { gx: 16, gy: 0, w: 8, d: 7, label: "Story table", floor: "#f2f3f7", alt: "#eaecf2" },
+  { gx: 0, gy: 7, w: 6, d: 5, label: "Quality gate", floor: "#f2f3f7", alt: "#eaecf2" },
+  { gx: 6, gy: 7, w: 10, d: 5, label: "Writers' room", floor: "#f2f3f7", alt: "#eaecf2" },
+  { gx: 16, gy: 7, w: 8, d: 5, label: "Art & sound", floor: "#f2f3f7", alt: "#eaecf2" },
+  { gx: 0, gy: 12, w: 24, d: 6, label: "Lounge", floor: "#e3cba6", alt: "#dcc29a" },
 ];
 
 /** Where each agent sits (chair position). Desks are drawn just in front. */
@@ -115,6 +115,9 @@ function Desk({ gx, gy, lit, prop }: { gx: number; gy: number; lit: boolean; pro
           {lit && <circle cx={gxp} cy={gyp - 4} r="30" fill="url(#simsLamp)" className="sims-glow" />}
           {/* a mug and a personal touch */}
           <Box gx={dx + 1.42} gy={dy + 0.3} w={0.12} d={0.12} h={0.14} z={top} top="#f3eaff" left="#c7b8ff" right="#d8ccff" />
+          <Box gx={dx + 1.56} gy={dy + 0.56} w={0.12} d={0.12} h={0.12} z={top} top="#ffffff" left="#d4d7e3" right="#e4e6ef" />
+          <circle cx={iso(dx + 1.62, dy + 0.62, top + 0.3)[0]} cy={iso(dx + 1.62, dy + 0.62, top + 0.3)[1]} r="5" fill="#3f9470" />
+          <circle cx={iso(dx + 1.62, dy + 0.62, top + 0.3)[0] + 3} cy={iso(dx + 1.62, dy + 0.62, top + 0.3)[1] - 3} r="3" fill="#5bbf8c" />
           <text x={iso(dx + 0.3, dy + 0.5, top + 0.1)[0]} y={iso(dx + 0.3, dy + 0.5, top + 0.1)[1]} fontSize="11" textAnchor="middle">{PROP[prop]}</text>
         </g>
       ),
@@ -180,21 +183,6 @@ function Person({ def, pose, activity }: { def: AgentDefinition; pose: "seated" 
 }
 
 /** Floating crescent-moon mood gem (our own – not a plumbob). */
-function MoodGem({ kind, y }: { kind: keyof typeof GEM; y: number }) {
-  const [light, dark] = GEM[kind];
-  return (
-    <g transform={`translate(0 ${y})`}>
-      <g className="sims-gem">
-        <polygon points="0,-11 7,0 0,11 -7,0" fill={dark} />
-        <polygon points="0,-11 7,0 0,0" fill={light} />
-        <polygon points="0,-11 -7,0 0,0" fill={light} opacity="0.75" />
-        <circle cx="2.2" cy="-2" r="3.2" fill={dark} opacity="0.55" />
-        <circle r="13" fill={light} opacity="0.18" />
-      </g>
-    </g>
-  );
-}
-
 export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (key: AgentKey) => void }) {
   const st = (k: AgentKey) => agents.find((a) => a.key === k);
   // Walking: when someone moves between desk and lounge, show the walk cycle for the trip.
@@ -233,7 +221,7 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
   // Story table + chairs
   items.push({ depth: 19 + 3 + 2.4, key: "story-table", node: <g><Box gx={18.4} gy={2.2} w={3.2} d={2.2} h={0.5} top="#f4f5fa" left="#cfd2e0" right="#e1e4ef" /><Box gx={19.3} gy={2.9} w={1.2} d={0.8} h={0.04} z={0.5} top="#f3eaff" left="#cfc6ee" right="#ddd4f7" /></g> });
   // Quality gate arch
-  items.push({ depth: 1.2 + 9.6 + 0.4, key: "gate", node: <g><Box gx={0.8} gy={9.2} w={0.25} d={0.25} h={1.6} top="#c7b8ff" left="#6b5fc4" right="#8a7be0" /><Box gx={0.8} gy={10.6} w={0.25} d={0.25} h={1.6} top="#c7b8ff" left="#6b5fc4" right="#8a7be0" /><Box gx={0.8} gy={9.2} w={0.25} d={1.65} h={0.2} z={1.6} top="#c7b8ff" left="#6b5fc4" right="#8a7be0" /></g> });
+  items.push({ depth: 1.2 + 9.6 + 0.4, key: "gate", node: <g><Box gx={0.8} gy={9.2} w={0.25} d={0.25} h={1.6} top="#f4f5fa" left="#cfd2e0" right="#e1e4ef" /><Box gx={0.8} gy={10.6} w={0.25} d={0.25} h={1.6} top="#f4f5fa" left="#cfd2e0" right="#e1e4ef" /><Box gx={0.8} gy={9.2} w={0.25} d={1.65} h={0.2} z={1.6} top="#f4f5fa" left="#cfd2e0" right="#e1e4ef" /></g> });
   // Lounge: rug, sofas, beanbags, fireplace, bookshelf, tea table
   const sofa = (gx: number, gy: number, len: number, key: string) => items.push({ depth: gx + gy + 0.2, key, node: <g><Box gx={gx} gy={gy} w={len} d={0.9} h={0.32} top="#d5d8e4" left="#a5a9bd" right="#b8bccd" /><Box gx={gx} gy={gy} w={len} d={0.28} h={0.72} top="#e2e5ef" left="#a5a9bd" right="#b8bccd" />{Array.from({ length: Math.floor(len) }, (_, i) => <Box key={i} gx={gx + i + 0.08} gy={gy + 0.32} w={0.84} d={0.5} h={0.06} z={0.32} top="#e9ebf3" left="#b8bccd" right="#c9ccda" />)}<Box gx={gx + 0.3} gy={gy + 0.3} w={0.35} d={0.12} h={0.3} z={0.38} top="#c7b8ff" left="#8a7be0" right="#a99bf4" /></g> });
   sofa(1.4, 13.0, 4.0, "sofa-1");
@@ -242,11 +230,11 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
   for (const [i, [x, y]] of ([[3.4, 16.2], [8.0, 16.3], [11.0, 16.3], [14.0, 16.3], [17.0, 16.3], [20.3, 16.6]] as [number, number][]).entries())
     items.push({ depth: x + y - 0.4, key: `bean-${i}`, node: <ellipse cx={iso(x, y)[0]} cy={iso(x, y)[1] - 4} rx="19" ry="9.5" fill={["#e9ebf3", "#c7b8ff", "#cfd2e0", "#a9c8ef"][i % 4]} /> });
   // a soft rug in the lounge
-  items.unshift({ depth: -1, key: "rug", node: <polygon points={pts([iso(5, 14.4), iso(19, 14.4), iso(19, 17.4), iso(5, 17.4)])} fill="#e9e2d6" opacity="0.35" /> });
+  items.unshift({ depth: -1, key: "rug", node: <polygon points={pts([iso(5, 14.4), iso(19, 14.4), iso(19, 17.4), iso(5, 17.4)])} fill="#f7f3ec" opacity="0.7" /> });
   items.push({ depth: 0.6 + 14.2, key: "fire", node: <g><Box gx={0.05} gy={14.4} w={0.6} d={2.2} h={1.3} top="#f4f5fa" left="#cfd2e0" right="#e1e4ef" /><polygon points={pts([iso(0.66, 14.7, 0.35), iso(0.66, 16.3, 0.35), iso(0.66, 16.3, 0.6), iso(0.66, 14.7, 0.6)])} fill="#1b1e30" /><polygon points={pts([iso(0.66, 14.8, 0.38), iso(0.66, 16.2, 0.38), iso(0.66, 16.2, 0.55), iso(0.66, 14.8, 0.55)])} fill="#ff9a5c" className="sims-fire" /><circle cx={iso(1.4, 15.5)[0]} cy={iso(1.4, 15.5)[1]} r="46" fill="url(#simsLamp)" className="sims-glow" /></g> });
-  items.push({ depth: 0.5 + 12.4, key: "shelf", node: <Box gx={0.05} gy={12.3} w={0.45} d={1.6} h={1.8} top="#f4f5fa" left="#cfd2e0" right="#e1e4ef" /> });
+  items.push({ depth: 0.5 + 12.4, key: "shelf", node: <g><Box gx={0.05} gy={12.3} w={0.45} d={1.6} h={1.8} top="#f4f5fa" left="#cfd2e0" right="#e1e4ef" />{[12.6, 13.1, 13.6].map((y) => { const [sx, sy] = iso(0.3, y, 1.85); return <g key={y}><circle cx={sx} cy={sy - 4} r="7" fill="#3f9470" /><circle cx={sx + 4} cy={sy - 8} r="4" fill="#5bbf8c" /><path d={`M${sx - 4} ${sy} q-3 14 1 26`} stroke="#3f9470" strokeWidth="3" fill="none" strokeLinecap="round" /></g>; })}</g> });
   // Indoor trees in white planters
-  for (const [i, [x, y, tall]] of ([[0.5, 0.5, 1], [15.4, 0.5, 1], [23.2, 0.6, 1], [0.5, 6.3, 0], [15.4, 7.3, 0], [23.2, 11.3, 1], [0.6, 17.2, 1], [12.4, 15.0, 0], [23.0, 17.0, 1]] as [number, number, number][]).entries()) {
+  for (const [i, [x, y, tall]] of ([[0.5, 0.5, 1], [6.5, 0.4, 1], [12.6, 0.4, 0], [15.4, 0.5, 1], [19.9, 0.4, 0], [23.2, 0.6, 1], [0.4, 2.0, 0], [0.5, 6.3, 0], [15.4, 7.3, 0], [23.2, 5.6, 0], [23.2, 11.3, 1], [0.6, 17.2, 1], [5.2, 17.3, 0], [18.6, 17.3, 0], [23.0, 17.0, 1], [23.1, 14.0, 0]] as [number, number, number][]).entries()) {
     const [px, py] = iso(x + 0.25, y + 0.25, 0.45);
     const h = tall ? 1 : 0.65;
     items.push({
@@ -265,11 +253,27 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
     });
   }
 
+  // Big atrium tree in a wooden planter bench, between the lounge sofas
+  {
+    const [tx, ty] = iso(12.1, 13.45, 0.5);
+    items.push({
+      depth: 11.4 + 13.0 + 1.4,
+      key: "atrium-tree",
+      node: (
+        <g>
+          <Box gx={11.4} gy={12.95} w={1.4} d={1.0} h={0.5} top="#d9b98c" left="#a8865e" right="#c09d72" />
+          <Box gx={11.5} gy={13.05} w={1.2} d={0.8} h={0.02} z={0.5} top="#6d5642" left="#5a4535" right="#5a4535" />
+          <path d={`M${tx} ${ty} L${tx - 2} ${ty - 54} M${tx - 1} ${ty - 30} L${tx - 16} ${ty - 62} M${tx - 1} ${ty - 40} L${tx + 18} ${ty - 70}`} stroke="#7a6048" strokeWidth="3.5" fill="none" strokeLinecap="round" />
+          {([[-30, -96, 22, "#2f7a5c"], [24, -104, 24, "#2f7a5c"], [-4, -118, 26, "#3f9470"], [-38, -72, 16, "#378a66"], [34, -78, 17, "#378a66"], [6, -84, 20, "#4fab82"], [-18, -128, 16, "#4fab82"], [20, -132, 15, "#5bbf8c"]] as [number, number, number, string][]).map(([cx, cy, r, f], i) => <circle key={i} cx={tx + cx * 0.75} cy={ty + cy * 0.75} r={r * 0.75} fill={f} opacity="0.95" />)}
+        </g>
+      ),
+    });
+  }
+
   // People
   for (const p of people) {
     const [x, y] = iso(p.spot[0], p.spot[1]);
     const pose = walking[p.def.key] ? "walk" : p.atDesk ? "seated" : "nap";
-    const gem: keyof typeof GEM = p.activity === "asking_for_help" ? "help" : p.activity === "celebrating" ? "done" : p.atDesk ? "work" : "rest";
     items.push({
       depth: p.spot[0] + p.spot[1],
       key: `person-${p.def.key}`,
@@ -285,7 +289,6 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
         >
           {p.activity === "asking_for_help" && <ellipse cx="0" cy="2" rx="22" ry="9" fill="none" stroke="#ffc96b" strokeWidth="2" className="sims-pulse" />}
           <Person def={p.def} pose={pose} activity={p.activity} />
-          <MoodGem kind={gem} y={pose === "walk" ? -74 : -70} />
           {!p.atDesk && pose === "nap" && <text x="12" y="-56" fontSize="11" fill="#c9d6ff" className="sims-z">z</text>}
         </g>
       ),
@@ -302,8 +305,8 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
     <div className="overflow-hidden rounded-3xl border border-white/10 bg-[#0a1026]">
       <svg viewBox={`0 0 ${VW} ${VH}`} className="sims-office block w-full" role="img" aria-label="The AI team in the studio">
         <defs>
-          <radialGradient id="simsLamp"><stop offset="0" stopColor="#ffd9a0" stopOpacity="0.55" /><stop offset="1" stopColor="#ffd9a0" stopOpacity="0" /></radialGradient>
-          <linearGradient id="simsSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#24306e" /><stop offset="1" stopColor="#0d1638" /></linearGradient>
+          <radialGradient id="simsLamp"><stop offset="0" stopColor="#ffe3b8" stopOpacity="0.28" /><stop offset="1" stopColor="#ffd9a0" stopOpacity="0" /></radialGradient>
+          <linearGradient id="simsSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#a9c9ee" /><stop offset="1" stopColor="#e3eefa" /></linearGradient>
           <linearGradient id="calmTee" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#60ade6" /><stop offset="1" stopColor="#6467e1" /></linearGradient>
         </defs>
         {/* walls */}
@@ -313,8 +316,6 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
           <g key={`wr-${gx}`}>
             <polygon points={pts([iso(gx, 0, 0.15), iso(gx + 2.4, 0, 0.15), iso(gx + 2.4, 0, 2.35), iso(gx, 0, 2.35)])} fill="url(#simsSky)" stroke="#9aa0b8" strokeWidth="2" />
             <line x1={iso(gx + 1.2, 0, 0.15)[0]} y1={iso(gx + 1.2, 0, 0.15)[1]} x2={iso(gx + 1.2, 0, 2.35)[0]} y2={iso(gx + 1.2, 0, 2.35)[1]} stroke="#9aa0b8" strokeWidth="1.5" />
-            <circle cx={iso(gx + 1.4, 0, 1.75)[0]} cy={iso(gx + 1.4, 0, 1.75)[1]} r="1.3" fill="#fff" className="sims-twinkle" />
-            {gx === 15 && <circle cx={iso(gx + 1.3, 0, 1.6)[0]} cy={iso(gx + 1.3, 0, 1.6)[1]} r="6" fill="#f3eaff" />}
           </g>
         ))}
         {[4, 10, 15].map((gy) => (
@@ -332,8 +333,8 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
         {/* low room dividers (walls-down view) with doorways */}
         {[[6, 0, 2.6], [6, 4.4, 2.6], [16, 0, 2.6], [16, 4.4, 2.6], [6, 7.2, 1.8], [6, 10.2, 1.8], [16, 7.2, 1.8], [16, 10.2, 1.8]].map(([gx, gy, d]) => (
           <g key={`glass-${gx}-${gy}`} opacity="0.9">
-            <Box gx={gx!} gy={gy!} w={0.05} d={d!} h={1.25} top="#e6f0ff" left="rgba(190,215,255,0.16)" right="rgba(210,228,255,0.22)" />
-            <Box gx={gx!} gy={gy!} w={0.05} d={d!} h={0.06} z={1.25} top="#e6f0ff" left="#c9d6ef" right="#dbe5f7" />
+            <Box gx={gx!} gy={gy!} w={0.05} d={d!} h={1.25} top="#cfe0f7" left="rgba(150,190,240,0.2)" right="rgba(170,205,245,0.28)" />
+            <Box gx={gx!} gy={gy!} w={0.05} d={d!} h={0.06} z={1.25} top="#cfe0f7" left="#aac0e2" right="#bcd0ec" />
           </g>
         ))}
         {/* zone labels on the floor */}
@@ -343,10 +344,10 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
         })}
         {/* everything else, back to front */}
         {items.map((it) => <g key={it.key}>{it.node}</g>)}
-        {/* name tags on top, above each mood gem */}
+        {/* name tags on top */}
         {people.map((p) => {
           const [x, y] = iso(p.spot[0], p.spot[1]);
-          return <text key={`n-${p.def.key}`} x={x} y={y - 88} textAnchor="middle" className="sims-name" pointerEvents="none" style={{ transition: "x 2.4s, y 2.4s" }}>{p.def.name}</text>;
+          return <text key={`n-${p.def.key}`} x={x} y={y - 68} textAnchor="middle" className="sims-name" pointerEvents="none" style={{ transition: "x 2.4s, y 2.4s" }}>{p.def.name}</text>;
         })}
         {/* thought bubbles on top */}
         {people.map((p) => {
@@ -354,7 +355,7 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
           if (!text || walking[p.def.key]) return null;
           const [x, y] = iso(p.spot[0], p.spot[1]);
           return (
-            <g key={`b-${p.def.key}`} transform={`translate(${x} ${y - 112})`} pointerEvents="none">
+            <g key={`b-${p.def.key}`} transform={`translate(${x} ${y - 92})`} pointerEvents="none">
               <g className="sims-bubble">
                 <rect x={-text.length * 3 - 10} y="-12" width={text.length * 6 + 20} height="21" rx="10.5" fill="#f3eaff" />
                 <circle cx="-4" cy="14" r="3" fill="#f3eaff" />
