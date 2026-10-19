@@ -367,3 +367,34 @@ describe("free up space", () => {
     expect(diskUsage()!.totalBytes).toBeGreaterThan(0);
   });
 });
+
+describe("Now board", () => {
+  it("puts each workflow in exactly one lane with a plain reason", async () => {
+    const { studioBoard } = await import("@/lib/studio/now");
+    const db = freshDb();
+    const mk = async (title: string, status: string, stepStatus: string, extra: Record<string, unknown> = {}) => {
+      const { run } = await createRun({ kind: "episode_production", title, budget_cents: 100, created_by: "usr_calm-editor", steps: [{ key: "a", type: "ep.draft", agent: "lead_writer", label: "Write the first draft", activity: "typing", deps: [] }] });
+      await db.update("workflow_runs", run.id, { status: status as never });
+      const s = (await db.findOne("workflow_steps", { run_id: run.id, key: "a" }))!;
+      await db.update("workflow_steps", s.id, { status: stepStatus as never, ...extra });
+    };
+    await mk("Working", "running", "running");
+    await mk("Approve me", "awaiting_approval", "awaiting_approval");
+    await mk("Over budget", "blocked", "blocked", { needs: "budget", error: "Run budget reached" });
+    await mk("Bad key", "blocked", "blocked", { needs: "ELEVENLABS_API_KEY", error: "rejected" });
+    await mk("In line", "running", "pending");
+    await mk("On hold", "paused", "pending");
+    await mk("Shipped", "succeeded", "succeeded");
+    const b = await studioBoard();
+    const titles = (lane: keyof typeof b) => b[lane].map((i) => i.title).sort();
+    expect(titles("working")).toEqual(["Working"]);
+    expect(b.working[0]!.headline).toBe("Lead Writer: Write the first draft");
+    expect(titles("needs_you")).toEqual(["Approve me"]);
+    expect(titles("stuck")).toEqual(["Bad key", "Over budget"]);
+    expect(b.stuck.find((i) => i.title === "Over budget")!.reason).toMatch(/raise the episode budget/);
+    expect(b.stuck.find((i) => i.title === "Bad key")!.reason).toMatch(/ELEVENLABS_API_KEY/);
+    expect(titles("queued")).toEqual(["In line"]);
+    expect(titles("paused")).toEqual(["On hold"]);
+    expect(titles("done")).toEqual(["Shipped"]);
+  });
+});
