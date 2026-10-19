@@ -49,7 +49,7 @@ export default async function ArtStudio({ searchParams }: { searchParams: Promis
                   const who = a.character_id ? chars.find((c) => c.id === a.character_id)?.name : a.episode_id ? `Ep ${episodes.find((e) => e.id === a.episode_id)?.number}` : null;
                   return (
                     <li key={a.id} className={cx("overflow-hidden rounded-2xl border bg-white/[0.03]", a.status === "approved" ? "border-emerald-300/60" : a.status === "selected" ? "border-lavender/60" : a.status === "rejected" ? "border-rose-300/30 opacity-60" : "border-white/10")}>
-                      <a href={a.variants.titled ?? a.url} target="_blank" rel="noreferrer"><img src={a.variants.titled ?? a.variants["800w"] ?? a.url} alt={`${label} ${who ?? ""}`} className={cx("w-full object-cover", aspect)} loading="lazy" /></a>
+                      <a href={a.variants.titled ?? a.url} target="_blank" rel="noreferrer"><img src={a.variants.titled ?? a.variants["600w"] ?? a.url} alt={`${label} ${who ?? ""}`} className={cx("w-full object-cover", aspect)} loading="lazy" /></a>
                       <div className="space-y-1.5 p-3 text-xs">
                         <div className="flex justify-between gap-2"><span className="text-white">{who ?? a.status}</span><span className="text-mist">{a.status} · {relativeTime(a.created_at)}</span></div>
                         {a.review && (

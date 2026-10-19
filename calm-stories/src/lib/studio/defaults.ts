@@ -19,7 +19,8 @@ export const DEFAULT_STUDIO_SETTINGS: Omit<StudioSettings, "updated_at"> = {
   max_parallel_steps: 8,
   // Room for a full development slate plus episodes in production at the same time.
   max_concurrent_runs: 20,
-  default_episode_budget_cents: 100,
+  // Measured on real runs: writing ~$1.50–2, narration ~$0.70 for a 10-minute episode.
+  default_episode_budget_cents: 300,
   default_series_budget_cents: 500,
   web_research: true,
   // Music generation is the priciest audio item; off keeps episodes under ~$1.

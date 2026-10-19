@@ -17,7 +17,7 @@ export const POST = route<{ params: Promise<{ id: string }> }>(async (req, { par
   if (!a) throw notFound();
   if (action === "reject") return { asset: await db.update("artwork_assets", id, { status: "rejected" }) };
   if (action === "use" || action === "approve") {
-    const url = a.variants["1600w"] ?? a.url;
+    const url = a.variants["1200w"] ?? a.url;
     if (a.kind === "poster") {
       const s = await db.get("series", a.series_id);
       if (s) await db.update("series", s.id, { artwork: { ...s.artwork, image_url: url }, updated_at: nowIso() });

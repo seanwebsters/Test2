@@ -66,7 +66,7 @@ export default async function StudioSeriesPage({ params }: { params: Promise<{ i
               const p = art.find((a) => a.id === c.portrait_asset_id);
               return (
                 <li key={c.id} className="flex gap-4 rounded-3xl border border-white/10 bg-white/[0.03] p-4">
-                  {p ? <img src={p.variants["400w"] ?? p.url} alt={`${c.name} portrait`} className="h-36 w-28 shrink-0 rounded-2xl object-cover" /> : <div className="h-36 w-28 shrink-0 rounded-2xl bg-white/5" />}
+                  {p ? <img src={p.variants["300w"] ?? p.url} alt={`${c.name} portrait`} className="h-36 w-28 shrink-0 rounded-2xl object-cover" /> : <div className="h-36 w-28 shrink-0 rounded-2xl bg-white/5" />}
                   <div className="min-w-0 text-sm">
                     <div className="font-serif text-2xl text-white">{c.name}</div>
                     <div className="text-xs text-mist">{c.role.replace("_", " ")} · {c.age} · {c.pronouns}{c.voice_name ? ` · voiced by ${c.voice_name}` : ""}</div>

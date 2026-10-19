@@ -67,7 +67,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
                 const p = portraits.find((a) => a.id === c.portrait_asset_id);
                 return (
                   <li key={c.id} className="flex items-center gap-2 rounded-full bg-white/5 py-1 pl-1 pr-3 text-sm">
-                    {p ? <img src={p.variants["400w"] ?? p.url} alt="" className="h-9 w-9 rounded-full object-cover" /> : <span className="h-9 w-9 rounded-full bg-white/10" />}
+                    {p ? <img src={p.variants["300w"] ?? p.url} alt="" className="h-9 w-9 rounded-full object-cover" /> : <span className="h-9 w-9 rounded-full bg-white/10" />}
                     <span className="text-white">{c.name}</span>
                     <span className="text-xs text-mist">{c.role.replace("_", " ")}</span>
                   </li>
@@ -113,7 +113,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           <ul className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
             {posters.map((p) => (
               <li key={p.id} className={cx("overflow-hidden rounded-2xl border", p.status === "selected" || p.status === "approved" ? "border-lavender" : "border-white/10")}>
-                <img src={p.variants.titled ?? p.variants["800w"] ?? p.url} alt="Poster concept" className="aspect-[2/3] w-full object-cover" />
+                <img src={p.variants.titled ?? p.variants["600w"] ?? p.url} alt="Poster concept" className="aspect-[2/3] w-full object-cover" />
                 <div className="p-2 text-xs text-mist">{p.status}{p.review?.consistency ? ` · ${p.review.consistency.slice(0, 80)}` : ""}</div>
               </li>
             ))}

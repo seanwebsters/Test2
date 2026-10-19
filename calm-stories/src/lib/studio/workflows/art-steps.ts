@@ -164,7 +164,7 @@ registerHandler("art.poster_review", async (ctx) => {
   const bible = await getBible(sid);
   const titled = await applyTitle(chosen, { title: bible.identity?.title ?? "", footer: "A Sleep Stories Original" });
   const series = await db.get("series", sid);
-  if (series) await db.update("series", sid, { artwork: { ...series.artwork, image_url: titled.variants["1600w"] ?? titled.url }, updated_at: nowIso() });
+  if (series) await db.update("series", sid, { artwork: { ...series.artwork, image_url: titled.variants["1200w"] ?? titled.url }, updated_at: nowIso() });
   return { summary: `Selected poster ${review.selected_index}: ${review.rationale.slice(0, 160)}` };
 });
 
@@ -223,7 +223,7 @@ registerHandler("art.cover_review", async (ctx) => {
     const ep1 = (await db.get("episodes", ctx.run.episode_id!))!;
     const s1 = (await db.get("series", ctx.run.series_id!))!;
     await applyTitle(only, { title: ep1.title, kicker: `${s1.title} · Episode ${ep1.number}` });
-    await db.update("episodes", ep1.id, { artwork_url: only.variants["1600w"] ?? only.url, updated_at: nowIso() });
+    await db.update("episodes", ep1.id, { artwork_url: only.variants["1200w"] ?? only.url, updated_at: nowIso() });
     return { summary: "Cover in place (single concept – no review needed)." };
   }
   const review = await reviewImages(ctx, covers, "These are episode cover concepts; they must match the series identity and keep characters consistent with their portraits.");
@@ -233,7 +233,7 @@ registerHandler("art.cover_review", async (ctx) => {
   const ep = (await db.get("episodes", ctx.run.episode_id!))!;
   const series = (await db.get("series", ctx.run.series_id!))!;
   await applyTitle(chosen, { title: ep.title, kicker: `${series.title} · Episode ${ep.number}` });
-  await db.update("episodes", ep.id, { artwork_url: chosen.variants["1600w"] ?? chosen.url, updated_at: nowIso() });
+  await db.update("episodes", ep.id, { artwork_url: chosen.variants["1200w"] ?? chosen.url, updated_at: nowIso() });
   return { summary: `Selected cover ${Math.max(1, review.selected_index)}${review.selected_index < 1 ? " (best available – flagged for your review)" : ""}.` };
 });
 

@@ -376,7 +376,7 @@ export interface ArtworkAsset {
   mime_type: string;
   width: number | null;
   height: number | null;
-  /** Delivery renditions, e.g. { "1600w": "/api/art/…?v=1600w", "titled": … }. */
+  /** Delivery renditions, e.g. { "1200w": "/api/art/…?v=1200w", "titled": … }. */
   variants: Record<string, string>;
   provider: string;
   model: string;

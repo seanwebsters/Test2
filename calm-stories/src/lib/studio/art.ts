@@ -73,7 +73,7 @@ export async function generateArtwork(input: {
   return { asset, cost_cents: img.cost_cents };
 }
 
-const RENDITIONS = [1600, 800, 400];
+const RENDITIONS = [1200, 600, 300];
 
 export async function storeArtwork(input: {
   meta: CallMeta;
@@ -89,6 +89,12 @@ export async function storeArtwork(input: {
 }): Promise<ArtworkAsset> {
   const storage = getStorage();
   const id = newId("art");
+  // Keep storage small: providers return multi-megabyte PNGs; a high-quality JPEG is a fraction of the size.
+  try {
+    input = { ...input, data: await sharp(input.data).jpeg({ quality: 90, mozjpeg: true }).toBuffer(), mimeType: "image/jpeg" };
+  } catch {
+    // Not decodable by sharp; store as received.
+  }
   const ext = input.mimeType.includes("jpeg") ? "jpg" : input.mimeType.includes("webp") ? "webp" : "png";
   const key = `art/${input.seriesId}/${id}/original.${ext}`;
   await storage.put(key, input.data, input.mimeType);
@@ -133,8 +139,15 @@ export async function storeArtwork(input: {
 export async function loadArtwork(asset: ArtworkAsset, variant?: string): Promise<{ data: Buffer; mimeType: string } | null> {
   const storage = getStorage();
   if (variant && asset.variants[variant]) {
-    const f = await storage.get(`art/${asset.series_id}/${asset.id}/${variant}.${variant === "titled" ? "png" : "webp"}`);
-    if (f) return { data: f.data, mimeType: variant === "titled" ? "image/png" : "image/webp" };
+    if (variant === "titled") {
+      const jpg = await storage.get(`art/${asset.series_id}/${asset.id}/titled.jpg`);
+      if (jpg) return { data: jpg.data, mimeType: "image/jpeg" };
+      const png = await storage.get(`art/${asset.series_id}/${asset.id}/titled.png`); // older assets
+      if (png) return { data: png.data, mimeType: "image/png" };
+    } else {
+      const f = await storage.get(`art/${asset.series_id}/${asset.id}/${variant}.webp`);
+      if (f) return { data: f.data, mimeType: "image/webp" };
+    }
   }
   const f = await storage.get(asset.storage_key);
   return f ? { data: f.data, mimeType: asset.mime_type } : null;
@@ -204,7 +217,7 @@ export async function applyTitle(asset: ArtworkAsset, lines: { title: string; ki
   if (lines.footer) parts.push(`<path d="${textPath(font("400", "italic"), lines.footer, titleSize * 0.32, W / 2, H * 0.94, W * 0.8)}" fill="${color}" fill-opacity="0.85"/>`);
   const shade = `<defs><linearGradient id="t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0.55"/><stop offset="0.38" stop-color="#000" stop-opacity="0"/><stop offset="0.85" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.45"/></linearGradient></defs><rect width="${W}" height="${H}" fill="url(#t)"/>`;
   const svg = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">${shade}${parts.join("")}</svg>`);
-  const out = await img.composite([{ input: svg, top: 0, left: 0 }]).png().toBuffer();
-  await getStorage().put(`art/${asset.series_id}/${asset.id}/titled.png`, out, "image/png");
+  const out = await img.composite([{ input: svg, top: 0, left: 0 }]).jpeg({ quality: 90, mozjpeg: true }).toBuffer();
+  await getStorage().put(`art/${asset.series_id}/${asset.id}/titled.jpg`, out, "image/jpeg");
   return getDb().update("artwork_assets", asset.id, { variants: { ...asset.variants, titled: `/api/art/${asset.id}?v=titled` } });
 }

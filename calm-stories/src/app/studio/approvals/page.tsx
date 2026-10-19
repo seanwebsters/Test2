@@ -96,7 +96,7 @@ export default async function Approvals() {
           <ul className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-6">
             {art.map((a) => (
               <li key={a.id} className="overflow-hidden rounded-2xl border border-white/10">
-                <img src={a.variants.titled ?? a.variants["400w"] ?? a.url} alt={a.kind} className="aspect-square w-full object-cover" loading="lazy" />
+                <img src={a.variants.titled ?? a.variants["300w"] ?? a.url} alt={a.kind} className="aspect-square w-full object-cover" loading="lazy" />
                 <div className="flex items-center justify-between gap-1 p-2 text-[11px]">
                   <span className="text-mist">{a.kind.replace("_", " ")}</span>
                   <AdminAction endpoint={`/api/studio/artwork/${a.id}`} body={{ action: "approve" }} label="Approve" className="btn-ghost btn-sm" />

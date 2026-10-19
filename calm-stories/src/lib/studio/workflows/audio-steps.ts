@@ -67,6 +67,21 @@ async function eleven<T>(ctx: StepContext, op: string, estimateCents: number, fn
 
 /** Flash/Turbo TTS costs about half of Multilingual/v3 per character. */
 const ttsRate = (model: string) => (/flash|turbo/.test(model) ? ELEVEN_PRICES.tts_flash_per_1k_chars_cents : ELEVEN_PRICES.tts_per_1k_chars_cents);
+/** Stored intermediates are MP3 (a tenth of the size of WAV) to keep the volume small. */
+async function toMp3(dir: string, wavPath: string, name: string): Promise<Buffer> {
+  const out = path.join(dir, `${name}-store.mp3`);
+  await runFfmpeg(["-i", wavPath, "-c:a", "libmp3lame", "-b:a", "192k", out]);
+  return fs.readFileSync(out);
+}
+
+/** Write a stored file back as WAV for mixing (older renders were stored as WAV already). */
+async function restoreAudio(dir: string, data: Buffer, key: string, wavPath: string) {
+  if (key.endsWith(".wav")) return fs.writeFileSync(wavPath, data);
+  const tmp = path.join(dir, `restore-${path.basename(key)}`);
+  fs.writeFileSync(tmp, data);
+  await runFfmpeg(["-i", tmp, "-c:a", "pcm_s16le", "-ar", "44100", wavPath]);
+}
+
 const ttsCost = (chars: number, model: string) => Math.round((chars / 1000) * ttsRate(model) * 100) / 100;
 
 /** At most this many ambience beds per scene (each is a paid generation the first time). */
@@ -317,7 +332,7 @@ registerHandler("audio.scene", async (ctx) => {
     const narrPath = path.join(dir, "narration.wav");
     let narrationKey = !revoice && prev?.narration_key ? prev.narration_key : null;
     if (narrationKey) {
-      fs.writeFileSync(narrPath, (await storage.get(narrationKey))!.data);
+      await restoreAudio(dir, (await storage.get(narrationKey))!.data, narrationKey, narrPath);
     } else {
       const parts = splitPerformance(scene.text);
       // Merge narration runs; attribute quotes to cast voices.
@@ -360,8 +375,8 @@ registerHandler("audio.scene", async (ctx) => {
         files.push({ file: f, pauseAfter: endsParagraph ? 1.1 : 0.35 });
       }
       await joinSegments(dir, files, narrPath);
-      narrationKey = `audio/${ep.series_id}/${ep.id}/scene-${idx}/narration-${Date.now()}.wav`;
-      await storage.put(narrationKey, fs.readFileSync(narrPath), "audio/wav");
+      narrationKey = `audio/${ep.series_id}/${ep.id}/scene-${idx}/narration-${Date.now()}.mp3`;
+      await storage.put(narrationKey, await toMp3(dir, narrPath, "narr"), "audio/mpeg");
     }
     const narrSec = await probeSeconds(narrPath);
 
@@ -402,8 +417,8 @@ registerHandler("audio.scene", async (ctx) => {
     /* ---- Scene stem ---- */
     const stemPath = path.join(dir, "stem.wav");
     const total = await mixScene({ narration: narrPath, layers: layerFiles, music, intensity: plan.intensity, out: stemPath });
-    const stemKey = `audio/${ep.series_id}/${ep.id}/scene-${idx}/stem-${Date.now()}.wav`;
-    await storage.put(stemKey, fs.readFileSync(stemPath), "audio/wav");
+    const stemKey = `audio/${ep.series_id}/${ep.id}/scene-${idx}/stem-${Date.now()}.mp3`;
+    await storage.put(stemKey, await toMp3(dir, stemPath, "stem"), "audio/mpeg");
     const monoQa = path.join(dir, "qa.wav");
     await runFfmpeg(["-i", stemPath, "-ac", "1", "-ar", "22050", "-c:a", "pcm_s16le", monoQa]);
     const decoded = decodeWav(fs.readFileSync(monoQa));
@@ -439,7 +454,7 @@ registerHandler("audio.master", async (ctx) => {
   return withTmp(async (dir) => {
     const stems: string[] = [];
     for (const r of renders) {
-      const f = path.join(dir, `stem_${r.scene_index}.wav`);
+      const f = path.join(dir, `stem_${r.scene_index}${path.extname(r.stem_key!) || ".wav"}`);
       fs.writeFileSync(f, (await storage.get(r.stem_key!))!.data);
       stems.push(f);
     }

@@ -419,8 +419,13 @@ export async function resumeRun(runId: string, opts: { budget_cents?: number } =
   const db = getDb();
   const steps = await db.list("workflow_steps", { where: { run_id: runId } });
   for (const s of steps.filter((x) => x.status === "blocked")) await db.update("workflow_steps", s.id, { status: "pending", needs: null, error: null, updated_at: nowIso() });
-  await patchRun(runId, { status: "running", error: null, ...(opts.budget_cents ? { budget_cents: opts.budget_cents } : {}) });
-  await emit({ run_id: runId, step_key: null, agent: "network_executive", kind: "log", message: "Resumed." });
+  // Plain Resume lifts the cap to the current Settings budget if that's higher, so raising it once in Settings is enough.
+  const run = await db.get("workflow_runs", runId);
+  const settings = await getStudioSettings();
+  const settingsBudget = run?.kind === "episode_production" ? settings.default_episode_budget_cents : settings.default_series_budget_cents;
+  const budget = opts.budget_cents ?? (run && settingsBudget > run.budget_cents ? settingsBudget : undefined);
+  await patchRun(runId, { status: "running", error: null, ...(budget ? { budget_cents: budget } : {}) });
+  await emit({ run_id: runId, step_key: null, agent: "network_executive", kind: "log", message: budget ? `Resumed with a $${(budget / 100).toFixed(2)} budget.` : "Resumed." });
   kick();
 }
 

@@ -6,7 +6,7 @@ import { notFound } from "@/lib/errors";
 import { loadArtwork } from "@/lib/studio/art";
 
 /**
- * Studio artwork and its renditions (?v=1600w|800w|400w|titled). Visible
+ * Studio artwork and its renditions (?v=1200w|600w|300w|titled). Visible
  * wherever its series or episode is visible; concepts and rejected images
  * only to staff.
  */

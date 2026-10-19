@@ -55,7 +55,7 @@ describe("Sleep Stories Studio – end to end", () => {
     expect(providers.counts.imagesWithRefs).toBeGreaterThanOrEqual(3);
     const poster = (await db.list("artwork_assets", { where: { series_id: seriesId, kind: "poster", status: "selected" } }))[0]!;
     expect(poster.variants.titled).toBeTruthy();
-    expect(await getStorage().get(`art/${seriesId}/${poster.id}/titled.png`)).not.toBeNull();
+    expect(await getStorage().get(`art/${seriesId}/${poster.id}/titled.jpg`)).not.toBeNull();
     // Web research was used and the bible context is cached in the system prompt.
     expect(script.calls.some((c) => c.webSearch && c.agent === "program_director")).toBe(true);
     expect(script.calls.filter((c) => c.agent === "lead_writer").length).toBe(0);
