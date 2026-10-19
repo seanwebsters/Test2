@@ -5,7 +5,9 @@ import { pipelineStages } from "@/lib/studio/pipeline-view";
 import { TeamRoom } from "@/components/studio/TeamRoom";
 import { PipelineStrip } from "@/components/studio/PipelineStrip";
 import { isStaff } from "@/app/admin/staff";
-import { AgentBedroom } from "@/components/studio/AgentBedroom";
+import { AgentAvatar } from "@/components/studio/AgentAvatar";
+import { AdminAction } from "@/components/admin/AdminAction";
+import { avatarClips, getAvatar } from "@/lib/studio/avatars";
 import { AGENT_BY_KEY } from "@/lib/studio/agents";
 import type { AgentActivity } from "@/lib/studio/types";
 
@@ -29,6 +31,8 @@ export default async function TeamPage() {
   const waiting = team.filter((a) => a.activity === "asking_for_help").length;
   const run = (await db.list("workflow_runs", { where: { status: ["running", "awaiting_approval", "blocked", "paused"] }, orderBy: { column: "updated_at", ascending: false }, limit: 1 }))[0];
   const steps = run ? await db.list("workflow_steps", { where: { run_id: run.id } }) : [];
+  const clips = await avatarClips();
+  const test = await getAvatar("lead_writer");
   return (
     <div className="space-y-8">
       <header className="flex flex-wrap items-center gap-4">
@@ -40,13 +44,29 @@ export default async function TeamPage() {
       <p className="max-w-3xl text-sm text-mist">
         Every pose reflects a real workflow step: resting when idle, reading while reviewing, typing while generating, a thought bubble while planning, a letter when handing work on, a little celebration when a task finishes, and a raised hand when they need you. Click anyone to see their current task, reasoning, outputs and history.
       </p>
-      <TeamRoom initial={team} />
+      <section className="rounded-3xl border border-lavender/30 bg-lavender/[0.05] p-5">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <h2 className="font-serif text-2xl text-white">Animated agents (test)</h2>
+            <p className="text-sm text-mist">
+              Films the Lead Writer as a photoreal person in four poses (resting, working, thinking, needs you) with Nano Banana and Kling on fal – about $0.90, takes ~5–10 minutes. Refresh to see progress.
+            </p>
+            {test && (
+              <p className={test.status === "failed" ? "mt-1 text-sm text-rose-300" : "mt-1 text-sm text-lavender"}>
+                {test.status === "ready" ? "Ready – the Lead Writer below is now filmed." : test.status === "failed" ? `Failed: ${test.error}` : `Working… ${test.step} (${Object.keys(test.clips).length}/4 clips)`}
+              </p>
+            )}
+          </div>
+          <AdminAction endpoint="/api/studio/avatars" body={{ agent: "lead_writer" }} label={test ? "Make it again" : "Make test avatar"} pendingLabel="Starting…" className="btn-primary btn-sm" />
+        </div>
+      </section>
+      <TeamRoom initial={team} clips={clips} />
       <section aria-labelledby="legend-h">
         <h2 id="legend-h" className="label">What the poses mean</h2>
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
           {LEGEND.map(([a, label, hint]) => (
             <li key={a} className="overflow-hidden rounded-2xl border border-white/10 bg-[#0c1226]">
-              <AgentBedroom agent={AGENT_BY_KEY.lead_writer} activity={a} className="block w-full" />
+              <AgentAvatar agent={AGENT_BY_KEY.lead_writer} activity={a} clips={clips.lead_writer} className="block w-full" />
               <div className="px-2.5 py-2 text-center">
                 <div className="font-serif text-[15px] text-white">{label}</div>
                 <div className="text-[11px] text-mist">{hint}</div>

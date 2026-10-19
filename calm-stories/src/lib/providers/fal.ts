@@ -36,3 +36,28 @@ export async function falNanoBanana(
   // ≈ $0.039 per image at list price; tracked as an estimate.
   return { data: Buffer.from(await file.arrayBuffer()), mimeType: img.content_type ?? file.headers.get("content-type") ?? "image/png", cost_cents: 3.9 };
 }
+
+/**
+ * Run a slow fal model (e.g. video) through fal's queue: submit, poll until it
+ * completes, then fetch the result. Returns the model's JSON output.
+ */
+export async function falQueue<T = Record<string, unknown>>(apiKey: string, endpoint: string, input: Record<string, unknown>, timeoutMs = 10 * 60_000): Promise<T> {
+  const headers = { authorization: `Key ${apiKey}`, "content-type": "application/json" };
+  const submit = await fetch(`https://queue.fal.run/${endpoint}`, { method: "POST", headers, body: JSON.stringify(input) });
+  if (!submit.ok) throw new GeminiError(`fal.ai error ${submit.status}: ${(await submit.text()).slice(0, 300)}`, submit.status, null);
+  const job = (await submit.json()) as { status_url: string; response_url: string };
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, process.env.NODE_ENV === "test" ? 5 : 5000));
+    const st = await fetch(job.status_url, { headers });
+    if (!st.ok) continue;
+    const s = (await st.json()) as { status: string };
+    if (s.status === "COMPLETED") {
+      const out = await fetch(job.response_url, { headers });
+      if (!out.ok) throw new GeminiError(`fal.ai error ${out.status}: ${(await out.text()).slice(0, 300)}`, out.status, null);
+      return (await out.json()) as T;
+    }
+    if (s.status === "FAILED" || s.status === "ERROR") throw new GeminiError(`fal.ai job failed: ${JSON.stringify(s).slice(0, 300)}`, 500, null);
+  }
+  throw new GeminiError("fal.ai job timed out", 504, null);
+}

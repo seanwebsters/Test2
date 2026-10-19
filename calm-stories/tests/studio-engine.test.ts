@@ -281,3 +281,45 @@ describe("scene mix", () => {
     });
   });
 });
+
+describe("animated agents (test avatar)", () => {
+  it("paints a still, films four looping clips through fal's queue, and stores them for the AI Team room", async () => {
+    const { vi } = await import("vitest");
+    const sharp = (await import("sharp")).default;
+    const { env } = await import("@/lib/env");
+    const { startAvatar, getAvatar, avatarClips, VIDEO_ENDPOINT } = await import("@/lib/studio/avatars");
+    freshDb();
+    (env as { falKey?: string }).falKey = "test-fal";
+    const png = await sharp({ create: { width: 64, height: 48, channels: 3, background: "#123" } }).png().toBuffer();
+    const submitted: { url: string; body: Record<string, unknown> }[] = [];
+    vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+      const u = String(url);
+      if (u.startsWith("https://fal.run/")) return Response.json({ images: [{ url: "https://cdn.fal/still.png" }] });
+      if (u === "https://cdn.fal/still.png") return new Response(new Uint8Array(png), { headers: { "content-type": "image/png" } });
+      if (u.startsWith("https://queue.fal.run/")) {
+        submitted.push({ url: u, body: JSON.parse(String(init?.body)) });
+        const id = submitted.length;
+        return Response.json({ status_url: `https://queue.fal/${id}/status`, response_url: `https://queue.fal/${id}` });
+      }
+      if (u.endsWith("/status")) return Response.json({ status: "COMPLETED" });
+      if (u.startsWith("https://queue.fal/")) return Response.json({ video: { url: `https://cdn.fal/clip-${u.split("/").pop()}.mp4` } });
+      if (u.startsWith("https://cdn.fal/clip-")) return new Response(new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112]));
+      throw new Error(`unexpected ${u}`);
+    });
+    try {
+      await startAvatar("lead_writer");
+      for (let i = 0; i < 200 && (await getAvatar("lead_writer"))?.status === "generating"; i++) await new Promise((r) => setTimeout(r, 10));
+      const m = (await getAvatar("lead_writer"))!;
+      expect(m.status, m.error ?? "").toBe("ready");
+      expect(Object.keys(m.clips).sort()).toEqual(["needs_you", "resting", "thinking", "working"]);
+      expect(submitted).toHaveLength(4);
+      expect(submitted.every((s) => s.url === `https://queue.fal.run/${VIDEO_ENDPOINT}` && String(s.body.image_url).startsWith("data:image/") && s.body.duration === "5")).toBe(true);
+      expect(String(submitted.find((s) => String(s.body.prompt).includes("asleep"))?.body.prompt)).toContain("breathing");
+      const clips = await avatarClips();
+      expect(clips.lead_writer?.working).toMatch(/^\/api\/studio\/avatars\/lead_writer\/working\.mp4\?v=/);
+      expect(clips.worldbuilder).toBeUndefined(); // everyone else keeps the drawn bedroom
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});

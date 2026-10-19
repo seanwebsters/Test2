@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { AGENTS } from "@/lib/studio/agents";
 import type { AgentState } from "@/lib/studio/team";
-import { AgentBedroom } from "./AgentBedroom";
+import { AgentAvatar, type AvatarClips } from "./AgentAvatar";
 import { AgentDrawer } from "./AgentDrawer";
 import { cx } from "@/lib/util";
 
@@ -18,7 +18,7 @@ const ACTIVITY_LABEL: Record<string, string> = {
 };
 
 /** Live AI Team room. Polls real workflow state; every pose reflects a real step. */
-export function TeamRoom({ initial, compact }: { initial: AgentState[]; compact?: boolean }) {
+export function TeamRoom({ initial, compact, clips }: { initial: AgentState[]; compact?: boolean; clips?: Record<string, AvatarClips> }) {
   const [agents, setAgents] = useState(initial);
   const [open, setOpen] = useState<string | null>(null);
   useEffect(() => {
@@ -53,7 +53,7 @@ export function TeamRoom({ initial, compact }: { initial: AgentState[]; compact?
                   activity === "asking_for_help" ? "border-amber-300/50 shadow-[0_0_30px_-10px_rgba(255,201,107,0.6)]" : activity === "sleeping" ? "border-white/10" : "border-lavender/40 shadow-glow",
                 )}
               >
-                <AgentBedroom agent={def} activity={activity} className="block w-full" />
+                <AgentAvatar agent={def} activity={activity} clips={clips?.[def.key]} className="block w-full" />
                 <div className="relative mx-2 -mt-7 mb-2 rounded-2xl border border-white/10 bg-[#0d1230]/90 p-3 backdrop-blur-md">
                   <div className="flex items-center gap-2">
                     <span className="grid h-7 w-7 place-items-center rounded-full text-[13px]" style={{ background: def.bedroom.blanket, color: def.bedroom.accent }}>
