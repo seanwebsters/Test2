@@ -199,7 +199,7 @@ export function StudioHome({ initial, review, inbox, latest, isOwner }: { initia
       <section className={cx("mt-4 rounded-3xl border p-4", panel)}>
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-1 pb-3">
           <h2 className="text-xl font-medium">Latest from the studio</h2>
-          <span className="text-sm text-white/60">Stories in progress, ready for review or recently published.</span>
+          <span className="text-sm text-white/60">Stories ready for review, approved or recently published.</span>
           <Link href="/studio/series" className="ml-auto text-sm text-[#c7b8ff] hover:text-white">View all stories →</Link>
         </div>
         <div className="relative">

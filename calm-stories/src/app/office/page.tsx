@@ -18,12 +18,13 @@ export default async function OfficePage() {
   const viewer = await getViewer();
   if (!viewer.user || !isEditor(viewer)) redirect("/studio-login?next=/office");
   const db = getDb();
-  const [team, allEpisodes, series, events, assets] = await Promise.all([
+  const [team, allEpisodes, series, events, assets, pendingReviews] = await Promise.all([
     getTeamState(),
     db.list("episodes", { orderBy: { column: "updated_at", ascending: false }, limit: 200 }),
     db.list("series"),
     db.list("workflow_events", { orderBy: { column: "created_at", ascending: false }, limit: 60 }),
     db.list("audio_assets"),
+    db.list("editorial_reviews", { where: { status: "pending" } }),
   ]);
   const role = readAccess((await cookies()).get(ACCESS_COOKIE)?.value);
   const cover = (seriesId: string, ep?: { artwork_url: string | null }) => ep?.artwork_url ?? series.find((s) => s.id === seriesId)?.artwork.image_url ?? null;
@@ -31,7 +32,7 @@ export default async function OfficePage() {
   const duration = (ep: (typeof allEpisodes)[number]) => Math.round(assets.find((a) => a.id === ep.audio_asset_id)?.duration_seconds ?? ep.duration_seconds ?? 0);
   const STAGE: Record<string, LatestCard["stage"]> = { draft: "production", in_review: "ready", changes_requested: "changes", approved: "approved", published: "published", rejected: "production" };
   const latest: LatestCard[] = allEpisodes
-    .filter((e) => e.status !== "rejected")
+    .filter((e) => ["in_review", "changes_requested", "approved", "published"].includes(e.status)) // nothing still in production
     .slice(0, 12)
     .map((ep) => ({ id: ep.id, title: ep.title, number: ep.number, cover: cover(ep.series_id, ep), stage: ep.status === "draft" && ep.audio_asset_id ? "audio" : STAGE[ep.status]!, seconds: duration(ep) }));
   const order = { in_review: 0, changes_requested: 1, approved: 2 } as const;
@@ -40,8 +41,8 @@ export default async function OfficePage() {
     .map((ep) => ({ id: ep.id, title: ep.title, series: series.find((s) => s.id === ep.series_id)?.title ?? "", cover: cover(ep.series_id, ep), status: ep.status as ReviewItem["status"] }));
 
   const inbox: InboxCard[] = [
-    ...episodes
-      .filter((ep) => ep.status === "in_review")
+    ...allEpisodes
+      .filter((ep) => ep.status === "in_review" || pendingReviews.some((r) => r.episode_id === ep.id))
       .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1))
       .map((ep) => ({
         id: ep.id,
@@ -53,6 +54,19 @@ export default async function OfficePage() {
         since: ep.updated_at,
         href: "/studio/releases",
         cta: "Review story",
+      })),
+    ...team
+      .filter((a) => a.activity === "asking_for_help" && a.task?.kind === "gate" && !allEpisodes.some((ep) => (ep.status === "in_review" || pendingReviews.some((r) => r.episode_id === ep.id)) && a.task?.run_title.includes(ep.title)))
+      .map((a) => ({
+        id: `gate-${a.key}-${a.task?.run_id}`,
+        kind: "approval" as const,
+        title: a.task?.run_title || a.task?.label || "Approval needed",
+        sub: `${a.task?.label ?? "Your decision"} · nothing goes out until you approve`,
+        cover: null,
+        seconds: 0,
+        since: a.task?.since ?? "",
+        href: "/studio/approvals",
+        cta: "Review",
       })),
     ...team
       .filter((a) => a.activity === "asking_for_help" && a.task?.kind === "blocked")
