@@ -35,7 +35,7 @@ const HAIR = (hex: string) => {
 export type OfficePose = "work" | "rest";
 const POSES: Record<OfficePose, string> = {
   work: "sitting on a black office chair, leaning slightly forward and typing on a small silver laptop on their lap, focused, friendly smile",
-  rest: "sitting relaxed on the floor with legs crossed, eyes closed, peaceful sleepy smile, hands resting in lap",
+  rest: "sitting on a black office chair, leaning back with eyes closed, dozing peacefully with a sleepy smile, hands resting in lap",
 };
 function personPrompt(agent: AgentKey, pose: OfficePose): string {
   const a = AGENT_BY_KEY[agent];

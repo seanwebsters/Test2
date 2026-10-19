@@ -9,8 +9,8 @@ import { cx } from "@/lib/util";
 /**
  * The AI Team as a little isometric studio (Sims-style, Calm-styled). Every
  * person's place and pose comes from real workflow state: seated and typing
- * at their desk while working, walking to the lounge to nap when idle, hand
- * up with an amber mood gem when they need you.
+ * at their desk while working, dozing in their chair when idle, hand up
+ * when they need you.
  */
 
 const TW = 64; // tile width
@@ -56,13 +56,6 @@ const SEAT: Partial<Record<AgentKey, [number, number]>> = {
   audio_director: [20.6, 8.4],
   audio_producer: [19.1, 10.6],
 };
-
-/** Lounge spots for resting agents (on sofas and beanbags). */
-const NAP: [number, number][] = [
-  [2.2, 13.6], [3.4, 13.6], [4.6, 13.6], [7.6, 13.6], [8.8, 13.6], [10.0, 13.6],
-  [14.2, 13.6], [15.4, 13.6], [16.6, 13.6], [5.6, 16.2], [3.4, 16.2], [8.0, 16.3],
-  [11.0, 16.3], [14.0, 16.3], [17.0, 16.3], [19.6, 15.4], [21.0, 15.4], [20.3, 16.6],
-];
 
 const GEM: Record<"work" | "help" | "rest" | "done", [string, string]> = {
   work: ["#c7b8ff", "#8a74e8"],
@@ -201,12 +194,12 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
   // Walking: when someone moves between desk and lounge, show the walk cycle for the trip.
   const prevAt = useRef<Partial<Record<AgentKey, boolean>>>({});
   const [walking, setWalking] = useState<Partial<Record<AgentKey, boolean>>>({});
-  let napIdx = 0;
   const people = AGENTS.map((def) => {
     const s = st(def.key);
     const activity: AgentActivity = def.human ? (s?.activity ?? "sleeping") : (s?.activity ?? "sleeping");
-    const atDesk = def.human || activity !== "sleeping";
-    const spot = atDesk ? SEAT[def.key]! : NAP[napIdx++ % NAP.length]!;
+    // Everyone always sits at their own desk; idle agents doze in their chair.
+    const atDesk = true;
+    const spot = SEAT[def.key]!;
     return { def, s, activity, atDesk, spot };
   });
   useEffect(() => {
@@ -403,15 +396,15 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
           onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onOpen(p.def.key)}
         >
           {p.activity === "asking_for_help" && <ellipse cx="0" cy="2" rx="22" ry="9" fill="none" stroke="#ffc96b" strokeWidth="2" className="sims-pulse" />}
-          {showPhoto && sprites?.done.includes(`${p.def.key}-${p.atDesk ? "work" : "rest"}`) ? (
+          {showPhoto && sprites?.done.includes(`${p.def.key}-${p.activity === "sleeping" ? "rest" : "work"}`) ? (
             <g className={cx(pose === "walk" && "sims-walk", pose === "nap" && "sims-breathe")}>
               <ellipse cx="2" cy="3" rx="14" ry="5.5" fill="#1b2140" opacity="0.3" filter="url(#simsSoft)" />
-              <image href={`/api/studio/office-render/people/${p.def.key}-${p.atDesk ? "work" : "rest"}.png?v=${sprites.v}`} x={-24} y={-60} width={48} height={64} preserveAspectRatio="xMidYMax meet" />
+              <image href={`/api/studio/office-render/people/${p.def.key}-${p.activity === "sleeping" ? "rest" : "work"}.png?v=${sprites.v}`} x={-24} y={-60} width={48} height={64} preserveAspectRatio="xMidYMax meet" />
             </g>
           ) : (
             <Person def={p.def} pose={pose} activity={p.activity} />
           )}
-          {!p.atDesk && pose === "nap" && <text x="12" y="-56" fontSize="11" fill="#c9d6ff" className="sims-z">z</text>}
+          {p.activity === "sleeping" && <text x="12" y="-56" fontSize="11" fill="#c9d6ff" className="sims-z">z</text>}
         </g>
       ),
     });
@@ -581,12 +574,12 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
         })}
       </svg>
       <ul className="flex flex-wrap gap-x-4 gap-y-1 border-t border-white/10 px-4 py-3 text-[12px]">
-        {people.map(({ def, activity, atDesk }) => (
+        {people.map(({ def, activity }) => (
           <li key={def.key}>
             <button onClick={() => onOpen(def.key)} className="flex items-center gap-1.5 hover:text-white">
-              <span className="h-2 w-2 rounded-full" style={{ background: GEM[activity === "asking_for_help" ? "help" : atDesk ? "work" : "rest"][1] }} />
+              <span className="h-2 w-2 rounded-full" style={{ background: GEM[activity === "asking_for_help" ? "help" : activity !== "sleeping" ? "work" : "rest"][1] }} />
               <span className="text-white/90">{def.name}</span>
-              <span className={activity === "asking_for_help" ? "text-amber-200" : atDesk ? "text-lavender" : "text-mist"}>· {def.human ? (activity === "asking_for_help" ? "Needs you" : "All clear") : LABEL[activity]}</span>
+              <span className={activity === "asking_for_help" ? "text-amber-200" : activity !== "sleeping" ? "text-lavender" : "text-mist"}>· {def.human ? (activity === "asking_for_help" ? "Needs you" : "All clear") : LABEL[activity]}</span>
             </button>
           </li>
         ))}
