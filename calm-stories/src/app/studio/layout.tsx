@@ -4,6 +4,7 @@ import { isEditor } from "@/lib/auth/policy";
 import { getDb } from "@/lib/db";
 import { SceneArt } from "@/components/art/SceneArt";
 import { StudioNav } from "@/components/studio/StudioNav";
+import { AGENT_BY_KEY } from "@/lib/studio/agents";
 import "@/lib/studio";
 
 export const metadata = { title: { default: "Sleep Stories Studio", template: "%s · Sleep Stories Studio" } };
@@ -27,6 +28,12 @@ export default async function StudioLayout({ children }: { children: React.React
     db.list("workflow_runs", { where: { status: "blocked" } }),
     db.list("workflow_runs", { where: { kind: "episode_production", status: ["running", "awaiting_approval", "blocked"] }, orderBy: { column: "updated_at", ascending: false }, limit: 1 }),
   ]);
+  // Surface what's going wrong on every page, with the provider's own message.
+  const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const troubled = (await db.list("workflow_steps", { where: { status: ["failed", "blocked", "waiting"] } }))
+    .filter((s) => s.error && s.updated_at >= since)
+    .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1));
+  const problems = [...new Map(troubled.map((s) => [s.error, s])).values()].slice(0, 3);
   const current = runs[0];
   const series = current?.series_id ? await db.get("series", current.series_id) : null;
   const steps = current ? await db.list("workflow_steps", { where: { run_id: current.id } }) : [];
@@ -78,6 +85,22 @@ export default async function StudioLayout({ children }: { children: React.React
           <Link href="/studio/approvals" className="ml-auto text-sm text-lavender">Approvals</Link>
           <Link href="/studio/team" className="text-sm text-mist">Team</Link>
         </div>
+        {problems.length > 0 && (
+          <div className="mx-4 mt-4 rounded-2xl border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm sm:mx-8 lg:mx-10" role="alert">
+            <div className="font-semibold text-rose-200">Something is stopping the studio</div>
+            <ul className="mt-2 space-y-2">
+              {problems.map((s) => (
+                <li key={s.id}>
+                  <Link href={`/studio/pipeline?run=${s.run_id}`} className="block hover:underline">
+                    <span className="text-white">{AGENT_BY_KEY[s.agent]?.name ?? s.agent} · {s.label}</span>{" "}
+                    <span className="text-mist">({s.status === "waiting" ? "retrying" : s.status})</span>
+                    <span className="mt-0.5 block break-words font-mono text-xs text-rose-100/90">{s.error!.slice(0, 400)}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="px-4 py-6 sm:px-8 lg:px-10">{children}</div>
       </div>
     </div>

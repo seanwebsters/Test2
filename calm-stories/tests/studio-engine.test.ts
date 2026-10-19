@@ -88,11 +88,16 @@ describe("autopilot", () => {
     // A failed development frees its place and doesn't count towards today's limit.
     const failedDev = await db.get("workflow_runs", projects[1]!.run_id!);
     await db.update("workflow_runs", failedDev!.id, { status: "failed" });
-    for (const r of runs) await db.update("workflow_runs", r.id, { status: "failed" });
+    await db.update("workflow_runs", runs[0]!.id, { status: "failed" });
+    await db.update("workflow_runs", runs[1]!.id, { status: "failed" });
     // Parallel developments don't trample each other's work.
     expect((await db.list("workflow_steps")).filter((s) => s.status === "failed")).toHaveLength(0);
-    expect(await runAutopilot()).toHaveLength(1); // one place freed; the failed commissions don't count
+    expect(await runAutopilot()).toHaveLength(1); // one place freed; failed commissions don't use up the allowance
     expect((await db.get("series_projects", projects[1]!.id))!.status).toBe("failed");
+    // Three failed commissions in a row: back off instead of retrying every heartbeat.
+    for (const r of await db.list("workflow_runs", { where: { kind: "series_development" } })) if (r.idempotency_key?.startsWith("autopilot:")) await db.update("workflow_runs", r.id, { status: "failed" });
+    await db.update("series_projects", projects[0]!.id, { status: "rejected" });
+    expect(await runAutopilot()).toHaveLength(0);
     for (const r of await db.list("workflow_runs", { where: { kind: "series_development" } })) if (r.idempotency_key?.startsWith("autopilot:")) await db.update("workflow_runs", r.id, { status: "succeeded" });
     // Daily limit: even with free places, no more today.
     for (const p of projects) await db.update("series_projects", p.id, { status: "rejected" });

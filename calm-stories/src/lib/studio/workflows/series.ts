@@ -516,6 +516,9 @@ export async function runAutopilot(now = new Date()) {
   const settings = await getStudioSettings();
   if (!settings.autopilot || settings.autopilot_pipeline < 1) return [];
   const autos = (await db.list("workflow_runs", { where: { kind: "series_development" } })).filter((r) => r.idempotency_key?.startsWith("autopilot:"));
+  // Don't hammer a broken setup: after three failed commissions in a row, wait an hour.
+  const latest = [...autos].sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, 3);
+  if (latest.length === 3 && latest.every((r) => r.status === "failed") && now.getTime() - new Date(latest[0]!.created_at).getTime() < 3600_000) return [];
   const commissioning = autos.filter((r) => ["running", "blocked", "paused"].includes(r.status)).length;
   // A project whose development run failed or was cancelled no longer holds a place in the slate.
   let active = 0;
