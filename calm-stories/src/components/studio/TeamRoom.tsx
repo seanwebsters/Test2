@@ -5,6 +5,7 @@ import { AGENTS } from "@/lib/studio/agents";
 import type { AgentState } from "@/lib/studio/team";
 import { AgentAvatar, type AvatarClips } from "./AgentAvatar";
 import { StudioOffice } from "./StudioOffice";
+import { SimsOffice } from "./SimsOffice";
 import { AgentDrawer } from "./AgentDrawer";
 import { cx } from "@/lib/util";
 
@@ -22,7 +23,7 @@ const ACTIVITY_LABEL: Record<string, string> = {
 export function TeamRoom({ initial, compact, clips }: { initial: AgentState[]; compact?: boolean; clips?: Record<string, AvatarClips> }) {
   const [agents, setAgents] = useState(initial);
   const [open, setOpen] = useState<string | null>(null);
-  const [view, setView] = useState<"office" | "rooms">(compact ? "rooms" : "office");
+  const [view, setView] = useState<"studio" | "office" | "rooms">(compact ? "rooms" : "studio");
   useEffect(() => {
     let alive = true;
     const poll = async () => {
@@ -42,13 +43,21 @@ export function TeamRoom({ initial, compact, clips }: { initial: AgentState[]; c
   const shown = compact ? AGENTS.filter((a) => !a.human).slice(0, 8) : AGENTS;
   const toggle = !compact && (
     <div className="mb-3 inline-flex rounded-full border border-white/15 p-0.5 text-sm" role="tablist" aria-label="Team view">
-      {(["office", "rooms"] as const).map((v) => (
+      {(["studio", "office", "rooms"] as const).map((v) => (
         <button key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)} className={cx("rounded-full px-3 py-1", view === v ? "bg-lavender/20 text-white" : "text-mist hover:text-white")}>
-          {v === "office" ? "Office" : "Rooms"}
+          {v === "studio" ? "Studio" : v === "office" ? "Floor plan" : "Rooms"}
         </button>
       ))}
     </div>
   );
+  if (view === "studio")
+    return (
+      <>
+        {toggle}
+        <SimsOffice agents={agents} onOpen={(k) => setOpen(k)} />
+        {open && <AgentDrawer agentKey={open} onClose={() => setOpen(null)} />}
+      </>
+    );
   if (view === "office")
     return (
       <>

@@ -172,3 +172,39 @@ body {
 @keyframes office-fire { from { opacity: 0.7; transform: scaleY(0.92); } to { opacity: 1; transform: scaleY(1.05); } }
 @keyframes office-bubble { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .studio-office * { animation: none !important; transition: none !important; } }
+
+/* ---------- AI Team isometric studio ---------- */
+.sims-office .sims-zone { font: 700 13px/1 var(--font-sans, system-ui); letter-spacing: 0.2em; fill: #c7b8ff; opacity: 0.35; }
+.sims-office .sims-name { font: 600 10px/1 var(--font-sans, system-ui); fill: #e6e0ff; paint-order: stroke; stroke: #0a1026; stroke-width: 3px; }
+.sims-office .sims-bubble-text { font: 500 11px/1 var(--font-sans, system-ui); fill: #0b1430; }
+.sims-office .sims-person { cursor: pointer; transition: transform 2.4s cubic-bezier(0.45, 0, 0.2, 1); }
+.sims-office .sims-person:focus { outline: none; }
+.sims-office * { transform-box: fill-box; transform-origin: center; }
+.sims-office .sims-person { transform-box: view-box; transform-origin: 0 0; }
+.sims-office .sims-gem { animation: sims-bob 2.4s ease-in-out infinite; }
+.sims-office .sims-type { animation: sims-type 0.45s ease-in-out infinite alternate; }
+.sims-office .sims-type-2 { animation-delay: 0.22s; }
+.sims-office .sims-walk .sims-leg-a { animation: sims-leg 0.5s ease-in-out infinite alternate; }
+.sims-office .sims-walk .sims-leg-b { animation: sims-leg 0.5s ease-in-out infinite alternate-reverse; }
+.sims-office .sims-walk { animation: sims-step 0.5s ease-in-out infinite alternate; }
+.sims-office .sims-breathe { animation: sims-breathe 4s ease-in-out infinite; }
+.sims-office .sims-z { animation: sims-z 3s ease-in infinite; opacity: 0; }
+.sims-office .sims-pulse { animation: sims-pulse 1.6s ease-out infinite; }
+.sims-office .sims-glow { animation: sims-glow 5s ease-in-out infinite; }
+.sims-office .sims-screen { animation: sims-screen 1.4s steps(2) infinite; }
+.sims-office .sims-twinkle { animation: sims-twinkle 3.5s ease-in-out infinite; }
+.sims-office .sims-fire { animation: sims-fire 0.8s ease-in-out infinite alternate; }
+.sims-office .sims-bubble { animation: sims-pop 0.4s ease-out both; }
+@keyframes sims-bob { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-4px) rotate(8deg); } }
+@keyframes sims-type { from { transform: translateY(0); } to { transform: translateY(-2.5px); } }
+@keyframes sims-leg { from { transform: rotate(-18deg); } to { transform: rotate(18deg); } }
+@keyframes sims-step { from { transform: translateY(0); } to { transform: translateY(-2px); } }
+@keyframes sims-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035); } }
+@keyframes sims-z { 0% { opacity: 0; transform: translate(0, 0); } 30% { opacity: 0.9; } 100% { opacity: 0; transform: translate(8px, -16px); } }
+@keyframes sims-pulse { from { transform: scale(0.7); opacity: 0.9; } to { transform: scale(1.5); opacity: 0; } }
+@keyframes sims-glow { 0%, 100% { opacity: 0.8; } 50% { opacity: 1; } }
+@keyframes sims-screen { 50% { opacity: 0.75; } }
+@keyframes sims-twinkle { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+@keyframes sims-fire { from { opacity: 0.7; transform: scaleY(0.9); } to { opacity: 1; transform: scaleY(1.08); } }
+@keyframes sims-pop { from { opacity: 0; transform: translateY(4px) scale(0.96); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .sims-office * { animation: none !important; transition: none !important; } }
