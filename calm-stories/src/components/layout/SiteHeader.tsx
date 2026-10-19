@@ -9,9 +9,8 @@ import { Avatar } from "@/components/ui/Avatar";
 import { cx } from "@/lib/util";
 
 const NAV = [
-  { href: "/", label: "Home", match: (p: string) => p === "/" },
-  { href: "/discover", label: "Series", match: (p: string) => p.startsWith("/discover") || p.startsWith("/series") },
-  { href: "/library", label: "My Library", match: (p: string) => p.startsWith("/library") },
+  // One tab: the studio's approved stories. (My Library stays in the profile menu.)
+  { href: "/", label: "Stories", match: (p: string) => p === "/" },
 ];
 
 export function Logo({ className }: { className?: string }) {
