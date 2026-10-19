@@ -284,6 +284,7 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
       if (kind === "generate") {
         const wasIllustrated = !photoOn || !(draft || photo);
         if (!wasIllustrated) setPhotoOn(false); // snapshot the layout, not the photo
+        setVideoOn(false);
         await new Promise((r) => setTimeout(r, 50));
         const snap = await snapshot();
         await post("/api/studio/office-render", { action: "generate", snapshot: snap, prompt: prompt.trim() || undefined });
@@ -303,8 +304,70 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
     }
   }
   const backdrop = draft?.url ?? photo;
-  const showPhoto = Boolean(backdrop && photoOn);
   const PW = (VH * 16) / 9;
+
+  // Animated office: Kling turns a still of the 3D office (with the team) into a looping clip.
+  type AnimMeta = { status: "running" | "ready" | "failed"; prompt: string; error?: string; updated_at: string } | null;
+  const [anim, setAnim] = useState<{ saved: AnimMeta; draft: AnimMeta }>({ saved: null, draft: null });
+  const [animPrompt, setAnimPrompt] = useState("");
+  const [videoOn, setVideoOn] = useState(false);
+  const [animBusy, setAnimBusy] = useState(false);
+  const loadAnim = async () => {
+    const res = await fetch("/api/studio/office-render/animate?info=1").catch(() => null);
+    if (res?.ok) setAnim((await res.json()) as { saved: AnimMeta; draft: AnimMeta });
+  };
+  useEffect(() => {
+    void loadAnim();
+  }, []);
+  useEffect(() => {
+    if (anim.draft?.status !== "running") return;
+    const t = setInterval(() => void loadAnim(), 8000);
+    return () => clearInterval(t);
+  }, [anim.draft?.status]);
+  useEffect(() => {
+    if (anim.draft?.status === "ready") setVideoOn(true);
+  }, [anim.draft?.status, anim.draft?.updated_at]);
+  const loadImg = (src: string) => new Promise<HTMLImageElement>((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => bad(new Error("Couldn't load the 3D office.")); i.src = src; });
+  /** The 3D office with the team drawn in, as a 16:9 JPEG for the video model. */
+  async function still3d(): Promise<string> {
+    if (!backdrop) throw new Error("Make the 3D office first.");
+    const canvas = document.createElement("canvas");
+    canvas.width = 1600;
+    canvas.height = 900;
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(await loadImg(backdrop), 0, 0, 1600, 900);
+    const k = 900 / VH, pad = (PW - VW) / 2;
+    for (const p of [...people].sort((a, b) => a.spot[0] + a.spot[1] - (b.spot[0] + b.spot[1]))) {
+      const pose = p.activity === "sleeping" ? "rest" : "work";
+      if (!sprites?.done.includes(`${p.def.key}-${pose}`)) continue;
+      const img = await loadImg(`/api/studio/office-render/people/${p.def.key}-${pose}.png?v=${sprites.v}`).catch(() => null);
+      if (!img) continue;
+      const [x, y] = iso(p.spot[0], p.spot[1]);
+      const sc = Math.min(48 / img.width, 64 / img.height);
+      const w = img.width * sc, h = img.height * sc;
+      ctx.drawImage(img, (x - w / 2 + pad) * k, (y + 4 - h) * k, w * k, h * k);
+    }
+    return canvas.toDataURL("image/jpeg", 0.9);
+  }
+  async function animAct(kind: "start" | "save" | "discard") {
+    setAnimBusy(true);
+    setRenderErr(null);
+    try {
+      if (kind === "start") {
+        if (!animPrompt.trim()) throw new Error("Type how you'd like the team to move.");
+        await post("/api/studio/office-render/animate", { action: "start", still: await still3d(), prompt: animPrompt.trim() });
+        setAnimPrompt("");
+      } else await post("/api/studio/office-render/animate", { action: kind });
+      await loadAnim();
+    } catch (err) {
+      setRenderErr(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAnimBusy(false);
+    }
+  }
+  const clip = anim.draft?.status === "ready" ? `/api/studio/office-render/animate?draft=1&v=${encodeURIComponent(anim.draft.updated_at)}` : anim.saved ? `/api/studio/office-render/animate?v=${encodeURIComponent(anim.saved.updated_at)}` : null;
+  const showVideo = Boolean(clip && videoOn && photoOn);
+  const showPhoto = Boolean(backdrop && photoOn);
 
   const items: Drawable[] = [];
   const shadows: ReactNode[] = [];
@@ -450,8 +513,32 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
             </>
           )}
         </form>
+        {photo && (
+          <form className="flex flex-wrap items-center gap-2" onSubmit={(e) => { e.preventDefault(); if (!animBusy) void animAct("start"); }}>
+            <input
+              value={animPrompt}
+              onChange={(e) => setAnimPrompt(e.target.value)}
+              placeholder="Animate the team… e.g. everyone types away, the Lead Writer stretches, lamps glow"
+              className="min-w-[240px] flex-1 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-[13px] text-white placeholder:text-mist/70 focus:border-lavender/60 focus:outline-none"
+              maxLength={1500}
+              disabled={animBusy || anim.draft?.status === "running"}
+            />
+            <button type="submit" disabled={animBusy || anim.draft?.status === "running" || !animPrompt.trim()} className="rounded-full bg-sky-300/90 px-3 py-1.5 font-medium text-[#0b1430] hover:bg-sky-200 disabled:opacity-40">
+              {anim.draft?.status === "running" ? "Animating…" : "🎬 Animate"}
+            </button>
+            {anim.draft?.status === "ready" && (
+              <>
+                <button type="button" onClick={() => void animAct("save")} disabled={animBusy} className="rounded-full bg-emerald-400/90 px-3 py-1.5 font-medium text-[#062016] hover:bg-emerald-300 disabled:opacity-40">Save clip</button>
+                <button type="button" onClick={() => void animAct("discard")} disabled={animBusy} className="rounded-full border border-white/15 px-3 py-1.5 text-mist hover:bg-white/10 hover:text-white disabled:opacity-40">Discard</button>
+              </>
+            )}
+          </form>
+        )}
         <div className="flex flex-wrap items-center gap-2">
-          {renderErr ? <span className="mr-auto text-rose-300">{renderErr}</span>
+          {anim.draft?.status === "running" && !renderErr ? <span className="mr-auto text-mist">Animating with Kling… “{short(anim.draft.prompt, 50)}” (1–3 minutes)</span>
+            : anim.draft?.status === "failed" && !renderErr ? <span className="mr-auto text-rose-300">Animation failed: {anim.draft.error}</span>
+            : anim.draft?.status === "ready" && !renderErr ? <span className="mr-auto text-amber-200">New clip – not saved yet. Save it or Discard.</span>
+            : renderErr ? <span className="mr-auto text-rose-300">{renderErr}</span>
             : busy === "generate" || busy === "refine" ? <span className="mr-auto text-mist">Rendering with Nano Banana… (about 20–40s)</span>
             : draft ? <span className="mr-auto text-amber-200">Draft – not saved yet.{draft.prompt ? ` “${short(draft.prompt, 60)}”` : ""} Keep changing it, then press Save.</span>
             : sprites?.status === "running" ? <span className="mr-auto text-mist">Making the 3D team… {sprites.done.length}/{sprites.total}</span>
@@ -459,7 +546,8 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
           {backdrop && (
             <div className="flex overflow-hidden rounded-full border border-white/15">
               <button onClick={() => setPhotoOn(false)} className={cx("px-3 py-1", !photoOn ? "bg-white/15 text-white" : "text-mist hover:text-white")}>Illustrated</button>
-              <button onClick={() => setPhotoOn(true)} className={cx("px-3 py-1", photoOn ? "bg-white/15 text-white" : "text-mist hover:text-white")}>3D</button>
+              <button onClick={() => { setPhotoOn(true); setVideoOn(false); }} className={cx("px-3 py-1", photoOn && !showVideo ? "bg-white/15 text-white" : "text-mist hover:text-white")}>3D</button>
+              {clip && <button onClick={() => { setPhotoOn(true); setVideoOn(true); }} className={cx("px-3 py-1", showVideo ? "bg-white/15 text-white" : "text-mist hover:text-white")}>Video</button>}
             </div>
           )}
           {photo && !draft && sprites?.status !== "running" && (
@@ -469,7 +557,8 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
           )}
         </div>
       </div>
-      <svg ref={svgRef} viewBox={`0 0 ${VW} ${VH}`} className="sims-office block w-full" role="img" aria-label="The AI team in the studio">
+      {showVideo && <video key={clip!} src={clip!} autoPlay loop muted playsInline className="block w-full" style={{ aspectRatio: `${PW} / ${VH}`, objectFit: "cover" }} />}
+      <svg ref={svgRef} viewBox={`0 0 ${VW} ${VH}`} className={cx("sims-office block w-full", showVideo && "hidden")} role="img" aria-label="The AI team in the studio">
         <defs>
           <radialGradient id="simsLamp"><stop offset="0" stopColor="#ffe3b8" stopOpacity="0.28" /><stop offset="1" stopColor="#ffd9a0" stopOpacity="0" /></radialGradient>
           <linearGradient id="simsSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#a9c9ee" /><stop offset="1" stopColor="#e3eefa" /></linearGradient>

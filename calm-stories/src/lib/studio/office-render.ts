@@ -3,7 +3,7 @@ import sharp from "sharp";
 import { env } from "@/lib/env";
 import { getStorage } from "@/lib/storage";
 import { nowIso } from "@/lib/util";
-import { falNanoBanana } from "@/lib/providers/fal";
+import { falNanoBanana, falQueue } from "@/lib/providers/fal";
 import { getStudioSettings } from "./settings";
 import { AGENTS, AGENT_BY_KEY } from "./agents";
 import { log } from "@/lib/log";
@@ -37,9 +37,11 @@ const POSES: Record<OfficePose, string> = {
   work: "sitting on a black office chair, leaning slightly forward and typing on a small silver laptop on their lap, focused, friendly smile",
   rest: "sitting on a black office chair, leaning back with eyes closed, dozing peacefully with a sleepy smile, hands resting in lap",
 };
-function personPrompt(agent: AgentKey, pose: OfficePose): string {
+const MATCH = "Match the reference image EXACTLY in art style, rendering, shading, lighting, proportions, head-to-body ratio, size in frame, camera angle, sweatshirt colour and logo, trousers and background – it must look like part of the same character set. This is a different person:";
+
+function personPrompt(agent: AgentKey, pose: OfficePose, matchMaster = false): string {
   const a = AGENT_BY_KEY[agent];
-  return `A single cute stylised 3D character for an isometric cozy office game (Pixar / The Sims style, soft clay-like shading, big friendly head, small body): the studio's ${a.name}, ${SKIN(a.bedroom.skin)} skin, ${HAIR(a.bedroom.hair)} hair, wearing a royal blue sweatshirt with a small white "Calm" script logo on the chest and dark trousers, ${POSES[pose]}. Seen from a high isometric three-quarter angle, facing towards the front-left. Full body, centred, filling most of the frame. Plain flat pure green (#00FF00) chroma-key background, no shadow, no floor, no other objects, no text other than the logo.`;
+  return `${matchMaster ? `${MATCH} ` : ""}A single cute stylised 3D character for an isometric cozy office game (Pixar / The Sims style, soft clay-like shading, big friendly head, small body): the studio's ${a.name}, ${SKIN(a.bedroom.skin)} skin, ${HAIR(a.bedroom.hair)} hair, wearing a royal blue sweatshirt with a small white "Calm" script logo on the chest and dark trousers, ${POSES[pose]}. Seen from a high isometric three-quarter angle, facing towards the front-left. Full body, centred, filling most of the frame. Plain flat pure green (#00FF00) chroma-key background, no shadow, no floor, no other objects, no text other than the logo.`;
 }
 
 /** Replace the green-screen background with transparency, despill the edges, trim and downsize. */
@@ -56,6 +58,7 @@ async function keyOut(img: Buffer): Promise<Buffer> {
 
 type PeopleManifest = { status: "idle" | "running" | "done" | "failed"; done: string[]; total: number; error?: string; updated_at: string };
 const PEOPLE = "office/people.json";
+const MASTER = "office/people/_master.png";
 const sprite = (agent: AgentKey, pose: OfficePose) => `office/people/${agent}-${pose}.png`;
 
 export async function officePeople(): Promise<PeopleManifest | null> {
@@ -81,10 +84,37 @@ export async function startOfficePeople(redo = false): Promise<PeopleManifest> {
   const settings = await getStudioSettings();
   peopleRun = (async () => {
     let failures = 0;
+    // One master character sets the style; everyone else is drawn to match it so the whole team looks like one set.
+    let master = redo ? null : ((await getStorage().get(MASTER))?.data ?? null);
+    if (!master) {
+      const first = todo.find((j) => j.pose === "work") ?? todo[0];
+      if (first) {
+        try {
+          const img = await falNanoBanana(env.falKey!, { prompt: personPrompt(first.agent, first.pose), endpoint: settings.fal_image_endpoint, aspectRatio: "3:4" });
+          master = img.data;
+          await getStorage().put(MASTER, master, img.mimeType);
+          await getStorage().put(sprite(first.agent, first.pose), await keyOut(img.data), "image/png");
+          m.done.push(`${first.agent}-${first.pose}`);
+          todo.splice(todo.indexOf(first), 1);
+          await save();
+        } catch (err) {
+          m.status = "failed";
+          m.error = err instanceof Error ? err.message : String(err);
+          await save();
+          return;
+        }
+      }
+    }
+    if (!master || !todo.length) {
+      m.status = "done";
+      await save();
+      return;
+    }
+    const ref = { mimeType: "image/png", data: await sharp(master).png().toBuffer() };
     const worker = async () => {
       for (let j = todo.shift(); j; j = todo.shift()) {
         try {
-          const img = await falNanoBanana(env.falKey!, { prompt: personPrompt(j.agent, j.pose), endpoint: settings.fal_image_endpoint, aspectRatio: "3:4" });
+          const img = await falNanoBanana(env.falKey!, { prompt: personPrompt(j.agent, j.pose, true), endpoint: settings.fal_image_endpoint, aspectRatio: "3:4", references: [ref] });
           await getStorage().put(sprite(j.agent, j.pose), await keyOut(img.data), "image/png");
           m.done.push(`${j.agent}-${j.pose}`);
           await save();
@@ -174,4 +204,66 @@ export async function clearOfficeRender(): Promise<void> {
   await getStorage().remove(KEY);
   await getStorage().remove(META);
   await discardOfficeDraft();
+}
+
+// ---------------------------------------------------------------------------
+// Animated office: Kling image-to-video on the 3D office with the team in it.
+
+type AnimMeta = { status: "running" | "ready" | "failed"; prompt: string; error?: string; updated_at: string };
+const ANIM = {
+  draft: { video: "office/anim-draft.mp4", meta: "office/anim-draft.json" },
+  saved: { video: "office/anim.mp4", meta: "office/anim.json" },
+};
+const ANIM_ENDPOINT = "fal-ai/kling-video/v2.5-turbo/standard/image-to-video";
+let animRun: Promise<void> | null = null;
+
+async function readAnim(which: Which): Promise<AnimMeta | null> {
+  const f = await getStorage().get(ANIM[which].meta);
+  return f ? (JSON.parse(f.data.toString()) as AnimMeta) : null;
+}
+export async function officeAnimInfo(): Promise<{ saved: AnimMeta | null; draft: AnimMeta | null }> {
+  return { saved: await readAnim("saved"), draft: await readAnim("draft") };
+}
+export const officeAnimKey = (which: Which) => ANIM[which].video;
+
+/**
+ * Start animating a still of the 3D office (backdrop + team, composited in the
+ * browser) with the typed motion prompt. Runs in the background (1–3 minutes);
+ * the result is a draft until saved.
+ */
+export async function startOfficeAnimation(still: Buffer, prompt: string): Promise<AnimMeta> {
+  if (!env.falKey) throw new Error("Connect a FAL_KEY in Railway to animate the office.");
+  const cur = await readAnim("draft");
+  if (animRun && cur?.status === "running") throw new Error("An animation is already being made – give it a minute.");
+  const png = await sharp(still).jpeg({ quality: 90 }).toBuffer();
+  const motion = `${prompt.trim()}. Isometric 3D cozy office diorama, locked-off static camera with no camera movement, the characters stay at their desks, small natural looping movements, warm lamps flicker softly, plants sway gently. Keep the art style exactly the same.`;
+  const meta: AnimMeta = { status: "running", prompt: prompt.trim(), updated_at: nowIso() };
+  const save = (m: AnimMeta) => getStorage().put(ANIM.draft.meta, Buffer.from(JSON.stringify({ ...m, updated_at: nowIso() })), "application/json");
+  await save(meta);
+  animRun = (async () => {
+    try {
+      const out = await falQueue<{ video?: { url: string } }>(env.falKey!, ANIM_ENDPOINT, { prompt: motion, image_url: `data:image/jpeg;base64,${png.toString("base64")}`, duration: "5" });
+      if (!out.video?.url) throw new Error("No video came back.");
+      const vid = await fetch(out.video.url);
+      if (!vid.ok) throw new Error(`Couldn't download the clip (${vid.status}).`);
+      await getStorage().put(ANIM.draft.video, Buffer.from(await vid.arrayBuffer()), "video/mp4");
+      await save({ ...meta, status: "ready" });
+    } catch (err) {
+      await save({ ...meta, status: "failed", error: err instanceof Error ? err.message : String(err) });
+    }
+  })().finally(() => { animRun = null; });
+  return meta;
+}
+
+export async function saveOfficeAnimation(): Promise<void> {
+  const meta = await readAnim("draft");
+  const f = await getStorage().get(ANIM.draft.video);
+  if (!f || meta?.status !== "ready") throw new Error("There's no finished animation to save.");
+  await getStorage().put(ANIM.saved.video, f.data, "video/mp4");
+  await getStorage().put(ANIM.saved.meta, Buffer.from(JSON.stringify({ ...meta, updated_at: nowIso() })), "application/json");
+  await discardOfficeAnimation();
+}
+export async function discardOfficeAnimation(): Promise<void> {
+  await getStorage().remove(ANIM.draft.video);
+  await getStorage().remove(ANIM.draft.meta);
 }
