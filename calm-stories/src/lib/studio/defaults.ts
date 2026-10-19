@@ -7,7 +7,7 @@ export const DEFAULT_STUDIO_SETTINGS: Omit<StudioSettings, "updated_at"> = {
   // Nano Banana (Gemini image generation). Change here when Google ships a newer model.
   image_model: "gemini-2.5-flash-image",
   image_size: "",
-  fal_image_endpoint: "fal-ai/nano-banana",
+  fal_image_endpoint: "fal-ai/nano-banana-2",
   // ElevenLabs Flash: about half the cost of Multilingual v2.
   tts_model: "eleven_flash_v2_5",
   sfx_model: "eleven_text_to_sound_v2",

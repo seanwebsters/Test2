@@ -51,11 +51,15 @@ describe("Sleep Stories Studio – end to end", () => {
     expect(bible.data.visual_identity?.palette.length).toBeGreaterThan(0);
     expect((await db.list("bible_versions", { where: { series_id: seriesId } })).length).toBeGreaterThan(3);
     expect((await db.list("characters", { where: { series_id: seriesId } })).map((c) => c.name)).toEqual(["Wren Alder", "Ilan Mere"]);
-    // Posters reference the character portraits for consistency, and get a typeset title.
-    expect(providers.counts.imagesWithRefs).toBeGreaterThanOrEqual(3);
-    const poster = (await db.list("artwork_assets", { where: { series_id: seriesId, kind: "poster", status: "selected" } }))[0]!;
-    expect(poster.variants.titled).toBeTruthy();
-    expect(await getStorage().get(`art/${seriesId}/${poster.id}/titled.jpg`)).not.toBeNull();
+    // One house key-art poster per series, 2:3, with the title baked in by the image model.
+    const posters = await db.list("artwork_assets", { where: { series_id: seriesId, kind: "poster" } });
+    expect(posters).toHaveLength(1);
+    const poster = posters[0]!;
+    expect(poster.status).toBe("selected");
+    expect(poster.prompt).toContain("Premium cinematic theatrical key art poster");
+    expect(poster.prompt).toContain('The title "The Night Train to Ossery" is baked into the artwork');
+    expect(await getStorage().get(poster.storage_key)).not.toBeNull();
+    expect((await db.get("series", seriesId))!.artwork.image_url).toBeTruthy();
     // Web research was used and the bible context is cached in the system prompt.
     expect(script.calls.some((c) => c.webSearch && c.agent === "program_director")).toBe(true);
     expect(script.calls.filter((c) => c.agent === "lead_writer").length).toBe(0);

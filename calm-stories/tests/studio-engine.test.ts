@@ -137,9 +137,9 @@ describe("fal.ai as the Nano Banana provider", () => {
     const meta = { runId: null, stepId: null, seriesId: "ser_the-moonlit-kingdom" };
     const a = await generateArtwork({ meta, seriesId: "ser_the-moonlit-kingdom", kind: "poster", prompt: "p", aspectRatio: "2:3" });
     await generateArtwork({ meta, seriesId: "ser_the-moonlit-kingdom", kind: "episode_cover", prompt: "p", aspectRatio: "16:9", references: [{ mimeType: "image/png", data: png }] });
-    expect(calls[0]!.url).toBe("https://fal.run/fal-ai/nano-banana");
+    expect(calls[0]!.url).toBe("https://fal.run/fal-ai/nano-banana-2");
     expect(calls[0]!.body!.aspect_ratio).toBe("2:3");
-    expect(calls[2]!.url).toBe("https://fal.run/fal-ai/nano-banana/edit");
+    expect(calls[2]!.url).toBe("https://fal.run/fal-ai/nano-banana-2/edit");
     expect(String((calls[2]!.body!.image_urls as string[])[0])).toMatch(/^data:image\/png;base64,/);
     expect(a.asset.provider).toBe("fal");
     keys.falKey = undefined;

@@ -27,6 +27,56 @@ function visualBrief(b: SeriesBible): string {
   return `Visual identity – palette: ${v.palette.map((p) => `${p.name} ${p.hex}`).join(", ")}. Lighting: ${v.lighting}. Mood: ${v.mood}. Composition: ${v.composition_rules.join("; ")}.`;
 }
 
+/* ---------------- Series key art (house prompt) ---------------- */
+
+export const KEY_ART_COMPOSITIONS = [
+  "hands almost touching over a glowing relic",
+  "vast symmetrical wide shot with tiny silhouetted lovers",
+  "mirrored split profile across one light source",
+  "overhead figure adrift on still water among lanterns",
+  "low-angle hero shot through falling petals/snow/embers",
+  "candlelit interior, painterly chiaroscuro",
+  "single iconic object centred on dark field, A24-style",
+  "golden-hour silhouette against an enormous moon",
+];
+export const KEY_ART_PALETTES = [
+  "midnight blue & silver",
+  "emerald & antique gold",
+  "frost white & pale ice blue",
+  "deep violet & amber candlelight",
+  "storm grey & bioluminescent teal",
+  "rose-gold dawn & soft lilac",
+  "ink black & molten copper",
+  "sea-glass green & moonlit pearl",
+];
+export const KEY_ART_LETTERING = [
+  "towering condensed serif with metallic sheen",
+  "hand-lettered calligraphic",
+  "glowing neon-edged retro",
+  "carved stone-textured",
+  "delicate art-nouveau",
+  "bold modern sans with wide tracking",
+  "gilded ornate fairytale",
+];
+
+const pick = <T,>(list: T[]) => list[Math.floor(Math.random() * list.length)]!;
+
+/** The studio's key-art prompt: one random composition, palette and lettering per story, so no two match. */
+export function keyArtPrompt(input: { title: string; logline: string; world: string; tone: string }): { prompt: string; composition: string; palette: string; lettering: string } {
+  const composition = pick(KEY_ART_COMPOSITIONS);
+  const palette = pick(KEY_ART_PALETTES);
+  const lettering = pick(KEY_ART_LETTERING);
+  const prompt = `Premium cinematic theatrical key art poster for a new streaming original series, Netflix / HBO campaign calibre. Photorealistic film still, natural film grain, shot on ARRI large-format with anamorphic lens, rich cinematic colour grade, dramatic but calm and dreamy. Composition: ${composition}. Palette: ${palette}. It must look completely unlike any other poster — its own concept, framing, lighting and typography; no generic person standing in a landscape, no generic castle. Draw one striking, original visual idea from this story. Story: ${input.logline}. World: ${input.world.slice(0, 600)}. Mood: ${input.tone}. The title "${input.title}" is baked into the artwork as a ${lettering}, perfectly spelled, integrated into the design. No other text, no taglines, no credits, no logos.`;
+  return { prompt, composition, palette, lettering };
+}
+
+/** Bible world as prose for the key-art prompt. */
+function worldText(b: SeriesBible): string {
+  const w = b.world;
+  if (!w) return b.identity?.premise ?? "";
+  return [w.name, w.overview, w.atmosphere, ...w.recurring_locations.map((l) => `${l.name}: ${l.description}`)].filter(Boolean).join(" ");
+}
+
 const NO_TEXT = "Premium theatrical film-marketing quality: considered composition, motivated cinematic light, restrained palette, believable materials and textures, expressive faces with real character. Absolutely no text, letters, logos, watermarks or signatures anywhere in the image.";
 
 async function leadReferences(seriesId: string, max = 2) {
@@ -119,26 +169,19 @@ registerHandler("art.posters", async (ctx) => {
   const sid = ctx.run.series_id!;
   const round = Number(ctx.step.params.round ?? 1);
   const bible = await getBible(sid);
-  const vi = (await db.list("deliverables", { where: { series_id: sid, key: "visual_identity", status: "current" } }))[0]?.data as { poster_prompts: string[] } | undefined;
-  const feedback = String(ctx.step.params.feedback ?? "");
-  const prompts = (vi?.poster_prompts ?? [bible.visual_identity?.poster_brief ?? ""]).slice(0, 3);
-  const refs = await leadReferences(sid);
   const existing = (await db.list("artwork_assets", { where: { run_id: ctx.run.id, kind: "poster" } })).filter((a) => a.prompt.includes(`[r${round}]`));
-  const made = existing.length;
-  for (let i = made; i < prompts.length; i++) {
-    await ctx.ensureBudget(5);
-    const { asset, cost_cents } = await generateArtwork({
-      meta: ctx.meta,
-      seriesId: sid,
-      kind: "poster",
-      aspectRatio: "2:3",
-      references: refs,
-      prompt: `[r${round}] Theatrical poster key art for the original audio series “${bible.identity?.title}”. ${prompts[i]} ${refs.length ? `Feature ${refs.map((r) => r.name).join(" and ")} exactly as in the reference portraits.` : ""} ${visualBrief(bible)} Leave calm negative space in the top third for the title. ${feedback ? `Fix from the last review: ${feedback}` : ""} ${NO_TEXT}`,
-    });
-    await ctx.addCost(cost_cents);
-    void asset;
-  }
-  return { summary: `${prompts.length} poster concept(s) created (round ${round}).` };
+  if (existing.length) return { summary: `Key art already created (round ${round}).` };
+  // One image per story, title baked in by the model (Nano Banana 2, 2:3 portrait).
+  const art = keyArtPrompt({
+    title: bible.identity?.title ?? "",
+    logline: bible.identity?.logline ?? bible.identity?.premise ?? "",
+    world: worldText(bible),
+    tone: bible.identity?.tone ?? "",
+  });
+  await ctx.ensureBudget(10);
+  const { cost_cents } = await generateArtwork({ meta: ctx.meta, seriesId: sid, kind: "poster", aspectRatio: "2:3", prompt: `[r${round}] ${art.prompt}` });
+  await ctx.addCost(cost_cents);
+  return { summary: `Key art created – ${art.composition}; ${art.palette}; ${art.lettering} title.` };
 });
 
 registerHandler("art.poster_review", async (ctx) => {
@@ -147,6 +190,14 @@ registerHandler("art.poster_review", async (ctx) => {
   const round = Number(ctx.step.params.round ?? 1);
   const posters = (await db.list("artwork_assets", { where: { run_id: ctx.run.id, kind: "poster" } })).filter((a) => a.prompt.includes(`[r${round}]`));
   if (!posters.length) throw new StepFailure("No poster concepts to review.");
+  if (posters.length === 1) {
+    // House key art: one image with the title already baked in – use it as is.
+    const only = posters[0]!;
+    await db.update("artwork_assets", only.id, { status: "selected" });
+    const s1 = await db.get("series", sid);
+    if (s1) await db.update("series", sid, { artwork: { ...s1.artwork, image_url: only.variants["1200w"] ?? only.url }, updated_at: nowIso() });
+    return { summary: "Key art selected." };
+  }
   const review = await reviewImages(ctx, posters, "These are poster concepts for the series.");
   await ctx.deliver({ kind: "image_review", key: "poster_review", title: `Poster review (round ${round})`, data: review, reasoning: review.rationale, model: review.model });
   if (review.selected_index < 1 && round < 2) {

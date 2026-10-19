@@ -8,6 +8,7 @@ export async function getStudioSettings(): Promise<StudioSettings> {
   const db = getDb();
   const saved = await db.get("studio_settings", "global");
   // Merge so settings saved before a new option existed pick up its default.
+  if (saved?.fal_image_endpoint === "fal-ai/nano-banana") saved.fal_image_endpoint = "fal-ai/nano-banana-2"; // old default → Nano Banana 2
   return saved ? { ...DEFAULT_STUDIO_SETTINGS, ...saved } : db.insert("studio_settings", { ...DEFAULT_STUDIO_SETTINGS, updated_at: nowIso() });
 }
 
