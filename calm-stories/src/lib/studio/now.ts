@@ -1,6 +1,7 @@
 import "server-only";
 import { getDb } from "@/lib/db";
 import { AGENT_BY_KEY } from "./agents";
+import { diagnose, stuckStep, type Diagnosis } from "./quickfix";
 import type { WorkflowRun, WorkflowStep } from "./types";
 
 export type Lane = "working" | "needs_you" | "stuck" | "queued" | "paused" | "done";
@@ -16,6 +17,8 @@ export interface BoardItem {
   agents: string[];
   /** Why it's stuck / what it's waiting for. */
   reason: string | null;
+  /** Plain-English diagnosis and the Quick fix, for stuck items. */
+  diagnosis: Diagnosis | null;
   progress: { done: number; total: number };
   costCents: number;
   budgetCents: number;
@@ -28,7 +31,7 @@ const DONE = ["succeeded", "skipped"];
 export function classifyRun(run: WorkflowRun, steps: WorkflowStep[]): BoardItem {
   const by = (st: string) => steps.filter((s) => s.status === st);
   const done = steps.filter((s) => DONE.includes(s.status)).length;
-  const base = { runId: run.id, title: run.title, kind: run.kind, progress: { done, total: steps.length }, costCents: run.cost_cents, budgetCents: run.budget_cents, updatedAt: run.updated_at, agents: [] as string[], reason: null as string | null };
+  const base = { runId: run.id, title: run.title, kind: run.kind, progress: { done, total: steps.length }, costCents: run.cost_cents, budgetCents: run.budget_cents, updatedAt: run.updated_at, agents: [] as string[], reason: null as string | null, diagnosis: null as Diagnosis | null };
   const name = (s: WorkflowStep) => AGENT_BY_KEY[s.agent]?.name ?? s.agent;
   const running = by("running");
   const approval = by("awaiting_approval");
@@ -45,13 +48,13 @@ export function classifyRun(run: WorkflowRun, steps: WorkflowStep[]): BoardItem 
     return { ...base, lane: "needs_you", headline: s.type === "series.greenlight" ? "Ready for your greenlight" : s.type === "ep.approval" ? "Finished – ready for you to listen and approve" : s.label, reason: null };
   }
   if (blocked.length || failed.length) {
-    const s = blocked[0] ?? failed[0]!;
+    const s = stuckStep(steps)!;
     const why = s.needs === "budget" ? "Budget reached – raise the episode budget in Settings, then Resume" : s.needs?.includes("API_KEY") ? `Missing or rejected key: ${s.needs}` : s.error ?? s.needs ?? "Stopped";
-    return { ...base, lane: "stuck", headline: `${name(s)}: ${s.label}`, reason: why };
+    return { ...base, lane: "stuck", headline: `${name(s)}: ${s.label}`, reason: why, diagnosis: diagnose(s) };
   }
   if (waiting.length) {
     const s = waiting[0]!;
-    return { ...base, lane: "stuck", headline: `${name(s)}: ${s.label} (retrying)`, reason: s.error ?? "Waiting to retry" };
+    return { ...base, lane: "stuck", headline: `${name(s)}: ${s.label} (retrying)`, reason: s.error ?? "Waiting to retry", diagnosis: diagnose(s) };
   }
   const next = steps.find((s) => s.status === "pending");
   return { ...base, lane: "queued", headline: next ? `Next: ${name(next)} – ${next.label}` : "Waiting for a free slot", reason: "Waiting for a free slot (other work is running)" };
@@ -65,7 +68,7 @@ export async function studioBoard(now = new Date()): Promise<Record<Lane, BoardI
   const board: Record<Lane, BoardItem[]> = { working: [], needs_you: [], stuck: [], queued: [], paused: [], done: [] };
   for (const run of runs) {
     const steps = await db.list("workflow_steps", { where: { run_id: run.id } });
-    const item = run.status === "failed" ? { ...classifyRun({ ...run, status: "running" }, steps), lane: "stuck" as Lane } : classifyRun(run, steps);
+    const item = run.status === "failed" ? (() => { const c = classifyRun({ ...run, status: "running" }, steps); const s = stuckStep(steps); return { ...c, lane: "stuck" as Lane, diagnosis: s ? diagnose(s) : c.diagnosis }; })() : classifyRun(run, steps);
     board[item.lane].push(item);
   }
   for (const lane of Object.keys(board) as Lane[]) board[lane].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));

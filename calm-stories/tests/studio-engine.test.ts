@@ -398,3 +398,36 @@ describe("Now board", () => {
     expect(titles("done")).toEqual(["Shipped"]);
   });
 });
+
+describe("Quick fix", () => {
+  it("explains common problems simply and picks the right fix", async () => {
+    const { diagnose } = await import("@/lib/studio/quickfix");
+    const d = (needs: string | null, error: string) => diagnose({ status: "blocked", needs, error, label: "x" });
+    expect(d("budget", "Run budget reached ($1.45 of $1.00)")).toMatchObject({ title: "Out of budget", fix: "raise_budget" });
+    expect(d(null, "ENOSPC: no space left on device, mkdir '/data/storage/audio'")).toMatchObject({ title: "Disk full", fix: "free_space" });
+    expect(d("ELEVENLABS_API_KEY", 'ElevenLabs 401: {"message":"The API key you used is missing the permission pronunciation_dictionary_write"}')).toMatchObject({ title: "Key missing a permission" });
+    expect(d("ELEVENLABS_API_KEY", 'ElevenLabs 401: {"status":"quota_exceeded"}')).toMatchObject({ title: "Out of credits" });
+    expect(d("ANTHROPIC_API_KEY", "Connect an Anthropic API key")).toMatchObject({ title: "Key missing or wrong", fix: "retry" });
+    expect(diagnose({ status: "failed", needs: null, error: "The model ran out of room before finishing.", label: "x" })).toMatchObject({ title: "Answer cut off", fix: "retry" });
+  });
+
+  it("raises the budget for a budget block, and re-queues failed steps", async () => {
+    const { quickFix } = await import("@/lib/studio/quickfix");
+    const db = freshDb();
+    const one = async (title: string) => (await createRun({ kind: "episode_production", title, budget_cents: 100, created_by: "usr_calm-editor", steps: [{ key: "a", type: "ep.draft", agent: "lead_writer", label: "Write", activity: "typing", deps: [] }] })).run;
+    const r1 = await one("Over budget");
+    await db.update("workflow_runs", r1.id, { status: "blocked", cost_cents: 145 });
+    const s1 = (await db.findOne("workflow_steps", { run_id: r1.id, key: "a" }))!;
+    await db.update("workflow_steps", s1.id, { status: "blocked", needs: "budget", error: "Run budget reached" });
+    expect((await quickFix(r1.id)).did).toMatch(/Raised the budget to \$3\.00/);
+    expect((await db.get("workflow_runs", r1.id))!.budget_cents).toBe(300);
+    expect((await db.findOne("workflow_steps", { run_id: r1.id, key: "a" }))!.status).toBe("pending");
+    const r2 = await one("Broke");
+    await db.update("workflow_runs", r2.id, { status: "failed" });
+    const s2 = (await db.findOne("workflow_steps", { run_id: r2.id, key: "a" }))!;
+    await db.update("workflow_steps", s2.id, { status: "failed", error: "The model ran out of room before finishing." });
+    await quickFix(r2.id);
+    expect((await db.findOne("workflow_steps", { run_id: r2.id, key: "a" }))!.status).toBe("pending");
+    expect((await db.get("workflow_runs", r2.id))!.status).toBe("running");
+  });
+});

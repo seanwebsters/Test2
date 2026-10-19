@@ -7,6 +7,8 @@ import { StudioNav } from "@/components/studio/StudioNav";
 import { AGENT_BY_KEY } from "@/lib/studio/agents";
 import { env } from "@/lib/env";
 import { diskUsage } from "@/lib/services/disk";
+import { diagnose } from "@/lib/studio/quickfix";
+import { AdminAction } from "@/components/admin/AdminAction";
 import "@/lib/studio";
 
 export const metadata = { title: { default: "Sleep Stories Studio", template: "%s · Sleep Stories Studio" } };
@@ -109,15 +111,18 @@ export default async function StudioLayout({ children }: { children: React.React
           <div className="mx-4 mt-4 rounded-2xl border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm sm:mx-8 lg:mx-10" role="alert">
             <div className="font-semibold text-rose-200">Something is stopping the studio</div>
             <ul className="mt-2 space-y-2">
-              {problems.map((s) => (
-                <li key={s.id}>
-                  <Link href={`/studio/pipeline?run=${s.run_id}`} className="block hover:underline">
-                    <span className="text-white">{AGENT_BY_KEY[s.agent]?.name ?? s.agent} · {s.label}</span>{" "}
-                    <span className="text-mist">({s.status === "waiting" ? "retrying" : s.status})</span>
-                    <span className="mt-0.5 block break-words font-mono text-xs text-rose-100/90">{s.error!.slice(0, 400)}</span>
-                  </Link>
-                </li>
-              ))}
+              {problems.map((s) => {
+                const d = diagnose(s);
+                return (
+                  <li key={s.id} className="flex flex-wrap items-start gap-3">
+                    <Link href={`/studio/pipeline?run=${s.run_id}`} className="min-w-0 flex-1 hover:underline">
+                      <span className="text-white">{d.title}</span> <span className="text-mist">· {AGENT_BY_KEY[s.agent]?.name ?? s.agent} · {s.label}</span>
+                      <span className="mt-0.5 block text-xs text-rose-100/90">{d.explain}{d.youFirst ? ` First: ${d.youFirst}` : ""}</span>
+                    </Link>
+                    <AdminAction endpoint="/api/studio/quickfix" body={{ run_id: s.run_id }} label={`Quick fix: ${d.fixLabel}`} pendingLabel="Fixing…" className="btn-primary btn-sm" />
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}
