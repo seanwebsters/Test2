@@ -34,7 +34,7 @@ const ZONES: Zone[] = [
   { gx: 0, gy: 7, w: 6, d: 5, label: "Quality gate", floor: "#f2f3f7", alt: "#eaecf2" },
   { gx: 6, gy: 7, w: 10, d: 5, label: "Writers' room", floor: "#f2f3f7", alt: "#eaecf2" },
   { gx: 16, gy: 7, w: 8, d: 5, label: "Art & sound", floor: "#f2f3f7", alt: "#eaecf2" },
-  { gx: 0, gy: 12, w: 24, d: 6, label: "Lounge", floor: "#e3cba6", alt: "#dcc29a" },
+  { gx: 0, gy: 12, w: 24, d: 6, label: "Lounge", floor: "#e6cfa9", alt: "#dcc29a" },
 ];
 
 /** Where each agent sits (chair position). Desks are drawn just in front. */
@@ -85,12 +85,20 @@ function Box({ gx, gy, w, d, h, z = 0, top, left, right, className }: { gx: numb
     <g className={className}>
       <polygon points={pts([e, c, c0, e0])} fill={left} />
       <polygon points={pts([c, b, b0, c0])} fill={right} />
+      {h > 0.1 && <polygon points={pts([e, c, c0, e0])} fill="url(#simsAO)" />}
+      {h > 0.1 && <polygon points={pts([c, b, b0, c0])} fill="url(#simsAO)" />}
       <polygon points={pts([a, b, c, e])} fill={top} />
+      <polyline points={pts([e, c, b])} fill="none" stroke="#ffffff" strokeOpacity="0.45" strokeWidth="0.7" />
     </g>
   );
 }
 
 type Drawable = { depth: number; key: string; node: ReactNode };
+
+/** Soft contact shadow on the floor under a footprint (light comes from the back windows). */
+function Shadow({ gx, gy, w, d, k = 0.22 }: { gx: number; gy: number; w: number; d: number; k?: number }) {
+  return <polygon points={pts([iso(gx - 0.05, gy), iso(gx + w + 0.1, gy), iso(gx + w + 0.25, gy + d + 0.3), iso(gx + 0.1, gy + d + 0.3)])} fill="#1b2140" opacity={k} filter="url(#simsSoft)" />;
+}
 
 function Desk({ gx, gy, lit, prop }: { gx: number; gy: number; lit: boolean; prop: AgentDefinition["bedroom"]["prop"] }): Drawable[] {
   // white desk in front of the seat, with a silver laptop whose lid faces the person
@@ -139,14 +147,14 @@ function Person({ def, pose, activity }: { def: AgentDefinition; pose: "seated" 
   const nap = pose === "nap";
   return (
     <g className={cx(pose === "walk" && "sims-walk", nap && "sims-breathe")}>
-      <ellipse cx="0" cy="2" rx="13" ry="5" fill="#000" opacity="0.25" />
+      <ellipse cx="2" cy="3" rx="14" ry="5.5" fill="#1b2140" opacity="0.3" filter="url(#simsSoft)" />
       {/* legs */}
       {sit || nap ? (
         <rect x="-8" y="-10" width="16" height="9" rx="4" fill="#2b2f55" />
       ) : (
         <>
-          <rect x="-7" y="-14" width="6" height="15" rx="3" fill="#2b2f55" className="sims-leg-a" />
-          <rect x="1" y="-14" width="6" height="15" rx="3" fill="#2b2f55" className="sims-leg-b" />
+          <g className="sims-leg-a"><rect x="-7" y="-14" width="6" height="15" rx="3" fill="#2b2f55" /><rect x="-8" y="-1" width="8" height="3.5" rx="1.7" fill="#f4f5fa" /></g>
+          <g className="sims-leg-b"><rect x="1" y="-14" width="6" height="15" rx="3" fill="#2b2f55" /><rect x="0" y="-1" width="8" height="3.5" rx="1.7" fill="#f4f5fa" /></g>
         </>
       )}
       {/* arms (skin), then short tee sleeves on top */}
@@ -160,14 +168,19 @@ function Person({ def, pose, activity }: { def: AgentDefinition; pose: "seated" 
         <path d="M-4 0 q4 3 8 0" stroke="#ffffff" strokeOpacity="0.55" strokeWidth="1" fill="none" />
         <image href="/brand/calm-script.png" x="-8" y="6" width="16" height="6.3" preserveAspectRatio="xMidYMid meet" />
         <path d="M-10 15 h20 v4 q0 3 -3 3 h-14 q-3 0 -3 -3z" fill="#1d2a6b" opacity="0.18" />
+        <path d="M3 0 h4 q3 0 3 3 v16 q0 3 -3 3 h-4z" fill="#1d2a6b" opacity="0.14" />
       </g>
       {/* head */}
       <g transform={`translate(0 ${sit || nap ? -40 : -44}) ${nap ? "rotate(-12)" : ""}`}>
+        <rect x="-3" y="7" width="6" height="5" fill={b.skin} />
+        <rect x="-3" y="9" width="6" height="2" fill="#000" opacity="0.12" />
         <circle r="10" fill={b.skin} />
+        <path d="M4 -8 a10 10 0 0 1 0 16 a12 12 0 0 0 0 -16z" fill="#000" opacity="0.08" />
         <circle cx="-5.5" cy="4.5" r="2" fill="#ff9aa8" opacity="0.35" />
         <circle cx="5.5" cy="4.5" r="2" fill="#ff9aa8" opacity="0.35" />
         <circle cx="-3" cy="-4" r="4" fill="#ffffff" opacity="0.08" />
         <path d="M-10 -1 a10 10 0 0 1 20 0 q-5 -4 -10 -3 q-5 -1 -10 3z" fill={b.hair} />
+        <path d="M-6 -7 q4 -3 9 -1" stroke="#ffffff" strokeOpacity="0.25" strokeWidth="1.5" fill="none" strokeLinecap="round" />
         {nap || activity === "sleeping" ? (
           <path d="M-5 2 h3 M2 2 h3" stroke="#1e1a2e" strokeWidth="1.3" strokeLinecap="round" />
         ) : (
@@ -210,14 +223,21 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
   }, [people.map((p) => `${p.def.key}:${p.atDesk}`).join("|")]);
 
   const items: Drawable[] = [];
+  const shadows: ReactNode[] = [];
+  const shadow = (gx: number, gy: number, w: number, d: number, k?: number) => shadows.push(<Shadow key={`sh-${shadows.length}`} gx={gx} gy={gy} w={w} d={d} k={k} />);
 
   // Furniture
   for (const [k, seat] of Object.entries(SEAT) as [AgentKey, [number, number]][]) {
     const p = people.find((x) => x.def.key === k)!;
+    shadow(seat[0] - 0.9, seat[1] + 0.55, 1.8, 0.8, 0.16);
+    shadow(seat[0] - 0.3, seat[1] - 0.3, 0.6, 0.6, 0.18);
     items.push(...Desk({ gx: seat[0], gy: seat[1], lit: p.atDesk && p.activity !== "sleeping", prop: p.def.bedroom.prop }));
     // chair
     items.push({ depth: seat[0] + seat[1] - 0.2, key: `chair-${k}`, node: <g><Box gx={seat[0] - 0.28} gy={seat[1] - 0.28} w={0.56} d={0.56} h={0.12} z={0.26} top="#3a3d4f" left="#26283a" right="#2f3244" /><Box gx={seat[0] - 0.04} gy={seat[1] - 0.04} w={0.08} d={0.08} h={0.26} top="#8e93a6" left="#6c7086" right="#7b8096" /><Box gx={seat[0] - 0.28} gy={seat[1] - 0.32} w={0.56} d={0.1} h={0.55} z={0.38} top="#3a3d4f" left="#26283a" right="#2f3244" /></g> });
   }
+  shadow(18.4, 2.2, 3.2, 2.2);
+  shadow(1.4, 13.0, 4, 0.9); shadow(6.8, 13.0, 4, 0.9); shadow(13.4, 13.0, 4, 0.9);
+  shadow(11.4, 12.95, 1.4, 1.0, 0.28);
   // Story table + chairs
   items.push({ depth: 19 + 3 + 2.4, key: "story-table", node: <g><Box gx={18.4} gy={2.2} w={3.2} d={2.2} h={0.5} top="#f4f5fa" left="#cfd2e0" right="#e1e4ef" /><Box gx={19.3} gy={2.9} w={1.2} d={0.8} h={0.04} z={0.5} top="#f3eaff" left="#cfc6ee" right="#ddd4f7" /></g> });
   // Quality gate arch
@@ -237,17 +257,20 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
   for (const [i, [x, y, tall]] of ([[0.5, 0.5, 1], [6.5, 0.4, 1], [12.6, 0.4, 0], [15.4, 0.5, 1], [19.9, 0.4, 0], [23.2, 0.6, 1], [0.4, 2.0, 0], [0.5, 6.3, 0], [15.4, 7.3, 0], [23.2, 5.6, 0], [23.2, 11.3, 1], [0.6, 17.2, 1], [5.2, 17.3, 0], [18.6, 17.3, 0], [23.0, 17.0, 1], [23.1, 14.0, 0]] as [number, number, number][]).entries()) {
     const [px, py] = iso(x + 0.25, y + 0.25, 0.45);
     const h = tall ? 1 : 0.65;
+    shadow(x - 0.3, y - 0.1, 1.1, 0.9, 0.14);
     items.push({
       depth: x + y + 0.6,
       key: `tree-${i}`,
       node: (
         <g>
           <Box gx={x} gy={y} w={0.5} d={0.5} h={0.45} top="#f4f5fa" left="#cfd2e0" right="#e1e4ef" />
-          <rect x={px - 1.5} y={py - 46 * h} width="3" height={46 * h} fill="#6d5642" />
-          <circle cx={px} cy={py - 52 * h} r={17 * h + 4} fill="#2f7a5c" />
-          <circle cx={px - 11 * h} cy={py - 44 * h} r={11 * h + 3} fill="#3f9470" />
-          <circle cx={px + 10 * h} cy={py - 60 * h} r={10 * h + 3} fill="#4fab82" />
-          <circle cx={px + 4} cy={py - 40 * h} r={8 * h + 2} fill="#378a66" />
+          <path d={`M${px} ${py} l0 ${-34 * h} m0 ${12 * h} l-7 ${-12 * h} m7 ${4 * h} l6 ${-14 * h}`} stroke="#6d5642" strokeWidth="2.2" fill="none" strokeLinecap="round" />
+          <circle cx={px + 2} cy={py - 46 * h} r={17 * h + 4} fill="url(#simsLeafDark)" />
+          <circle cx={px - 10 * h} cy={py - 48 * h} r={12 * h + 3} fill="url(#simsLeaf)" />
+          <circle cx={px + 11 * h} cy={py - 52 * h} r={11 * h + 3} fill="url(#simsLeaf)" />
+          <circle cx={px - 2} cy={py - 62 * h} r={12 * h + 3} fill="url(#simsLeaf)" />
+          <circle cx={px + 6} cy={py - 38 * h} r={8 * h + 2} fill="url(#simsLeafDark)" />
+          <circle cx={px - 6 * h} cy={py - 66 * h} r={5 * h + 1} fill="#9ad8b2" opacity="0.35" />
         </g>
       ),
     });
@@ -264,7 +287,8 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
           <Box gx={11.4} gy={12.95} w={1.4} d={1.0} h={0.5} top="#d9b98c" left="#a8865e" right="#c09d72" />
           <Box gx={11.5} gy={13.05} w={1.2} d={0.8} h={0.02} z={0.5} top="#6d5642" left="#5a4535" right="#5a4535" />
           <path d={`M${tx} ${ty} L${tx - 2} ${ty - 54} M${tx - 1} ${ty - 30} L${tx - 16} ${ty - 62} M${tx - 1} ${ty - 40} L${tx + 18} ${ty - 70}`} stroke="#7a6048" strokeWidth="3.5" fill="none" strokeLinecap="round" />
-          {([[-30, -96, 22, "#2f7a5c"], [24, -104, 24, "#2f7a5c"], [-4, -118, 26, "#3f9470"], [-38, -72, 16, "#378a66"], [34, -78, 17, "#378a66"], [6, -84, 20, "#4fab82"], [-18, -128, 16, "#4fab82"], [20, -132, 15, "#5bbf8c"]] as [number, number, number, string][]).map(([cx, cy, r, f], i) => <circle key={i} cx={tx + cx * 0.75} cy={ty + cy * 0.75} r={r * 0.75} fill={f} opacity="0.95" />)}
+          {([[-30, -96, 22, "#2f7a5c"], [24, -104, 24, "#2f7a5c"], [-4, -118, 26, "#3f9470"], [-38, -72, 16, "#378a66"], [34, -78, 17, "#378a66"], [6, -84, 20, "#4fab82"], [-18, -128, 16, "#4fab82"], [20, -132, 15, "#5bbf8c"]] as [number, number, number, string][]).map(([cx, cy, r, f], i) => <circle key={i} cx={tx + cx * 0.75} cy={ty + cy * 0.75} r={r * 0.75} fill={f === "#2f7a5c" || f === "#378a66" ? "url(#simsLeafDark)" : "url(#simsLeaf)"} />)}
+          {([[-14, -104], [10, -96], [4, -86], [-24, -76]] as [number, number][]).map(([cx, cy], i) => <circle key={`hl-${i}`} cx={tx + cx * 0.75} cy={ty + cy * 0.75} r="5" fill="#a8e0bd" opacity="0.3" />)}
         </g>
       ),
     });
@@ -302,46 +326,84 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
   const backRight = [iso(0, 0), iso(GX, 0), iso(GX, 0, wallH), iso(0, 0, wallH)] as [number, number][];
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-white/10 bg-[#0a1026]">
+    <div className="overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(ellipse_at_50%_40%,#1d2752_0%,#0a1026_75%)]">
       <svg viewBox={`0 0 ${VW} ${VH}`} className="sims-office block w-full" role="img" aria-label="The AI team in the studio">
         <defs>
           <radialGradient id="simsLamp"><stop offset="0" stopColor="#ffe3b8" stopOpacity="0.28" /><stop offset="1" stopColor="#ffd9a0" stopOpacity="0" /></radialGradient>
           <linearGradient id="simsSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#a9c9ee" /><stop offset="1" stopColor="#e3eefa" /></linearGradient>
+          <linearGradient id="simsAO" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#0b1030" stopOpacity="0" /><stop offset="1" stopColor="#0b1030" stopOpacity="0.16" /></linearGradient>
+          <radialGradient id="simsLeaf" cx="0.35" cy="0.3" r="0.75"><stop offset="0" stopColor="#7fd0a0" /><stop offset="0.55" stopColor="#3f9470" /><stop offset="1" stopColor="#2a6e52" /></radialGradient>
+          <radialGradient id="simsLeafDark" cx="0.35" cy="0.3" r="0.75"><stop offset="0" stopColor="#4fab82" /><stop offset="1" stopColor="#1f5a42" /></radialGradient>
+          <linearGradient id="simsSun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#fff4d6" stopOpacity="0.85" /><stop offset="1" stopColor="#fff4d6" stopOpacity="0" /></linearGradient>
+          <linearGradient id="simsWallL" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#e4e6ef" /><stop offset="1" stopColor="#cfd3e1" /></linearGradient>
+          <linearGradient id="simsWallR" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#f1f2f7" /><stop offset="1" stopColor="#dde0ea" /></linearGradient>
+          <linearGradient id="simsGlassShine" x1="0" y1="0" x2="1" y2="1"><stop offset="0.3" stopColor="#ffffff" stopOpacity="0" /><stop offset="0.45" stopColor="#ffffff" stopOpacity="0.45" /><stop offset="0.55" stopColor="#ffffff" stopOpacity="0" /></linearGradient>
+          <filter id="simsSoft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3" /></filter>
+          <filter id="simsSunBlur" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="6" /></filter>
           <linearGradient id="calmTee" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#60ade6" /><stop offset="1" stopColor="#6467e1" /></linearGradient>
         </defs>
         {/* walls */}
-        <polygon points={pts(backLeft)} fill="#d9dce8" />
-        <polygon points={pts(backRight)} fill="#e6e8f1" />
+        <polygon points={pts(backLeft)} fill="url(#simsWallL)" />
+        <polygon points={pts(backRight)} fill="url(#simsWallR)" />
         {[3, 9, 15, 21].map((gx) => (
           <g key={`wr-${gx}`}>
             <polygon points={pts([iso(gx, 0, 0.15), iso(gx + 2.4, 0, 0.15), iso(gx + 2.4, 0, 2.35), iso(gx, 0, 2.35)])} fill="url(#simsSky)" stroke="#9aa0b8" strokeWidth="2" />
+            <polygon points={pts([iso(gx, 0, 0.15), iso(gx + 2.4, 0, 0.15), iso(gx + 2.4, 0, 2.35), iso(gx, 0, 2.35)])} fill="url(#simsGlassShine)" />
             <line x1={iso(gx + 1.2, 0, 0.15)[0]} y1={iso(gx + 1.2, 0, 0.15)[1]} x2={iso(gx + 1.2, 0, 2.35)[0]} y2={iso(gx + 1.2, 0, 2.35)[1]} stroke="#9aa0b8" strokeWidth="1.5" />
           </g>
         ))}
         {[4, 10, 15].map((gy) => (
           <polygon key={`wl-${gy}`} points={pts([iso(0, gy, 0.15), iso(0, gy + 2.4, 0.15), iso(0, gy + 2.4, 2.35), iso(0, gy, 2.35)])} fill="url(#simsSky)" stroke="#9aa0b8" strokeWidth="2" />
         ))}
-        {/* floors (checker tiles per zone) */}
-        {ZONES.map((z) => (
-          <g key={z.label}>
-            {Array.from({ length: z.w * z.d }, (_, i) => {
-              const tx = z.gx + (i % z.w), ty = z.gy + Math.floor(i / z.w);
-              return <polygon key={i} points={pts([iso(tx, ty), iso(tx + 1, ty), iso(tx + 1, ty + 1), iso(tx, ty + 1)])} fill={(tx + ty) % 2 ? z.floor : z.alt} />;
-            })}
-          </g>
+        {[4, 10, 15].map((gy) => (
+          <polygon key={`wls-${gy}`} points={pts([iso(0, gy, 0.15), iso(0, gy + 2.4, 0.15), iso(0, gy + 2.4, 2.35), iso(0, gy, 2.35)])} fill="url(#simsGlassShine)" />
         ))}
+        {/* floors: large pale stone tiles in the work areas, light oak planks in the lounge */}
+        {ZONES.map((z) => {
+          const wood = z.label === "Lounge";
+          const lines: ReactNode[] = [];
+          if (wood) {
+            for (let k = 1; k < z.d * 4; k++) {
+              const y = z.gy + k / 4;
+              lines.push(<line key={`p${k}`} x1={iso(z.gx, y)[0]} y1={iso(z.gx, y)[1]} x2={iso(z.gx + z.w, y)[0]} y2={iso(z.gx + z.w, y)[1]} stroke="#b8976c" strokeOpacity="0.35" strokeWidth="0.8" />);
+              for (let x = z.gx + ((k * 1.7) % 3); x < z.gx + z.w; x += 3) {
+                const [x1, y1] = iso(x, y - 0.25), [x2, y2] = iso(x, y);
+                lines.push(<line key={`j${k}-${x}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#b8976c" strokeOpacity="0.35" strokeWidth="0.8" />);
+              }
+            }
+          } else {
+            for (let x = z.gx + 2; x < z.gx + z.w; x += 2) lines.push(<line key={`x${x}`} x1={iso(x, z.gy)[0]} y1={iso(x, z.gy)[1]} x2={iso(x, z.gy + z.d)[0]} y2={iso(x, z.gy + z.d)[1]} stroke="#dfe2ea" strokeWidth="1" />);
+            for (let y = z.gy + 2; y < z.gy + z.d; y += 2) lines.push(<line key={`y${y}`} x1={iso(z.gx, y)[0]} y1={iso(z.gx, y)[1]} x2={iso(z.gx + z.w, y)[0]} y2={iso(z.gx + z.w, y)[1]} stroke="#dfe2ea" strokeWidth="1" />);
+          }
+          return (
+            <g key={z.label}>
+              <polygon points={pts([iso(z.gx, z.gy), iso(z.gx + z.w, z.gy), iso(z.gx + z.w, z.gy + z.d), iso(z.gx, z.gy + z.d)])} fill={z.floor} stroke={z.floor} strokeWidth="0.6" />
+              {lines}
+            </g>
+          );
+        })}
+        {/* the floor slab's front edges */}
+        <polygon points={pts([iso(0, GY), iso(GX, GY), [iso(GX, GY)[0], iso(GX, GY)[1] + 14], [iso(0, GY)[0], iso(0, GY)[1] + 14]])} fill="#c9b08a" />
+        <polygon points={pts([iso(GX, 0), iso(GX, GY), [iso(GX, GY)[0], iso(GX, GY)[1] + 14], [iso(GX, 0)[0], iso(GX, 0)[1] + 14]])} fill="#d6d9e3" />
+        <polygon points={pts([iso(GX, 12), iso(GX, GY), [iso(GX, GY)[0], iso(GX, GY)[1] + 14], [iso(GX, 12)[0], iso(GX, 12)[1] + 14]])} fill="#bfa47c" />
+        {/* skirting boards */}
+        <polygon points={pts([iso(0, 0), iso(GX, 0), iso(GX, 0, 0.08), iso(0, 0, 0.08)])} fill="#ffffff" opacity="0.8" />
+        <polygon points={pts([iso(0, 0), iso(0, GY), iso(0, GY, 0.08), iso(0, 0, 0.08)])} fill="#ffffff" opacity="0.7" />
+        {/* sunlight falling through the windows */}
+        <g filter="url(#simsSunBlur)">
+          {[3, 9, 15, 21].map((gx) => <polygon key={`sun-r-${gx}`} points={pts([iso(gx, 0.1), iso(gx + 2.4, 0.1), iso(gx + 3.6, 3.6), iso(gx + 1.2, 3.6)])} fill="url(#simsSun)" opacity="0.7" />)}
+          {[4, 10, 15].map((gy) => <polygon key={`sun-l-${gy}`} points={pts([iso(0.1, gy), iso(0.1, gy + 2.4), iso(3.4, gy + 3.4), iso(3.4, gy + 1)])} fill="url(#simsSun)" opacity="0.55" />)}
+        </g>
+        {/* contact shadows */}
+        <g>{shadows}</g>
         {/* low room dividers (walls-down view) with doorways */}
         {[[6, 0, 2.6], [6, 4.4, 2.6], [16, 0, 2.6], [16, 4.4, 2.6], [6, 7.2, 1.8], [6, 10.2, 1.8], [16, 7.2, 1.8], [16, 10.2, 1.8]].map(([gx, gy, d]) => (
           <g key={`glass-${gx}-${gy}`} opacity="0.9">
             <Box gx={gx!} gy={gy!} w={0.05} d={d!} h={1.25} top="#cfe0f7" left="rgba(150,190,240,0.2)" right="rgba(170,205,245,0.28)" />
             <Box gx={gx!} gy={gy!} w={0.05} d={d!} h={0.06} z={1.25} top="#cfe0f7" left="#aac0e2" right="#bcd0ec" />
+            <Box gx={gx!} gy={gy! + d! - 0.06} w={0.06} d={0.06} h={1.3} top="#e6e8ef" left="#a9adbd" right="#c4c7d4" />
           </g>
         ))}
-        {/* zone labels on the floor */}
-        {ZONES.map((z) => {
-          const [x, y] = iso(z.gx + 0.6, z.gy + z.d - 0.4);
-          return <text key={`l-${z.label}`} x={x} y={y} className="sims-zone">{z.label.toUpperCase()}</text>;
-        })}
         {/* everything else, back to front */}
         {items.map((it) => <g key={it.key}>{it.node}</g>)}
         {/* name tags on top */}

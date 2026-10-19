@@ -175,7 +175,7 @@ body {
 
 /* ---------- AI Team isometric studio ---------- */
 .sims-office .sims-zone { font: 700 13px/1 var(--font-sans, system-ui); letter-spacing: 0.2em; fill: #6b7190; opacity: 0.45; }
-.sims-office .sims-name { font: 600 10px/1 var(--font-sans, system-ui); fill: #e6e0ff; paint-order: stroke; stroke: #0a1026; stroke-width: 3px; }
+.sims-office .sims-name { font: 600 9.5px/1 var(--font-sans, system-ui); fill: #2a2f4f; paint-order: stroke; stroke: #ffffff; stroke-width: 3px; stroke-opacity: 0.9; }
 .sims-office .sims-bubble-text { font: 500 11px/1 var(--font-sans, system-ui); fill: #0b1430; }
 .sims-office .sims-person { cursor: pointer; transition: transform 2.4s cubic-bezier(0.45, 0, 0.2, 1); }
 .sims-office .sims-person:focus { outline: none; }
