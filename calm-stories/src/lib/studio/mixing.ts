@@ -70,11 +70,25 @@ export async function joinSegments(dir: string, segments: { file: string; pauseA
 
 export interface SceneMixInput {
   narration: string;
+  /** gainDb: the Audio Director's level relative to the voice (typically −20 to −30); used to balance beds against each other. */
   layers: { file: string; gainDb: number }[];
   music: { file: string; gainDb: number } | null;
   /** 0–1: later, calmer scenes sit the bed lower and fade longer. */
   intensity: number;
   out: string;
+}
+
+/** Narration loudness inside a scene mix (the master is normalised afterwards). */
+const VOICE_LUFS = -18;
+
+/**
+ * How far under the voice a bed sits, in LU: about 11 below for the main ambience,
+ * a little lower for extra layers and calmer scenes. The Audio Director's level
+ * nudges it by up to ±3.
+ */
+export function bedOffsetDb(levelDb: number, calm: number, layerIndex: number): number {
+  const nudge = Math.max(-3, Math.min(3, levelDb + 24));
+  return -11 + nudge - layerIndex * 2 - calm * 2;
 }
 
 /** Mix one scene: ambience and music loop under the voice and duck while it speaks. */
@@ -88,14 +102,17 @@ export async function mixScene(input: SceneMixInput): Promise<number> {
   for (const b of beds) args.push("-stream_loop", "-1", "-i", b.file);
   const calm = Math.max(0, Math.min(1, 1 - input.intensity));
   const parts: string[] = [];
-  parts.push(`[0:a]aformat=sample_rates=44100:channel_layouts=mono,adelay=${Math.round(pre * 1000)}:all=1,apad=pad_dur=${post},asplit=2[voice][key]`);
+  // Loudness-match everything first (provider files arrive at arbitrary levels), so beds sit a
+  // known distance under the voice: audible and atmospheric, never competing.
+  parts.push(`[0:a]aformat=sample_rates=44100:channel_layouts=mono,loudnorm=I=${VOICE_LUFS}:TP=-2:LRA=11,aresample=44100,aformat=sample_rates=44100:channel_layouts=mono,adelay=${Math.round(pre * 1000)}:all=1,apad=pad_dur=${post},asplit=2[voice][key]`);
   if (beds.length) {
     beds.forEach((b, i) => {
-      const gain = b.gainDb - calm * 3; // calmer scenes sit the bed a little lower
-      parts.push(`[${i + 1}:a]aformat=sample_rates=44100:channel_layouts=stereo,atrim=0:${total.toFixed(2)},volume=${gain.toFixed(1)}dB,afade=t=in:d=${(2 + calm * 2).toFixed(1)},afade=t=out:st=${Math.max(0, total - 3).toFixed(2)}:d=3[b${i}]`);
+      const target = VOICE_LUFS + bedOffsetDb(b.gainDb, calm, i);
+      parts.push(`[${i + 1}:a]aformat=sample_rates=44100:channel_layouts=stereo,atrim=0:${total.toFixed(2)},loudnorm=I=${target.toFixed(1)}:TP=-6:LRA=11,aresample=44100,aformat=sample_rates=44100:channel_layouts=stereo,afade=t=in:d=${(2 + calm * 2).toFixed(1)},afade=t=out:st=${Math.max(0, total - 3).toFixed(2)}:d=3[b${i}]`);
     });
     parts.push(`${beds.map((_, i) => `[b${i}]`).join("")}amix=inputs=${beds.length}:normalize=0:duration=longest[bed]`);
-    parts.push(`[bed][key]sidechaincompress=threshold=0.03:ratio=5:attack=25:release=900:makeup=1[ducked]`);
+    // Gentle ducking (a few dB) while the voice speaks; narration is near-continuous, so heavy ducking would bury the bed.
+    parts.push(`[bed][key]sidechaincompress=threshold=0.1:ratio=2:attack=60:release=1200:makeup=1[ducked]`);
     parts.push(`[voice]pan=stereo|c0=c0|c1=c0[vs]`);
     parts.push(`[vs][ducked]amix=inputs=2:normalize=0:duration=first[out]`);
   } else {

@@ -259,3 +259,25 @@ describe("audio isn't capped by the run budget", () => {
     expect((await db.findOne("workflow_steps", { run_id: run.id, key: "write" }))!.needs).toBe("budget");
   });
 });
+
+describe("scene mix", () => {
+  it("keeps the background sound clearly audible under the narration", async () => {
+    const path = (await import("node:path")).default;
+    const { mixScene, runFfmpeg, withTmp } = await import("@/lib/studio/mixing");
+    await withTmp(async (dir) => {
+      const voice = path.join(dir, "voice.wav");
+      const rain = path.join(dir, "rain.wav");
+      // A loud provider file for the bed and a normal voice, as ElevenLabs returns them.
+      await runFfmpeg(["-f", "lavfi", "-i", "sine=frequency=1000:duration=8", "-af", "volume=-6dB", "-ar", "44100", "-ac", "1", voice]);
+      await runFfmpeg(["-f", "lavfi", "-i", "sine=frequency=100:duration=4", "-ar", "44100", "-ac", "2", rain]);
+      const out = path.join(dir, "mix.wav");
+      await mixScene({ narration: voice, layers: [{ file: rain, gainDb: -24 }], music: null, intensity: 0.6, out });
+      const band = async (filter: string) => Number((await runFfmpeg(["-ss", "3", "-t", "6", "-i", out, "-af", `${filter},volumedetect`, "-f", "null", "-"])).match(/mean_volume: (-?[\d.]+)/)![1]);
+      const voiceDb = await band("highpass=f=600");
+      const bedDb = await band("lowpass=f=200");
+      const gap = voiceDb - bedDb;
+      expect(gap).toBeGreaterThan(5); // under the voice…
+      expect(gap).toBeLessThan(20); // …but you can hear it
+    });
+  });
+});

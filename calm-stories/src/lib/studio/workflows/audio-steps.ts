@@ -394,7 +394,7 @@ registerHandler("audio.scene", async (ctx) => {
       }
       const f = path.join(dir, `amb_${i}.mp3`);
       fs.writeFileSync(f, (await storage.get(k))!.data);
-      layerFiles.push({ file: f, gainDb: Math.min(-14, layer.level_db) });
+      layerFiles.push({ file: f, gainDb: layer.level_db });
       ambienceKeys.push(k);
     }
     let musicKey: string | null = null;
@@ -411,7 +411,7 @@ registerHandler("audio.scene", async (ctx) => {
       }
       const f = path.join(dir, "music.mp3");
       fs.writeFileSync(f, (await storage.get(musicKey))!.data);
-      music = { file: f, gainDb: Math.min(-16, plan.music_cue.level_db) };
+      music = { file: f, gainDb: plan.music_cue.level_db - 2 };
     }
 
     /* ---- Scene stem ---- */
