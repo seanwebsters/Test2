@@ -137,6 +137,10 @@ async function episode(ctx: StepContext) {
 
 const scope = (ctx: StepContext) => ({ episode_id: ctx.run.episode_id! });
 
+/** Writing rules when one narrator performs the whole episode. */
+export const SINGLE_NARRATOR_NOTE =
+  "This episode is read aloud by ONE narrator – a slow, silky, calming voice – who reads every line, dialogue included; there are no separate character voices. Write for that: make it always clear who is speaking (simple tags like “she said”, or a name, placed early in the line), give characters distinct ways of speaking through word choice and rhythm rather than accents or shouting, keep dialogue sparing and quiet, and never rely on sound effects, voices overlapping or typography to carry meaning.";
+
 export function scriptText(s: ScriptData, opts: { numbered?: boolean } = {}): string {
   return s.scenes.map((sc) => (opts.numbered ? `## Scene ${sc.index}: ${sc.title}\n${sc.text}` : sc.text)).join("\n\n---\n\n");
 }
@@ -208,6 +212,7 @@ registerHandler("ep.draft", async (ctx) => {
   const context = await seriesContext(ep.series_id);
   // Resume support: scenes already written in an earlier attempt are kept.
   const progress = (await currentDeliverable<ScriptData>(scope(ctx), "draft_progress"))?.data ?? { scenes: [] };
+  const narration = (await getStudioSettings()).single_narrator ? `\n\n${SINGLE_NARRATOR_NOTE}` : "";
   const scenes = [...progress.scenes];
   let model = "";
   for (const sc of plan.scenes) {
@@ -219,7 +224,7 @@ registerHandler("ep.draft", async (ctx) => {
       : "";
     const res = await ctx.claude({
       context,
-      prompt: `Write scene ${sc.index} of ${plan.scenes.length} for episode ${ep.number}, “${outline.title}”.\n\nOutline:\n${JSON.stringify(outline, null, 1)}\n\nFull scene plan:\n${plan.scenes.map((p) => `${p.index}. ${p.title} – ${p.purpose} (intensity ${p.intensity})`).join("\n")}\n\nThis scene:\n${JSON.stringify(sc, null, 1)}${prior}\n\nWrite about ${sc.target_words} words of finished prose for this scene only. No heading, no scene number, no notes – just the story, in the series' voice. ${sc.index === plan.scenes.length ? "This is the final scene: let it drift gently to rest." : ""}`,
+      prompt: `Write scene ${sc.index} of ${plan.scenes.length} for episode ${ep.number}, “${outline.title}”.\n\nOutline:\n${JSON.stringify(outline, null, 1)}\n\nFull scene plan:\n${plan.scenes.map((p) => `${p.index}. ${p.title} – ${p.purpose} (intensity ${p.intensity})`).join("\n")}\n\nThis scene:\n${JSON.stringify(sc, null, 1)}${prior}\n\nWrite about ${sc.target_words} words of finished prose for this scene only. No heading, no scene number, no notes – just the story, in the series' voice. ${sc.index === plan.scenes.length ? "This is the final scene: let it drift gently to rest." : ""}${narration}`,
       maxTokens: 16000,
     });
     model = res.model;
@@ -242,7 +247,7 @@ registerHandler("ep.review", async (ctx) => {
   const res = await ctx.claude({
     agent: reviewer.agent,
     context: await seriesContext(ep.series_id),
-    prompt: `${reviewer.label} of episode ${ep.number}, “${ep.title}” (draft round ${round}).\n${reviewer.brief}\nGive structured notes with quoted evidence and concrete suggestions. Mark "revise" only for problems a listener would notice.\n\nScene plan (intended intensity): ${plan.scenes.map((s) => `${s.index}:${s.intensity}`).join(", ")}\n\n${scriptText(script, { numbered: true })}`,
+    prompt: `${reviewer.label} of episode ${ep.number}, “${ep.title}” (draft round ${round}).\n${reviewer.brief}\nGive structured notes with quoted evidence and concrete suggestions. Mark "revise" only for problems a listener would notice.${(await getStudioSettings()).single_narrator ? `\n${SINGLE_NARRATOR_NOTE} Flag any line where a listener couldn't tell who is speaking.` : ""}\n\nScene plan (intended intensity): ${plan.scenes.map((s) => `${s.index}:${s.intensity}`).join(", ")}\n\n${scriptText(script, { numbered: true })}`,
     schema: ReviewSchema,
   });
   await ctx.deliver({ kind: "review", key: `review:${focus}`, title: `${reviewer.label} – round ${round}`, data: res.data, reasoning: res.data.summary, model: res.model });
@@ -296,6 +301,7 @@ registerHandler("ep.rewrite", async (ctx) => {
     for (const i of rv?.data.issues ?? []) allIssues.push({ focus: r.focus, issue: i });
   }
   let model = "";
+  const narration = (await getStudioSettings()).single_narrator ? `\n\n${SINGLE_NARRATOR_NOTE}` : "";
   for (const ins of brief.scene_instructions) {
     const sc = script.scenes.find((s) => s.index === ins.scene_index);
     if (!sc) continue;
@@ -305,7 +311,7 @@ registerHandler("ep.rewrite", async (ctx) => {
       prompt: `Revise scene ${sc.index} (“${sc.title}”) of episode ${ep.number}. Apply these instructions from the Creative Director exactly, and preserve everything that already works – voice, length, imagery, continuity.\n\nInstructions:\n${ins.instructions.map((i) => `- ${i}`).join("\n")}\n\nSupporting editorial notes:\n${notes.map((n) => `- [${n.focus}] “${n.issue.quote}” – ${n.issue.problem} → ${n.issue.suggestion}`).join("\n") || "- none"}\n\nNeighbouring scenes for continuity:\n${script.scenes
         .filter((s) => Math.abs(s.index - sc.index) === 1)
         .map((s) => `## Scene ${s.index}\n${s.text.slice(0, 2500)}`)
-        .join("\n\n")}\n\nCurrent scene ${sc.index}:\n${sc.text}\n\nReturn only the complete revised scene prose.`,
+        .join("\n\n")}\n\nCurrent scene ${sc.index}:\n${sc.text}\n\nReturn only the complete revised scene prose.${narration}`,
       maxTokens: 16000,
     });
     model = res.model;

@@ -135,7 +135,7 @@ function tone(seconds: number, freq: number, file: string): Buffer {
 
 export async function fakeProviderFetch() {
   const png = await sharp({ create: { width: 832, height: 1248, channels: 3, background: { r: 20, g: 24, b: 60 } } }).png().toBuffer();
-  const counts = { tts: 0, sfx: 0, music: 0, images: 0, voices: 0, dictionaries: 0, imagesWithRefs: 0 };
+  const counts = { tts: 0, sfx: 0, music: 0, images: 0, voices: 0, dictionaries: 0, imagesWithRefs: 0, ttsVoices: new Set<string>() };
   const fn = async (url: string | URL, init?: RequestInit): Promise<Response> => {
     const u = String(url);
     const headers = (init?.headers ?? {}) as Record<string, string>;
@@ -150,7 +150,12 @@ export async function fakeProviderFetch() {
       if (headers["xi-api-key"] !== "test-eleven") return new Response("bad key", { status: 401 });
       if (u.endsWith("/v1/voices")) {
         counts.voices++;
-        return Response.json({ voices: ["a", "b", "c"].map((x) => ({ voice_id: `voice_${x}`, name: `Voice ${x.toUpperCase()}`, category: "premade", labels: { gender: "female", accent: "british" }, description: "calm" })) });
+        return Response.json({
+          voices: [
+            ...["a", "b", "c"].map((x) => ({ voice_id: `voice_${x}`, name: `Voice ${x.toUpperCase()}`, category: "premade", labels: { gender: "female", accent: "british" }, description: "calm" })),
+            { voice_id: "voice_theo", name: "Theo – Silky & Slow", category: "professional", labels: { gender: "male", use_case: "narration" }, description: "slow, silky sleep narrator" },
+          ],
+        });
       }
       if (u.includes("/pronunciation-dictionaries/")) {
         counts.dictionaries++;
@@ -158,6 +163,7 @@ export async function fakeProviderFetch() {
       }
       if (u.includes("/text-to-speech/")) {
         counts.tts++;
+        counts.ttsVoices.add(u.split("/text-to-speech/")[1]!.split("?")[0]!);
         return new Response(new Uint8Array(tone(1.5, 220, "tts.mp3")), { headers: { "request-id": `req_${counts.tts}` } });
       }
       if (u.includes("/sound-generation")) {

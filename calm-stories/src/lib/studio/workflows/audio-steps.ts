@@ -115,6 +115,19 @@ export function calmNarratorCandidates(voices: ElevenVoice[], n = 3): ElevenVoic
   return [...voices].sort((a, b) => score(b) - score(a)).slice(0, n);
 }
 
+/**
+ * Find a voice by the name the studio knows it by (e.g. "Theo Silk Slow" matches
+ * "Theo – Silky & Slow"): every word of the wanted name must start a word of the
+ * voice's name. Falls back to the first word alone (e.g. just "Theo").
+ */
+export function findVoiceByName(voices: ElevenVoice[], wanted: string): ElevenVoice | null {
+  const words = (s: string) => s.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const want = words(wanted);
+  if (!want.length) return null;
+  const matches = (v: ElevenVoice, ws: string[]) => ws.every((w) => words(v.name).some((n) => n.startsWith(w)));
+  return voices.find((v) => matches(v, want)) ?? voices.find((v) => matches(v, want.slice(0, 1))) ?? null;
+}
+
 /** Narrator delivery: steadier and less theatrical than character voices, so it soothes. */
 export const NARRATOR_VOICE_SETTINGS = { stability: 0.78, similarity_boost: 0.75, style: 0.05 };
 
@@ -130,8 +143,15 @@ registerHandler("audio.casting", async (ctx) => {
     throw err;
   }
   if (!voices.length) throw new BlockedError("elevenlabs:voices", "Your ElevenLabs account has no voices. Add licensed voices to your ElevenLabs library, then resume.");
-  const chars = (await db.list("characters", { where: { series_id: sid } })).filter((c) => c.role !== "narrator");
-  const res = await ctx.claude({
+  const settings = await getStudioSettings();
+  // One-narrator house style: nobody else needs a voice.
+  const chars = settings.single_narrator ? [] : (await db.list("characters", { where: { series_id: sid } })).filter((c) => c.role !== "narrator");
+  const preferred = settings.narrator_voice.trim() ? findVoiceByName(voices, settings.narrator_voice) : null;
+  if (settings.narrator_voice.trim() && !preferred) ctx.log(`The narrator voice “${settings.narrator_voice}” isn't in your ElevenLabs account (add it to My Voices). Casting the calmest available voice instead.`, "warn");
+  const direction = "Slow, silky and calming: warm, soft and unhurried, intimate rather than performed, reading every part – characters included – in one gentle voice that softens further as the episode goes on.";
+  const res = preferred && !chars.length
+    ? { data: { narrator: { direction, candidates: [{ voice_id: preferred.voice_id, rationale: "The studio's house narrator (Settings → Narrator voice)." }] }, characters: [] as { name: string; direction: string; candidates: { voice_id: string; rationale: string }[] }[] }, model: "settings" }
+    : await ctx.claude({
     context: await seriesContext(sid),
     prompt: `Cast this series from the voices available in our ElevenLabs account (only these – they are the voices we hold rights to use). Every series MUST have a narrator – they read all the prose and most of the episode, so they matter most. The narrator must be calming: warm, low, soft and unhurried, intimate rather than performed, the kind of voice that helps a listener fall asleep (prefer voices described as calm, soothing, gentle, warm, meditation, audiobook or narration; never energetic, upbeat, announcer, news, commercial or cartoon voices). Then choose a voice for each speaking character (${chars.map((c) => c.name).join(", ")}). Give two or three candidates per role, best first, with reasons.\n\nVoices (id | name | category | labels | description):\n${voices.map(voiceCard).join("\n")}`,
     schema: CastingSchema,
@@ -140,6 +160,7 @@ registerHandler("audio.casting", async (ctx) => {
   const name = (id: string) => voices.find((v) => v.voice_id === id)?.name ?? id;
   // A narrator is mandatory: if none of Claude's picks exist in the account, fall back to the calmest voices we hold.
   let narratorCandidates = res.data.narrator.candidates.filter((c) => valid.has(c.voice_id));
+  if (preferred) narratorCandidates = [{ voice_id: preferred.voice_id, rationale: "The studio's house narrator (Settings → Narrator voice)." }, ...narratorCandidates.filter((c) => c.voice_id !== preferred.voice_id)];
   if (!narratorCandidates.length) {
     narratorCandidates = calmNarratorCandidates(voices).map((v) => ({ voice_id: v.voice_id, rationale: "Calmest voice in the account by its ElevenLabs labels (fallback – the suggested voices weren't available)." }));
     ctx.log("None of the suggested narrator voices are in the ElevenLabs account; auditioning the calmest available voices instead.", "warn");
@@ -149,7 +170,6 @@ registerHandler("audio.casting", async (ctx) => {
     const ch = chars.find((x) => x.name.toLowerCase() === c.name.toLowerCase());
     if (ch) roles.push({ characterId: ch.id, label: ch.name, line: "", candidates: c.candidates });
   }
-  const settings = await getStudioSettings();
   let auditions = 0;
   for (const role of roles) {
     const picks = role.candidates.filter((c) => valid.has(c.voice_id)).slice(0, role.characterId ? 2 : 3);
@@ -298,7 +318,7 @@ registerHandler("audio.scene", async (ctx) => {
       const segments: { text: string; voiceId: string }[] = [];
       for (const p of parts) {
         let voiceId = narrator.voice_id;
-        if (p.kind === "quote") {
+        if (p.kind === "quote" && !settings.single_narrator) {
           const who = plan.quote_speakers.find((q) => q.quote_number === p.quoteNumber)?.speaker ?? "narrator";
           const ch = chars.find((c) => who.toLowerCase().includes(c.name.toLowerCase().split(" ")[0]!.toLowerCase()));
           if (ch?.voice_id) voiceId = ch.voice_id;

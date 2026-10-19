@@ -543,6 +543,8 @@ create table public.studio_settings (
   default_series_budget_cents int not null,
   web_research boolean not null default true,
   episode_music boolean not null default false,
+  single_narrator boolean not null default true,
+  narrator_voice text not null default 'Theo Silk Slow',
   publish_roles text[] not null default '{admin,editor}',
   autopilot boolean not null default true,
   autopilot_pipeline int not null default 10,

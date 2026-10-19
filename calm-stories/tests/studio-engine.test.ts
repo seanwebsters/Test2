@@ -192,3 +192,15 @@ describe("Claude request options per model", () => {
     expect(webSearchToolType("claude-sonnet-5-5")).toBe("web_search_20260209");
   });
 });
+
+describe("house narrator voice", () => {
+  it("finds the narrator by name however ElevenLabs formats it", async () => {
+    const { findVoiceByName } = await import("@/lib/studio/workflows/audio-steps");
+    const v = (voice_id: string, name: string) => ({ voice_id, name, category: "professional", description: null, labels: {}, preview_url: null });
+    const voices = [v("a", "Theodora - Bright"), v("b", "Theo – Silky & Slow"), v("c", "Calm Clara")];
+    expect(findVoiceByName(voices, "Theo Silk Slow")?.voice_id).toBe("b");
+    expect(findVoiceByName(voices, "theo silky slow")?.voice_id).toBe("b");
+    expect(findVoiceByName([v("x", "Theo"), ...voices], "Theo Silk Slow")?.voice_id).toBe("b");
+    expect(findVoiceByName(voices, "Nobody")).toBeNull();
+  });
+});

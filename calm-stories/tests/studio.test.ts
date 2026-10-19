@@ -67,7 +67,10 @@ describe("Sleep Stories Studio – end to end", () => {
     r = (await db.get("workflow_runs", run.id))!;
     expect(r.status).toBe("succeeded");
     expect((await db.get("series_projects", project.id))!.status).toBe("greenlit");
-    expect((await db.list("voice_auditions", { where: { series_id: seriesId } })).length).toBeGreaterThanOrEqual(3);
+    // One-narrator house style: Theo (from Settings) narrates; no character voices, no casting call to Claude.
+    const auditions = await db.list("voice_auditions", { where: { series_id: seriesId } });
+    expect(auditions.map((a) => a.voice_id)).toEqual(["voice_theo"]);
+    expect(script.calls.some((c) => c.agent === "audio_director" && JSON.stringify(c.content).includes("Cast this series"))).toBe(false);
     expect(providers.counts.dictionaries).toBe(1);
     // Every series gets exactly one selected narrator.
     expect((await db.list("voice_auditions", { where: { series_id: seriesId, character_id: null, selected: true } })).length).toBe(1);
@@ -97,6 +100,11 @@ describe("Sleep Stories Studio – end to end", () => {
     expect(loud.true_peak_dbtp).toBeLessThanOrEqual(-1);
     expect((await db.list("scene_renders", { where: { episode_id: ep.id } })).length).toBe(5);
     expect(providers.counts.tts).toBeGreaterThanOrEqual(5);
+    expect([...providers.counts.ttsVoices]).toEqual(["voice_theo"]); // every line, dialogue included, in Theo's voice
+    // The writer is told the whole episode is read by one narrator.
+    const prose = script.calls.filter((c) => c.agent === "lead_writer" && !c.jsonSchema);
+    expect(prose.length).toBeGreaterThan(0);
+    expect(prose.every((c) => JSON.stringify(c.content).includes("ONE narrator"))).toBe(true);
     // Budget mode: the same ambience prompt is generated once and reused from the series library; music is off by default.
     expect(providers.counts.sfx).toBe(1);
     expect(providers.counts.music).toBe(0);

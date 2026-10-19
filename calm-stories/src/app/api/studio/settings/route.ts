@@ -22,6 +22,8 @@ const Body = z.object({
   default_series_budget_cents: z.number().int().min(0).max(1_000_000),
   web_research: z.boolean(),
   episode_music: z.boolean(),
+  single_narrator: z.boolean(),
+  narrator_voice: z.string().max(120),
   publish_roles: z.array(z.enum(["admin", "editor"])).min(1),
   autopilot: z.boolean(),
   autopilot_pipeline: z.number().int().min(0).max(50),

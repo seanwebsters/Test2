@@ -312,6 +312,10 @@ export interface StudioSettings {
   default_series_budget_cents: number;
   web_research: boolean;
   episode_music: boolean;
+  /** One narrator voices everything, characters included. */
+  single_narrator: boolean;
+  /** ElevenLabs voice to narrate with (matched by name), e.g. "Theo Silk Slow". Empty = let the Audio Director cast. */
+  narrator_voice: string;
   /** Only these roles may press "Publish". Never the agents. */
   publish_roles: ("admin" | "editor")[];
   /** Autopilot: the Program Director invents and develops new series without a brief. */

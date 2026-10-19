@@ -40,6 +40,7 @@ export function StudioSettingsForm({ initial, canEdit }: { initial: StudioSettin
         {text("tts_model", "ElevenLabs narration model")}
         {text("sfx_model", "ElevenLabs sound-effects model")}
         {text("music_model", "ElevenLabs music model")}
+        {text("narrator_voice", "Narrator voice (ElevenLabs name)", "Add it to My Voices in ElevenLabs first. Empty = the Audio Director casts one.")}
         {num("max_revision_rounds", "Revision rounds (max)", "Per writing, continuity and QC loop.")}
         {num("max_episode_minutes", "Episode length cap (minutes)", "Narration is the main cost – about $0.07 a minute with ElevenLabs Flash.")}
         {num("cover_concepts", "Cover concepts per episode", "1 = cheapest (no extra image review).")}
@@ -48,6 +49,7 @@ export function StudioSettingsForm({ initial, canEdit }: { initial: StudioSettin
         {num("default_episode_budget_cents", "Episode budget (¢)")}
         {num("default_series_budget_cents", "Series development budget (¢)")}
         <div className="space-y-2 text-xs text-mist">
+          <label className="flex items-center gap-2"><input type="checkbox" className="accent-lavender" checked={f.single_narrator} onChange={(e) => setF({ ...f, single_narrator: e.target.checked })} /> One narrator reads every part (no character voices)</label>
           <label className="flex items-center gap-2"><input type="checkbox" className="accent-lavender" checked={f.episode_music} onChange={(e) => setF({ ...f, episode_music: e.target.checked })} /> Music cues (one per series, reused; costs extra the first time)</label>
           <label className="flex items-center gap-2"><input type="checkbox" className="accent-lavender" checked={f.web_research} onChange={(e) => setF({ ...f, web_research: e.target.checked })} /> Program Director may research the web</label>
           <div>Who may publish episodes</div>

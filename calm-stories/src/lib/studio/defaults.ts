@@ -24,6 +24,9 @@ export const DEFAULT_STUDIO_SETTINGS: Omit<StudioSettings, "updated_at"> = {
   web_research: true,
   // Music generation is the priciest audio item; off keeps episodes under ~$1.
   episode_music: false,
+  // House style: one calm narrator reads every part.
+  single_narrator: true,
+  narrator_voice: "Theo Silk Slow",
   publish_roles: ["admin", "editor"],
   autopilot: true,
   autopilot_pipeline: 10,
