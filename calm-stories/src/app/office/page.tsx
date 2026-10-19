@@ -10,7 +10,7 @@ import { cookies } from "next/headers";
 import { ACCESS_COOKIE, readAccess } from "@/lib/auth/studio-access";
 import "@/lib/studio";
 
-export const metadata = { title: "Studio · Sleep Stories" };
+export const metadata = { title: { absolute: "Sleep Stories Studio" } };
 export const dynamic = "force-dynamic";
 
 /** The shared studio home: the live 3D office, your inbox and recent activity. Everything else is Sean access only. */

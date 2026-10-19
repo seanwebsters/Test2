@@ -8,6 +8,10 @@ import { SimsOffice, type ReviewItem } from "./SimsOffice";
 import { AgentDrawer } from "./AgentDrawer";
 import { AgentFace } from "./AgentFace";
 import { cx } from "@/lib/util";
+import { BrandLogo } from "@/components/layout/BrandLogo";
+
+/** Where the team can listen to published stories. */
+const LISTEN_URL = "https://seanidealink.xyz/";
 
 export type InboxCard = { id: string; kind: "approval" | "question"; title: string; sub: string; cover: string | null; seconds: number; since: string; href: string; cta: string };
 export type ActivityRow = { id: string; text: string; since: string; tone: "done" | "warn" | "info" };
@@ -88,13 +92,13 @@ export function StudioHome({ initial, review, inbox, latest, isOwner }: { initia
       <div className="grid gap-4 xl:grid-cols-[240px_minmax(0,1fr)_380px]">
         {/* left menu card */}
         <aside className={cx("flex flex-col gap-6 rounded-3xl border p-4 xl:min-h-[calc(100vh-290px)]", panel)}>
-          <div className="flex items-center gap-3 px-1 pt-2">
-            <svg viewBox="0 0 40 40" className="h-11 w-11 shrink-0 text-[#d9d2ff]" aria-hidden><path d="M27 6a15 15 0 1 0 7 25A13 13 0 0 1 27 6Z" fill="currentColor" /></svg>
-            <div>
-              <div className="font-serif text-[25px] leading-none">Sleep Stories</div>
-              <div className="mt-1.5 text-[11px] tracking-[0.45em] text-white/80">STUDIO</div>
-            </div>
+          <div className="px-2 pt-3">
+            <BrandLogo onDark={night} width={196} />
           </div>
+          <a href={LISTEN_URL} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(90deg,#2346c4,#7a3fc0)] px-4 py-3 text-[15px] font-semibold text-white shadow-lg shadow-[#3b2a8a]/30 hover:brightness-110">
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden><path d="M8 5v14l11-7z" /></svg>
+            Listen Now
+          </a>
           <nav className="space-y-1.5">
             <span className="flex items-center gap-4 rounded-2xl border border-lavender/60 bg-lavender/15 px-4 py-3">
               <Icon d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />

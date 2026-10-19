@@ -13,6 +13,7 @@ import { diskUsage } from "@/lib/services/disk";
 import { diagnose } from "@/lib/studio/quickfix";
 import { AdminAction } from "@/components/admin/AdminAction";
 import "@/lib/studio";
+import { BrandLogo } from "@/components/layout/BrandLogo";
 
 export const metadata = { title: { default: "Sleep Stories Studio", template: "%s · Sleep Stories Studio" } };
 
@@ -21,7 +22,7 @@ export default async function StudioLayout({ children }: { children: React.React
   if (!viewer.user || !isEditor(viewer)) {
     return (
       <div className="mx-auto max-w-xl px-6 pt-40 text-center">
-        <h1 className="headline text-5xl">Sleep Stories Studio</h1>
+        <h1 className="flex justify-center"><BrandLogo width={300} /></h1>
         <p className="mt-4 text-mist">The production house is for Calm&rsquo;s creative team.</p>
         {env.studioLocked ? (
           <Link href="/studio-login" className="btn-primary mt-6">Enter studio password</Link>
@@ -55,21 +56,7 @@ export default async function StudioLayout({ children }: { children: React.React
   return (
     <div className="studio flex min-h-screen bg-[radial-gradient(ellipse_at_top_left,#1b1f4a_0%,#0b1128_45%,#070b1c_100%)]">
       <aside className="sticky top-0 hidden h-screen w-[260px] shrink-0 flex-col border-r border-white/5 bg-[#0b1029]/80 px-4 py-6 backdrop-blur lg:flex">
-        <Link href="/studio" className="mb-8 flex items-center gap-3 px-2">
-          <svg viewBox="0 0 40 40" width="40" height="40" aria-hidden>
-            <defs>
-              <linearGradient id="moonmark" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stopColor="#f3eaff" />
-                <stop offset="1" stopColor="#a99bf4" />
-              </linearGradient>
-            </defs>
-            <path d="M26 4a16 16 0 1 0 10 25A13 13 0 0 1 26 4Z" fill="url(#moonmark)" />
-          </svg>
-          <span>
-            <span className="block font-serif text-[22px] leading-none text-white">Sleep Stories</span>
-            <span className="text-[11px] font-semibold uppercase tracking-[0.35em] text-mist">Studio</span>
-          </span>
-        </Link>
+        <Link href="/office" className="mb-6 block px-2 pt-1" aria-label="Sleep Stories Studio home"><BrandLogo width={180} /></Link>
         <StudioNav approvals={projects.length + reviews.length + blockedRuns.length} />
         <Link href="/studio/series/new" className="mt-6 flex items-center justify-center gap-2 rounded-xl border border-lavender/40 py-2.5 font-serif text-[16px] text-white hover:bg-lavender/10">
           <span className="text-lg leading-none">+</span> New Series
@@ -95,7 +82,7 @@ export default async function StudioLayout({ children }: { children: React.React
       </aside>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-3 border-b border-white/5 px-4 py-3 lg:hidden">
-          <Link href="/studio" className="font-serif text-xl">Sleep Stories Studio</Link>
+          <Link href="/office" aria-label="Sleep Stories Studio home"><BrandLogo width={130} studio={false} /></Link>
           <Link href="/studio/approvals" className="ml-auto text-sm text-lavender">Approvals</Link>
           <Link href="/studio/team" className="text-sm text-mist">Team</Link>
         </div>

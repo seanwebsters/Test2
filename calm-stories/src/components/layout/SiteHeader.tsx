@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ViewerInfo } from "@/lib/viewer-info";
 import { Icon } from "@/components/ui/Icon";
 import { Avatar } from "@/components/ui/Avatar";
+import { BrandLogo } from "./BrandLogo";
 import { cx } from "@/lib/util";
 
 const NAV = [
@@ -15,9 +16,8 @@ const NAV = [
 
 export function Logo({ className }: { className?: string }) {
   return (
-    <Link href="/" className={cx("group flex items-baseline gap-2", className)} aria-label="Calm Stories home">
-      <span className="font-serif text-[1.75rem] font-semibold italic leading-none tracking-tight text-white">Calm</span>
-      <span className="text-[0.68rem] font-semibold uppercase tracking-[0.32em] text-lavender">Stories</span>
+    <Link href="/" className={cx("group flex items-center", className)} aria-label="Sleep Stories home">
+      <BrandLogo width={150} studio={false} />
     </Link>
   );
 }

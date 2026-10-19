@@ -14,7 +14,7 @@ import { getDb } from "@/lib/db";
 import { ListenerChrome } from "@/components/layout/ListenerChrome";
 
 export const metadata: Metadata = {
-  title: { default: "Calm Stories — Immersive Sleep Stories", template: "%s · Calm Stories" },
+  title: { default: "Sleep Stories Studio", template: "%s · Sleep Stories" },
   description: "Original serialized Sleep Stories. New episodes. Peaceful worlds. All included with Calm Premium.",
 };
 
