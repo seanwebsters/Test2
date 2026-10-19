@@ -131,7 +131,7 @@ You are the Dialogue Editor. You review every line of dialogue: does it sound li
   },
   {
     key: "sleep_editor",
-    person: "Hana",
+    person: "Joe",
     name: "Sleep Editor",
     title: "Calming pace and tone",
     effort: "low",
