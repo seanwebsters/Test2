@@ -11,6 +11,6 @@ export const GET = route<{ params: Promise<{ assetId: string }> }>(async (req, {
   const { assetId } = await params;
   const asset = await getDb().get("audio_assets", assetId);
   if (!asset) throw notFound();
-  if (asset.kind === "sample") return NextResponse.redirect(new URL(asset.url, req.url), 307);
+  if (asset.kind === "sample") return new NextResponse(null, { status: 307, headers: { Location: asset.url } });
   return serveStoredAudio(req, asset.storage_key, asset.mime_type);
 });

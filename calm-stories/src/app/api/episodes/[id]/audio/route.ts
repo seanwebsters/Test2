@@ -23,6 +23,6 @@ export const GET = route<{ params: Promise<{ id: string }> }>(async (req, { para
   const asset = ep.audio_asset_id ? await db.get("audio_assets", ep.audio_asset_id) : null;
   if (!asset) throw notFound("No audio has been produced for this episode yet.");
   // Shared ambience samples are static, non-premium files.
-  if (asset.kind === "sample") return NextResponse.redirect(new URL(asset.url, req.url), 307);
+  if (asset.kind === "sample") return new NextResponse(null, { status: 307, headers: { Location: asset.url } });
   return serveStoredAudio(req, asset.storage_key, asset.mime_type);
 });
