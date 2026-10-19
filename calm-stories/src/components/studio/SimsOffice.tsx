@@ -222,6 +222,54 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [people.map((p) => `${p.def.key}:${p.atDesk}`).join("|")]);
 
+  // Photoreal backdrop (Nano Banana render of the empty office, made on the server with the fal key)
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [photoOn, setPhotoOn] = useState(true);
+  const [rendering, setRendering] = useState(false);
+  const [renderErr, setRenderErr] = useState<string | null>(null);
+  useEffect(() => {
+    const url = `/api/studio/office-render?v=${Date.now()}`;
+    const img = new Image();
+    img.onload = () => setPhoto(url);
+    img.src = url;
+  }, []);
+  async function makePhotoreal() {
+    const svg = svgRef.current;
+    if (!svg) return;
+    setRendering(true);
+    setRenderErr(null);
+    try {
+      const clone = svg.cloneNode(true) as SVGSVGElement;
+      clone.querySelectorAll(".sims-person, .sims-name, .sims-bubble-wrap, .sims-photo").forEach((n) => n.remove());
+      clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+      clone.setAttribute("width", String(VW));
+      clone.setAttribute("height", String(VH));
+      const src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(clone))}`;
+      const img = new Image();
+      await new Promise<void>((ok, bad) => { img.onload = () => ok(); img.onerror = () => bad(new Error("Couldn't snapshot the office.")); img.src = src; });
+      const canvas = document.createElement("canvas");
+      canvas.width = 1600;
+      canvas.height = 900;
+      const ctx = canvas.getContext("2d")!;
+      ctx.fillStyle = "#0a1026";
+      ctx.fillRect(0, 0, 1600, 900);
+      const k = 900 / VH;
+      ctx.drawImage(img, (1600 - VW * k) / 2, 0, VW * k, 900);
+      const res = await fetch("/api/studio/office-render", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ snapshot: canvas.toDataURL("image/png") }) });
+      const json = (await res.json().catch(() => ({}))) as { error?: { message?: string } | string };
+      if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : json.error?.message ?? `Render failed (${res.status}).`);
+      setPhoto(`/api/studio/office-render?v=${Date.now()}`);
+      setPhotoOn(true);
+    } catch (err) {
+      setRenderErr(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRendering(false);
+    }
+  }
+  const showPhoto = Boolean(photo && photoOn);
+  const PW = (VH * 16) / 9;
+
   const items: Drawable[] = [];
   const shadows: ReactNode[] = [];
   const shadow = (gx: number, gy: number, w: number, d: number, k?: number) => shadows.push(<Shadow key={`sh-${shadows.length}`} gx={gx} gy={gy} w={w} d={d} k={k} />);
@@ -327,7 +375,20 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
 
   return (
     <div className="overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(ellipse_at_50%_40%,#1d2752_0%,#0a1026_75%)]">
-      <svg viewBox={`0 0 ${VW} ${VH}`} className="sims-office block w-full" role="img" aria-label="The AI team in the studio">
+      <div className="flex flex-wrap items-center justify-end gap-2 border-b border-white/10 px-4 py-2 text-[12px]">
+        {renderErr && <span className="mr-auto text-rose-300">{renderErr}</span>}
+        {rendering && <span className="mr-auto text-mist">Rendering a photoreal office with Nano Banana… (about 20–40s)</span>}
+        {photo && (
+          <div className="flex overflow-hidden rounded-full border border-white/15">
+            <button onClick={() => setPhotoOn(false)} className={cx("px-3 py-1", !photoOn ? "bg-white/15 text-white" : "text-mist hover:text-white")}>Illustrated</button>
+            <button onClick={() => setPhotoOn(true)} className={cx("px-3 py-1", photoOn ? "bg-white/15 text-white" : "text-mist hover:text-white")}>Photoreal</button>
+          </div>
+        )}
+        <button onClick={makePhotoreal} disabled={rendering} className="rounded-full border border-white/15 px-3 py-1 text-white/90 hover:bg-white/10 disabled:opacity-50">
+          {rendering ? "Rendering…" : photo ? "Re-render photoreal" : "✨ Make it photoreal"}
+        </button>
+      </div>
+      <svg ref={svgRef} viewBox={`0 0 ${VW} ${VH}`} className="sims-office block w-full" role="img" aria-label="The AI team in the studio">
         <defs>
           <radialGradient id="simsLamp"><stop offset="0" stopColor="#ffe3b8" stopOpacity="0.28" /><stop offset="1" stopColor="#ffd9a0" stopOpacity="0" /></radialGradient>
           <linearGradient id="simsSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#a9c9ee" /><stop offset="1" stopColor="#e3eefa" /></linearGradient>
@@ -342,6 +403,8 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
           <filter id="simsSunBlur" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="6" /></filter>
           <linearGradient id="calmTee" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#60ade6" /><stop offset="1" stopColor="#6467e1" /></linearGradient>
         </defs>
+        {showPhoto && <image className="sims-photo" href={photo!} x={-(PW - VW) / 2} y={0} width={PW} height={VH} preserveAspectRatio="none" />}
+        {!showPhoto && <>
         {/* walls */}
         <polygon points={pts(backLeft)} fill="url(#simsWallL)" />
         <polygon points={pts(backRight)} fill="url(#simsWallR)" />
@@ -404,8 +467,9 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
             <Box gx={gx!} gy={gy! + d! - 0.06} w={0.06} d={0.06} h={1.3} top="#e6e8ef" left="#a9adbd" right="#c4c7d4" />
           </g>
         ))}
-        {/* everything else, back to front */}
-        {items.map((it) => <g key={it.key}>{it.node}</g>)}
+        </>}
+        {/* everything else, back to front (just the people over the photo) */}
+        {items.filter((it) => !showPhoto || it.key.startsWith("person-")).map((it) => <g key={it.key}>{it.node}</g>)}
         {/* name tags on top */}
         {people.map((p) => {
           const [x, y] = iso(p.spot[0], p.spot[1]);
@@ -417,7 +481,7 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
           if (!text || walking[p.def.key]) return null;
           const [x, y] = iso(p.spot[0], p.spot[1]);
           return (
-            <g key={`b-${p.def.key}`} transform={`translate(${x} ${y - 92})`} pointerEvents="none">
+            <g key={`b-${p.def.key}`} className="sims-bubble-wrap" transform={`translate(${x} ${y - 92})`} pointerEvents="none">
               <g className="sims-bubble">
                 <rect x={-text.length * 3 - 10} y="-12" width={text.length * 6 + 20} height="21" rx="10.5" fill="#f3eaff" />
                 <circle cx="-4" cy="14" r="3" fill="#f3eaff" />
