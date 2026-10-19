@@ -1,25 +1,13 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { getDb } from "@/lib/db";
+import { env } from "@/lib/env";
+import { ACCESS_COOKIE, readAccess } from "@/lib/auth/studio-access";
 import { getTeamState } from "@/lib/studio/team";
 import { pipelineStages } from "@/lib/studio/pipeline-view";
 import { TeamRoom } from "@/components/studio/TeamRoom";
 import { PipelineStrip } from "@/components/studio/PipelineStrip";
 import { isStaff } from "@/app/admin/staff";
-import { AgentAvatar } from "@/components/studio/AgentAvatar";
-import { AdminAction } from "@/components/admin/AdminAction";
-import { avatarClips, avatarProgress } from "@/lib/studio/avatars";
-import { AGENT_BY_KEY } from "@/lib/studio/agents";
-import type { AgentActivity } from "@/lib/studio/types";
-
-const LEGEND: [AgentActivity, string, string][] = [
-  ["sleeping", "Resting", "No task"],
-  ["thinking", "Planning", "Outlines, plans, briefs"],
-  ["typing", "Writing", "Generating a deliverable"],
-  ["reading", "Reviewing", "Critiques and checks"],
-  ["handing_off", "Handing off", "Work passed to the next agent"],
-  ["celebrating", "Done", "Task just completed"],
-  ["asking_for_help", "Needs you", "Blocked or awaiting approval"],
-];
 
 export const metadata = { title: "AI Team" };
 
@@ -31,52 +19,19 @@ export default async function TeamPage() {
   const waiting = team.filter((a) => a.activity === "asking_for_help").length;
   const run = (await db.list("workflow_runs", { where: { status: ["running", "awaiting_approval", "blocked", "paused"] }, orderBy: { column: "updated_at", ascending: false }, limit: 1 }))[0];
   const steps = run ? await db.list("workflow_steps", { where: { run_id: run.id } }) : [];
-  const clips = await avatarClips();
-  const filming = await avatarProgress();
+  // Team (view-only) logins just watch; the owner also gets the office and animation controls.
+  const role = readAccess((await cookies()).get(ACCESS_COOKIE)?.value);
+  const canEdit = !env.studioLocked || role === "owner";
   return (
-    <div className="space-y-8">
-      <header className="flex flex-wrap items-center gap-4">
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-center gap-3">
         <h1 className="font-serif text-5xl text-white">AI Team</h1>
-        <span className="rounded-full border border-white/15 px-3 py-1 text-sm text-mist">{working} agent{working === 1 ? "" : "s"} working</span>
-        {waiting > 0 && <Link href="/studio/approvals" className="rounded-full border border-amber-300/40 px-3 py-1 text-sm text-amber-200">{waiting} need{waiting === 1 ? "s" : ""} you</Link>}
+        <span className="rounded-full border border-white/15 px-3 py-1 text-sm text-mist">{working} working</span>
+        {waiting > 0 && <span className="rounded-full border border-amber-300/40 px-3 py-1 text-sm text-amber-200">✉️ {waiting} email{waiting === 1 ? "" : "s"} for you</span>}
         <Link href="/studio/pipeline" className="ml-auto rounded-xl border border-lavender/40 px-4 py-2 font-serif text-white hover:bg-lavender/10">View workflow →</Link>
       </header>
-      <p className="max-w-3xl text-sm text-mist">
-        Every pose reflects a real workflow step: resting when idle, reading while reviewing, typing while generating, a thought bubble while planning, a letter when handing work on, a little celebration when a task finishes, and a raised hand when they need you. Click anyone to see their current task, reasoning, outputs and history.
-      </p>
-      <section className="rounded-3xl border border-lavender/30 bg-lavender/[0.05] p-5">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <h2 className="font-serif text-2xl text-white">Real-person agents</h2>
-            <p className="text-sm text-mist">
-              Films every agent as a photoreal person in four poses (resting, working, thinking, needs you) – each in their own bedroom, or all together in one cosy little office. About $0.90 per agent (~$14 for everyone); takes roughly 30–60 minutes. Refresh to see progress; anyone not finished keeps their drawing.
-            </p>
-            <p className="mt-1 text-sm text-lavender">
-              {filming.ready}/{filming.total} filmed{filming.generating ? ` · ${filming.generating} in progress` : ""}
-              {filming.failed.length ? <span className="text-rose-300"> · {filming.failed.length} failed: {filming.failed[0]!.error.slice(0, 140)}</span> : null}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <AdminAction endpoint="/api/studio/avatars" body={{ all: true, scene: "office" }} label="Film everyone – little office" pendingLabel="Starting…" confirmText="Film every agent in the shared office? About $14 of fal credits." className="btn-primary btn-sm" />
-            <AdminAction endpoint="/api/studio/avatars" body={{ all: true, scene: "bedroom" }} label="Film everyone – bedrooms" pendingLabel="Starting…" confirmText="Film every agent in their bedroom? About $14 of fal credits." className="btn-ghost btn-sm" />
-          </div>
-        </div>
-      </section>
-      <TeamRoom initial={team} clips={clips} />
-      <section aria-labelledby="legend-h">
-        <h2 id="legend-h" className="label">What the poses mean</h2>
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
-          {LEGEND.map(([a, label, hint]) => (
-            <li key={a} className="overflow-hidden rounded-2xl border border-white/10 bg-[#0c1226]">
-              <AgentAvatar agent={AGENT_BY_KEY.lead_writer} activity={a} clips={clips.lead_writer} className="block w-full" />
-              <div className="px-2.5 py-2 text-center">
-                <div className="font-serif text-[15px] text-white">{label}</div>
-                <div className="text-[11px] text-mist">{hint}</div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <p className="max-w-3xl text-sm text-mist">The studio, live. Everyone sits at their own desk and works on real steps of the pipeline. Click anyone to see what they&apos;re doing.</p>
+      <TeamRoom initial={team} canEdit={canEdit} />
       {run && (
         <section className="rounded-3xl border border-white/10 bg-white/[0.02] p-5">
           <div className="mb-4 flex items-baseline justify-between">

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { AGENTS } from "@/lib/studio/agents";
 import type { AgentState } from "@/lib/studio/team";
 import { AgentAvatar, type AvatarClips } from "./AgentAvatar";
-import { StudioOffice } from "./StudioOffice";
 import { SimsOffice } from "./SimsOffice";
 import { StudioInbox } from "./StudioInbox";
 import { AgentDrawer } from "./AgentDrawer";
@@ -21,10 +20,11 @@ const ACTIVITY_LABEL: Record<string, string> = {
 };
 
 /** Live AI Team room. Polls real workflow state; every pose reflects a real step. */
-export function TeamRoom({ initial, compact, clips }: { initial: AgentState[]; compact?: boolean; clips?: Record<string, AvatarClips> }) {
+export function TeamRoom({ initial, compact, clips, canEdit = true }: { initial: AgentState[]; compact?: boolean; clips?: Record<string, AvatarClips>; canEdit?: boolean }) {
   const [agents, setAgents] = useState(initial);
   const [open, setOpen] = useState<string | null>(null);
-  const [view, setView] = useState<"studio" | "office" | "rooms">(compact ? "rooms" : "studio");
+  // The full page shows only the 3D studio; the compact card (overview page) keeps the rooms grid.
+  const view = compact ? "rooms" : "studio";
   useEffect(() => {
     let alive = true;
     const poll = async () => {
@@ -42,35 +42,16 @@ export function TeamRoom({ initial, compact, clips }: { initial: AgentState[]; c
     };
   }, []);
   const shown = compact ? AGENTS.filter((a) => !a.human).slice(0, 8) : AGENTS;
-  const toggle = !compact && (
-    <div className="mb-3 inline-flex rounded-full border border-white/15 p-0.5 text-sm" role="tablist" aria-label="Team view">
-      {(["studio", "office", "rooms"] as const).map((v) => (
-        <button key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)} className={cx("rounded-full px-3 py-1", view === v ? "bg-lavender/20 text-white" : "text-mist hover:text-white")}>
-          {v === "studio" ? "Studio" : v === "office" ? "Floor plan" : "Rooms"}
-        </button>
-      ))}
-    </div>
-  );
   if (view === "studio")
     return (
       <>
-        {toggle}
         <StudioInbox agents={agents} onOpen={(k) => setOpen(k)} />
-        <SimsOffice agents={agents} onOpen={(k) => setOpen(k)} />
-        {open && <AgentDrawer agentKey={open} onClose={() => setOpen(null)} />}
-      </>
-    );
-  if (view === "office")
-    return (
-      <>
-        {toggle}
-        <StudioOffice agents={agents} onOpen={(k) => setOpen(k)} />
+        <SimsOffice agents={agents} onOpen={(k) => setOpen(k)} canEdit={canEdit} />
         {open && <AgentDrawer agentKey={open} onClose={() => setOpen(null)} />}
       </>
     );
   return (
     <>
-      {toggle}
       <ul className={cx("grid gap-4", compact ? "sm:grid-cols-2 xl:grid-cols-4" : "sm:grid-cols-2 xl:grid-cols-4")}>
         {shown.map((def) => {
           const st = agents.find((a) => a.key === def.key);
