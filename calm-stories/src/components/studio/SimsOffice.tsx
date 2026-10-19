@@ -137,15 +137,24 @@ function Person({ def, pose, activity }: { def: AgentDefinition; pose: "seated" 
           <rect x="1" y="-14" width="6" height="15" rx="3" fill="#2b2f55" className="sims-leg-b" />
         </>
       )}
-      {/* body */}
-      <rect x="-10" y={sit || nap ? -30 : -34} width="20" height="22" rx="8" fill={b.blanket} />
-      <rect x="-10" y={sit || nap ? -30 : -34} width="20" height="6" rx="3" fill={b.accent} opacity="0.35" />
-      {/* arms */}
-      <rect x="-14" y={help ? -52 : sit || nap ? -27 : -31} width="5" height={help ? 22 : 14} rx="2.5" fill={b.skin} className={busy ? "sims-type" : ""} />
-      <rect x="9" y={sit || nap ? -27 : -31} width="5" height="14" rx="2.5" fill={b.skin} className={busy ? "sims-type sims-type-2" : ""} />
+      {/* arms (skin), then short tee sleeves on top */}
+      <rect x="-14.5" y={help ? -52 : sit || nap ? -27 : -31} width="5" height={help ? 22 : 14} rx="2.5" fill={b.skin} className={busy ? "sims-type" : ""} />
+      <rect x="9.5" y={sit || nap ? -27 : -31} width="5" height="14" rx="2.5" fill={b.skin} className={busy ? "sims-type sims-type-2" : ""} />
+      {/* Calm tee: the app icon's sky-blue → violet gradient, white "Calm" script */}
+      <g transform={`translate(0 ${sit || nap ? -30 : -34})`}>
+        <path d="M-10 3 q0 -3 3 -3 h14 q3 0 3 3 v16 q0 3 -3 3 h-14 q-3 0 -3 -3z" fill="url(#calmTee)" stroke="#1d2a6b" strokeOpacity="0.35" strokeWidth="0.8" />
+        <path d={help ? "M-10 2 l-5 -3 l-1.5 5 l5 2z" : "M-10 2 l-5 3 l1.5 5 l4 -2z"} fill="url(#calmTee)" />
+        <path d="M10 2 l5 3 l-1.5 5 l-4 -2z" fill="url(#calmTee)" />
+        <path d="M-4 0 q4 3 8 0" stroke="#ffffff" strokeOpacity="0.55" strokeWidth="1" fill="none" />
+        <text x="0" y="13" textAnchor="middle" className="sims-tee">Calm</text>
+        <path d="M-10 15 h20 v4 q0 3 -3 3 h-14 q-3 0 -3 -3z" fill="#1d2a6b" opacity="0.18" />
+      </g>
       {/* head */}
       <g transform={`translate(0 ${sit || nap ? -40 : -44}) ${nap ? "rotate(-12)" : ""}`}>
         <circle r="10" fill={b.skin} />
+        <circle cx="-5.5" cy="4.5" r="2" fill="#ff9aa8" opacity="0.35" />
+        <circle cx="5.5" cy="4.5" r="2" fill="#ff9aa8" opacity="0.35" />
+        <circle cx="-3" cy="-4" r="4" fill="#ffffff" opacity="0.08" />
         <path d="M-10 -1 a10 10 0 0 1 20 0 q-5 -4 -10 -3 q-5 -1 -10 3z" fill={b.hair} />
         {nap || activity === "sleeping" ? (
           <path d="M-5 2 h3 M2 2 h3" stroke="#1e1a2e" strokeWidth="1.3" strokeLinecap="round" />
@@ -228,7 +237,7 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
   items.push({ depth: 0.6 + 14.2, key: "fire", node: <g><Box gx={0.05} gy={14.4} w={0.6} d={2.2} h={1.3} top="#6d5642" left="#3a2a22" right="#4a372c" /><polygon points={pts([iso(0.66, 14.8, 0.2), iso(0.66, 16.2, 0.2), iso(0.66, 16.2, 0.85), iso(0.66, 14.8, 0.85)])} fill="#ff9a5c" className="sims-fire" /><circle cx={iso(1.4, 15.5)[0]} cy={iso(1.4, 15.5)[1]} r="46" fill="url(#simsLamp)" className="sims-glow" /></g> });
   items.push({ depth: 0.5 + 12.4, key: "shelf", node: <Box gx={0.05} gy={12.3} w={0.45} d={1.6} h={1.8} top="#6d5642" left="#4a372c" right="#5a4636" /> });
   // Plants
-  for (const [i, [x, y]] of ([[5.3, 0.4], [15.5, 0.4], [23.3, 0.5], [0.4, 6.4], [15.5, 7.4], [23.3, 11.4], [0.5, 17.3], [12.6, 15.2]] as [number, number][]).entries())
+  for (const [i, [x, y]] of ([[0.5, 0.5], [15.5, 0.4], [23.3, 0.5], [0.4, 6.4], [15.5, 7.4], [23.3, 11.4], [0.5, 17.3], [12.6, 15.2]] as [number, number][]).entries())
     items.push({ depth: x + y + 0.5, key: `plant-${i}`, node: <g><Box gx={x} gy={y} w={0.4} d={0.4} h={0.35} top="#8a5a3f" left="#5a3a2a" right="#6d4a33" />{(() => { const [px, py] = iso(x + 0.2, y + 0.2, 0.7); return <g><circle cx={px} cy={py} r="11" fill="#2f6b5a" /><circle cx={px - 6} cy={py - 5} r="7" fill="#3f8a72" /><circle cx={px + 6} cy={py - 6} r="6" fill="#4fa386" /></g>; })()}</g> });
 
   // People
@@ -270,6 +279,7 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
         <defs>
           <radialGradient id="simsLamp"><stop offset="0" stopColor="#ffd9a0" stopOpacity="0.55" /><stop offset="1" stopColor="#ffd9a0" stopOpacity="0" /></radialGradient>
           <linearGradient id="simsSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#24306e" /><stop offset="1" stopColor="#0d1638" /></linearGradient>
+          <linearGradient id="calmTee" x1="0" y1="0" x2="0.35" y2="1"><stop offset="0" stopColor="#5fb4ea" /><stop offset="1" stopColor="#6a55e0" /></linearGradient>
         </defs>
         {/* walls */}
         <polygon points={pts(backLeft)} fill="#22285a" />
