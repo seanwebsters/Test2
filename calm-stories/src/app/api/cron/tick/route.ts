@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/lib/env";
 import { log } from "@/lib/log";
 import { releaseDueEpisodes } from "@/lib/services/releases";
+import { removeDemoCatalogue } from "@/lib/services/demo-catalogue";
 import { runAutopilot, runScheduledProduction, runUntil } from "@/lib/studio";
 
 export const maxDuration = 800;
@@ -20,6 +21,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const deadline = Date.now() + WORK_MS;
+  await removeDemoCatalogue();
   await runAutopilot();
   const scheduled = await runScheduledProduction();
   const started = await runUntil(deadline);

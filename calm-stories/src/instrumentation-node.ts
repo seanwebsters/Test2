@@ -7,6 +7,8 @@ if (process.env.DISABLE_HEARTBEAT !== "1" && !g.__calmHeartbeat) {
     try {
       const { releaseDueEpisodes } = await import("@/lib/services/releases");
       const { runAutopilot, runScheduledProduction, tick } = await import("@/lib/studio");
+      const { removeDemoCatalogue } = await import("@/lib/services/demo-catalogue");
+      await removeDemoCatalogue();
       await runAutopilot();
       await runScheduledProduction();
       await tick();

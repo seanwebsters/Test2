@@ -226,3 +226,19 @@ describe("provider blocks clear themselves", () => {
     expect((await db.get("workflow_runs", run.id))!.status).toBe("succeeded");
   });
 });
+
+describe("sample catalogue", () => {
+  it("removes the seeded sample series but keeps studio-produced ones and accounts", async () => {
+    const db = freshDb();
+    const { removeDemoCatalogue } = await import("@/lib/services/demo-catalogue");
+    const before = await db.list("series");
+    expect(before.length).toBeGreaterThan(5);
+    const studio = await db.insert("series", { ...before[0]!, id: "ser_studio-original", slug: "studio-original", title: "A Studio Original" });
+    await db.insert("episodes", { ...(await db.list("episodes"))[0]!, id: "ep_studio_1", series_id: studio.id });
+    expect(await removeDemoCatalogue()).toBeGreaterThan(0);
+    expect((await db.list("series")).map((s) => s.id)).toEqual(["ser_studio-original"]);
+    expect((await db.list("episodes")).map((e) => e.id)).toEqual(["ep_studio_1"]);
+    expect(await db.count("user_roles")).toBeGreaterThan(0); // sign-ins and roles untouched
+    expect(await db.count("listening_events")).toBe(0);
+  });
+});
