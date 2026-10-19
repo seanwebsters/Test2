@@ -23,7 +23,7 @@ export function StudioInbox({ agents, onOpen }: { agents: AgentState[]; onOpen: 
       return {
         id: `${a.key}-${a.task?.step_key ?? ""}`,
         key: a.key,
-        from: def.human ? "Approvals desk" : def.name,
+        from: def.human ? "Approvals desk" : `${def.person} · ${def.name}`,
         address: def.human ? "approvals@studio.calm" : `${a.key.replace(/_/g, ".")}@studio.calm`,
         subject: blocked ? `Stuck: ${a.task?.label ?? "a step"}` : `Your decision: ${a.task?.label ?? "approval needed"}`,
         body: blocked

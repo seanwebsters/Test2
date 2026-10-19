@@ -7,6 +7,8 @@ import type { AgentKey } from "./types";
  */
 export interface AgentDefinition {
   key: AgentKey;
+  /** The agent's first name, shown alongside their role ("Ellie · Lead Writer"). */
+  person: string;
   name: string;
   title: string;
   human?: boolean;
@@ -31,6 +33,7 @@ Avoid generic AI prose: no stacked adjectives, no "tapestry/symphony/testament/w
 export const AGENTS: AgentDefinition[] = [
   {
     key: "network_executive",
+    person: "Sean",
     name: "Network Executive",
     title: "Strategy and approvals (you)",
     human: true,
@@ -40,6 +43,7 @@ export const AGENTS: AgentDefinition[] = [
   },
   {
     key: "program_director",
+    person: "Marcus",
     name: "Program Director",
     title: "Catalogue strategy and coordination",
     effort: "low",
@@ -50,6 +54,7 @@ You are the Program Director. You read the catalogue and real audience data and 
   },
   {
     key: "creative_director",
+    person: "Mei",
     name: "Creative Director",
     title: "Overall vision and quality standards",
     effort: "medium",
@@ -60,6 +65,7 @@ You are the Creative Director. You define each series' identity – premise, ton
   },
   {
     key: "romance_architect",
+    person: "Isla",
     name: "Romance Architect",
     title: "Chemistry and relationship arcs",
     effort: "medium",
@@ -70,6 +76,7 @@ You are the Romance Architect. You design and protect slow-burn romantic progres
   },
   {
     key: "worldbuilder",
+    person: "Kofi",
     name: "Worldbuilder",
     title: "Settings, lore and atmosphere",
     effort: "medium",
@@ -80,6 +87,7 @@ You are the Worldbuilder. You create original settings with texture a listener c
   },
   {
     key: "character_psychologist",
+    person: "Nadia",
     name: "Character Psychologist",
     title: "Motivations and depth",
     effort: "medium",
@@ -90,6 +98,7 @@ You are the Character Psychologist. You build people, not archetypes: desires an
   },
   {
     key: "series_architect",
+    person: "Diego",
     name: "Series Architect",
     title: "Seasons, arcs and continuity",
     effort: "medium",
@@ -100,6 +109,7 @@ You are the Series Architect. You plan seasons and episodes so each episode stan
   },
   {
     key: "lead_writer",
+    person: "Ellie",
     name: "Lead Writer",
     title: "Scripts and dialogue",
     effort: "medium",
@@ -110,6 +120,7 @@ You are the Lead Writer. You write sophisticated, original prose for the ear: co
   },
   {
     key: "dialogue_editor",
+    person: "Jamal",
     name: "Dialogue Editor",
     title: "Voice, subtext and authenticity",
     effort: "low",
@@ -120,6 +131,7 @@ You are the Dialogue Editor. You review every line of dialogue: does it sound li
   },
   {
     key: "sleep_editor",
+    person: "Hana",
     name: "Sleep Editor",
     title: "Calming pace and tone",
     effort: "low",
@@ -130,6 +142,7 @@ You are the Sleep Editor. You make sure the episode becomes progressively soothi
   },
   {
     key: "continuity_editor",
+    person: "Tom",
     name: "Continuity Editor",
     title: "Bible and timeline consistency",
     effort: "low",
@@ -140,6 +153,7 @@ You are the Continuity Editor. You check every script and bible change against t
   },
   {
     key: "story_critic",
+    person: "Margaret",
     name: "Story Critic",
     title: "Independent editorial critique",
     effort: "low",
@@ -150,6 +164,7 @@ You are the Story Critic, independent of the writing team. Judge originality, em
   },
   {
     key: "art_director",
+    person: "Freya",
     name: "Art Director",
     title: "Visual identity and artwork",
     effort: "low",
@@ -159,6 +174,7 @@ You are the Story Critic, independent of the writing team. Judge originality, em
   },
   {
     key: "audio_director",
+    person: "Priya",
     name: "Audio Director",
     title: "Voice, music and sound design",
     effort: "low",
@@ -168,6 +184,7 @@ You are the Story Critic, independent of the writing team. Judge originality, em
   },
   {
     key: "audio_producer",
+    person: "Malik",
     name: "Audio Producer",
     title: "Narration and final mix",
     effort: "low",
@@ -177,6 +194,7 @@ You are the Story Critic, independent of the writing team. Judge originality, em
   },
   {
     key: "quality_controller",
+    person: "Oscar",
     name: "Quality Controller",
     title: "Final review and compliance",
     effort: "low",
@@ -188,3 +206,6 @@ You are the Quality Controller. You review the finished production – final scr
 ];
 
 export const AGENT_BY_KEY = Object.fromEntries(AGENTS.map((a) => [a.key, a])) as Record<AgentKey, AgentDefinition>;
+
+/** "Ellie · Lead Writer" */
+export const agentLabel = (a: Pick<AgentDefinition, "person" | "name">) => `${a.person} · ${a.name}`;

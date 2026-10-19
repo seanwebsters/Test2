@@ -44,7 +44,7 @@ export function AgentDrawer({ agentKey, onClose }: { agentKey: string; onClose: 
         <div className="flex items-start justify-between">
           <div>
             <p className="text-[11px] uppercase tracking-[0.3em] text-lavender">AI Team</p>
-            <h2 className="font-serif text-3xl text-white">{def.name}</h2>
+            <h2 className="font-serif text-3xl text-white">{def.person} <span className="text-white/60">· {def.name}</span></h2>
             <p className="text-sm text-mist">{def.title}</p>
           </div>
           <button onClick={onClose} className="rounded-full px-3 py-1 text-mist hover:bg-white/5" aria-label="Close">✕</button>
@@ -70,7 +70,7 @@ export function AgentDrawer({ agentKey, onClose }: { agentKey: string; onClose: 
             {d.state?.next.length ? (
               <section>
                 <h3 className="label">Next handoff</h3>
-                <ul className="space-y-1">{d.state.next.map((n, i) => <li key={i} className="text-white/90">→ {AGENT_BY_KEY[n.agent].name}: {n.label}</li>)}</ul>
+                <ul className="space-y-1">{d.state.next.map((n, i) => <li key={i} className="text-white/90">→ {AGENT_BY_KEY[n.agent].person} ({AGENT_BY_KEY[n.agent].name}): {n.label}</li>)}</ul>
               </section>
             ) : null}
             <section>
@@ -97,7 +97,7 @@ export function AgentDrawer({ agentKey, onClose }: { agentKey: string; onClose: 
                 <ul className="space-y-2">
                   {d.feedback.map((f) => (
                     <li key={f.id} className="rounded-xl bg-white/[0.04] p-2.5">
-                      <div className="text-xs text-lavender">{AGENT_BY_KEY[f.agent].name} · {f.title}</div>
+                      <div className="text-xs text-lavender">{AGENT_BY_KEY[f.agent].person} ({AGENT_BY_KEY[f.agent].name}) · {f.title}</div>
                       <p className="mt-0.5 line-clamp-3 text-white/85">{f.summary}</p>
                     </li>
                   ))}

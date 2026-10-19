@@ -485,7 +485,7 @@ export function SimsOffice({ agents, onOpen, canEdit = true, review = [], legend
           onClick={() => onOpen(p.def.key)}
           role="button"
           tabIndex={0}
-          aria-label={`${p.def.name}: ${LABEL[p.activity]}${p.s?.task ? ` – ${p.s.task.label}` : ""}`}
+          aria-label={`${p.def.person}, ${p.def.name}: ${LABEL[p.activity]}${p.s?.task ? ` – ${p.s.task.label}` : ""}`}
           onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onOpen(p.def.key)}
         >
           {p.activity === "asking_for_help" && <ellipse cx="0" cy="2" rx="22" ry="9" fill="none" stroke="#ffc96b" strokeWidth="2" className="sims-pulse" />}
@@ -675,7 +675,7 @@ export function SimsOffice({ agents, onOpen, canEdit = true, review = [], legend
         {/* name tags on top */}
         {people.map((p) => {
           const [x, y] = iso(p.spot[0], p.spot[1]);
-          return <text key={`n-${p.def.key}`} x={x} y={y - 68} textAnchor="middle" className="sims-name" pointerEvents="none" style={{ transition: "x 2.4s, y 2.4s" }}>{p.def.name}</text>;
+          return <text key={`n-${p.def.key}`} x={x} y={y - 68} textAnchor="middle" className="sims-name" pointerEvents="none" style={{ transition: "x 2.4s, y 2.4s" }}>{p.def.person} · {p.def.name}</text>;
         })}
         {/* thought bubbles on top */}
         {people.map((p) => {
@@ -699,7 +699,7 @@ export function SimsOffice({ agents, onOpen, canEdit = true, review = [], legend
           <li key={def.key}>
             <button onClick={() => onOpen(def.key)} className="flex items-center gap-1.5 hover:text-white">
               <span className="h-2 w-2 rounded-full" style={{ background: GEM[activity === "asking_for_help" ? "help" : activity !== "sleeping" ? "work" : "rest"][1] }} />
-              <span className="text-white/90">{def.name}</span>
+              <span className="text-white/90">{def.person} · {def.name}</span>
               <span className={activity === "asking_for_help" ? "text-amber-200" : activity !== "sleeping" ? "text-lavender" : "text-mist"}>· {def.human ? (activity === "asking_for_help" ? "Needs you" : "All clear") : LABEL[activity]}</span>
             </button>
           </li>

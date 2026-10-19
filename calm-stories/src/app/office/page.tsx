@@ -74,7 +74,7 @@ export default async function OfficePage() {
         id: `${a.key}-${a.task?.step_key}`,
         kind: "question" as const,
         title: a.task?.label ?? "A question",
-        sub: `${AGENT_BY_KEY[a.key].name} needs your input${a.needs ? `: ${a.needs}` : "."}`,
+        sub: `${AGENT_BY_KEY[a.key].person} (${AGENT_BY_KEY[a.key].name}) needs your input${a.needs ? `: ${a.needs}` : "."}`,
         cover: null,
         seconds: 0,
         since: a.task?.since ?? "",
@@ -87,7 +87,7 @@ export default async function OfficePage() {
   const activity: ActivityRow[] = events
     .filter((e) => e.agent && e.kind !== "log")
     .slice(0, 6)
-    .map((e) => ({ id: e.id, text: `${AGENT_BY_KEY[e.agent!]?.name ?? e.agent} ${verb[e.kind] ?? ""} ${e.message.replace(/^[A-Z][a-z]+ /, (m) => m.toLowerCase())}`.replace(/\s+/g, " ").slice(0, 70), since: e.created_at, tone: e.kind === "completed" ? "done" : e.kind === "blocked" ? "warn" : "info" }));
+    .map((e) => ({ id: e.id, text: `${AGENT_BY_KEY[e.agent!] ? `${AGENT_BY_KEY[e.agent!]!.person} (${AGENT_BY_KEY[e.agent!]!.name})` : e.agent} ${verb[e.kind] ?? ""} ${e.message.replace(/^[A-Z][a-z]+ /, (m) => m.toLowerCase())}`.replace(/\s+/g, " ").slice(0, 70), since: e.created_at, tone: e.kind === "completed" ? "done" : e.kind === "blocked" ? "warn" : "info" }));
 
   return <StudioHome initial={team} review={review} inbox={inbox} activity={activity} latest={latest} isOwner={role === "owner"} />;
 }

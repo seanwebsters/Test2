@@ -85,7 +85,7 @@ export default async function PipelinePage({ searchParams }: { searchParams: Pro
                           <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px]" style={{ background: a.bedroom.blanket, color: a.bedroom.accent }}>{a.name.charAt(0)}</span>
                           <span className="truncate text-[13px] text-white">{s.label}</span>
                         </div>
-                        <div className="mt-1 text-mist">{a.name} · {s.status.replace("_", " ")}{s.attempts > 1 ? ` · ${s.attempts} tries` : ""}{s.cost_cents ? ` · ${formatCents(s.cost_cents)}` : ""}</div>
+                        <div className="mt-1 text-mist">{a.person} ({a.name}) · {s.status.replace("_", " ")}{s.attempts > 1 ? ` · ${s.attempts} tries` : ""}{s.cost_cents ? ` · ${formatCents(s.cost_cents)}` : ""}</div>
                         {s.summary && <p className="mt-1 line-clamp-3 text-white/80">{s.summary}</p>}
                         {s.error && <p className={cx("mt-1 line-clamp-3", s.status === "blocked" || s.status === "waiting" ? "text-amber-200" : "text-rose-300")}>{s.error}</p>}
                         {s.deliverable_ids.length > 0 && <p className="mt-1 text-lavender">{s.deliverable_ids.length} deliverable(s)</p>}
