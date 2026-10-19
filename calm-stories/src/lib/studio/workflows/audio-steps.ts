@@ -139,7 +139,7 @@ registerHandler("audio.casting", async (ctx) => {
   try {
     voices = await listVoices(key);
   } catch (err) {
-    if (err instanceof ElevenLabsError && (err.status === 401 || err.status === 403)) throw new BlockedError("ELEVENLABS_API_KEY", "ElevenLabs rejected the API key.");
+    if (err instanceof ElevenLabsError && (err.status === 401 || err.status === 403)) throw new BlockedError("ELEVENLABS_API_KEY", `ElevenLabs refused to list voices (${err.status}) – the key needs the Voices (read) permission. ${err.message.slice(0, 200)}`);
     throw err;
   }
   if (!voices.length) throw new BlockedError("elevenlabs:voices", "Your ElevenLabs account has no voices. Add licensed voices to your ElevenLabs library, then resume.");
@@ -216,7 +216,13 @@ registerHandler("audio.pronunciation", async (ctx) => {
   const series = await db.get("series", sid);
   let dict: { id: string; versionId: string } | null = null;
   if (res.data.entries.length) {
-    dict = await eleven(ctx, "dictionary", 0, (k) => createPronunciationDictionary(k, `${series?.title ?? sid} – names`.slice(0, 90), res.data.entries), {});
+    try {
+      dict = await eleven(ctx, "dictionary", 0, (k) => createPronunciationDictionary(k, `${series?.title ?? sid} – names`.slice(0, 90), res.data.entries), {});
+    } catch (err) {
+      // Nice to have, not essential: carry on without it if the key lacks the permission.
+      if (!(err instanceof BlockedError)) throw err;
+      ctx.log(`Skipped the ElevenLabs pronunciation dictionary: ${err.message.slice(0, 240)}`, "warn");
+    }
   }
   await ctx.deliver({ kind: "pronunciation_dictionary", key: "pronunciation_dictionary", title: "Pronunciation dictionary", data: { entries: res.data.entries, dictionary: dict }, reasoning: `${res.data.entries.length} entries`, model: res.model });
   return { summary: `${res.data.entries.length} pronunciation entries${dict ? " uploaded to ElevenLabs" : ""}.` };

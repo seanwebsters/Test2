@@ -178,7 +178,8 @@ export async function callClaude<T = string>(call: ClaudeCall<T>): Promise<Claud
     schemaName: call.schema ? (call.schema.description ?? "structured") : null,
     jsonSchema,
     webSearch: Boolean(call.webSearch),
-    maxTokens: call.maxTokens ?? (call.schema ? 32000 : 64000),
+    // Generous ceilings: thinking counts towards them, and only tokens actually used are billed.
+    maxTokens: call.maxTokens ?? 64000,
   });
   let data: T;
   if (call.schema) {
