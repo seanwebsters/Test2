@@ -54,3 +54,12 @@ Steps are idempotent and their state lives in the database, so several workers c
 ## Local single-server mode
 
 `SESSION_SECRET=… npm run build && npm start` works on a single VM with the local store and the in-process heartbeat (`src/instrumentation-node.ts`, every 30 s) for studio workflows and releases. Data lives in `DATA_DIR` (default `.data`).
+
+## Sharing the studio safely
+
+Set these in Railway → Test2 → Variables:
+
+* `STUDIO_OWNER_PASSWORD`: full control (you). Setting it locks the studio and closes the open "dev" link and the demo admin sign-in.
+* `STUDIO_TEAM_PASSWORD`: view-only. Teammates can see everything (agents, pipeline, scripts, art, audio, releases) but every change is refused. They can still use "Ask the studio".
+
+People enter the password at `/studio-login`. Changing a password signs out everyone who used the old one. The cron endpoint then needs `CRON_SECRET`. The public site and `/api/approved-stories` stay open.

@@ -46,7 +46,18 @@ export const env = {
   authProvider: (opt("AUTH_PROVIDER") ?? "demo") as "demo" | "supabase",
   /** Temporary: the footer "dev" link opens the studio without a login. Set DEV_ACCESS=off to disable. */
   get devAccess(): boolean {
-    return opt("DEV_ACCESS") !== "off" && (opt("AUTH_PROVIDER") ?? "demo") === "demo";
+    // The open "dev" link switches off automatically once the studio is password-protected.
+    return opt("DEV_ACCESS") !== "off" && (opt("AUTH_PROVIDER") ?? "demo") === "demo" && !opt("STUDIO_OWNER_PASSWORD");
+  },
+  /** Owner (full control) and team (view-only) passwords for the studio. Setting the owner password locks the studio. */
+  get studioOwnerPassword(): string | undefined {
+    return opt("STUDIO_OWNER_PASSWORD");
+  },
+  get studioTeamPassword(): string | undefined {
+    return opt("STUDIO_TEAM_PASSWORD");
+  },
+  get studioLocked(): boolean {
+    return Boolean(opt("STUDIO_OWNER_PASSWORD"));
   },
 
   supabaseUrl: opt("SUPABASE_URL") ?? opt("NEXT_PUBLIC_SUPABASE_URL"),

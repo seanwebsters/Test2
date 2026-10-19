@@ -4,6 +4,7 @@ import { env } from "@/lib/env";
 import { getDb } from "@/lib/db";
 import type { Plan } from "@/lib/types";
 import { verifyToken } from "./session-token";
+import { ACCESS_COOKIE, readAccess } from "./studio-access";
 
 export const SESSION_COOKIE = "cs_session";
 /** Set by /dev: temporary open access to the studio as Calm Editorial (demo deployments only). */
@@ -25,6 +26,13 @@ export class DemoAuthProvider implements AuthProvider {
   readonly name = "demo";
   async resolveUserId(cookies: { get(name: string): { value: string } | undefined }) {
     const payload = verifyToken<{ uid: string }>(cookies.get(SESSION_COOKIE)?.value, env.sessionSecret);
+    if (env.studioLocked) {
+      // Password-protected studio: staff access only via the studio password (owner or team).
+      if (readAccess(cookies.get(ACCESS_COOKIE)?.value)) return DEV_USER_ID;
+      if (!payload?.uid) return null;
+      const staff = await getDb().list("user_roles", { where: { user_id: payload.uid } });
+      return staff.length ? null : payload.uid; // listener personas still work; staff personas don't
+    }
     if (payload?.uid) return payload.uid;
     // Temporary open dev access (footer "dev" link). Turn off with DEV_ACCESS=off.
     if (env.devAccess && cookies.get(DEV_COOKIE)?.value === "1") return DEV_USER_ID;

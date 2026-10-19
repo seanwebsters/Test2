@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "./SiteHeader";
+import { env } from "@/lib/env";
 
 export function SiteFooter() {
   return (
@@ -33,7 +34,7 @@ export function SiteFooter() {
       </div>
       <div className="border-t border-white/5 py-4 text-center text-xs text-mist/60">
         Prototype · Calm Stories ·{" "}
-        <a href="/dev" className="text-mist/40 hover:text-white">dev</a>
+        {env.studioLocked ? <a href="/studio-login" className="text-mist/40 hover:text-white">studio</a> : <a href="/dev" className="text-mist/40 hover:text-white">dev</a>}
       </div>
     </footer>
   );

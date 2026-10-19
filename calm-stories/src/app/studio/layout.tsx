@@ -6,6 +6,9 @@ import { SceneArt } from "@/components/art/SceneArt";
 import { StudioNav } from "@/components/studio/StudioNav";
 import { AGENT_BY_KEY } from "@/lib/studio/agents";
 import { env } from "@/lib/env";
+import { cookies } from "next/headers";
+import { ACCESS_COOKIE, readAccess } from "@/lib/auth/studio-access";
+import { SignOutStudio } from "@/components/studio/SignOutStudio";
 import { diskUsage } from "@/lib/services/disk";
 import { diagnose } from "@/lib/studio/quickfix";
 import { AdminAction } from "@/components/admin/AdminAction";
@@ -20,11 +23,18 @@ export default async function StudioLayout({ children }: { children: React.React
       <div className="mx-auto max-w-xl px-6 pt-40 text-center">
         <h1 className="headline text-5xl">Sleep Stories Studio</h1>
         <p className="mt-4 text-mist">The production house is for Calm&rsquo;s creative team.</p>
-        <Link href="/sign-in?next=/studio" className="btn-primary mt-6">Sign in</Link>
-        <p className="mt-6 text-xs"><a href="/dev" className="text-mist/50 hover:text-white">dev</a></p>
+        {env.studioLocked ? (
+          <Link href="/studio-login" className="btn-primary mt-6">Enter studio password</Link>
+        ) : (
+          <>
+            <Link href="/sign-in?next=/studio" className="btn-primary mt-6">Sign in</Link>
+            <p className="mt-6 text-xs"><a href="/dev" className="text-mist/50 hover:text-white">dev</a></p>
+          </>
+        )}
       </div>
     );
   }
+  const jar = await cookies();
   const db = getDb();
   const [projects, reviews, blockedRuns, runs] = await Promise.all([
     db.list("series_projects", { where: { status: "awaiting_greenlight" } }),
@@ -89,6 +99,17 @@ export default async function StudioLayout({ children }: { children: React.React
           <Link href="/studio/approvals" className="ml-auto text-sm text-lavender">Approvals</Link>
           <Link href="/studio/team" className="text-sm text-mist">Team</Link>
         </div>
+        {(() => {
+          const role = readAccess(jar.get(ACCESS_COOKIE)?.value);
+          if (!env.studioLocked || !role) return null;
+          return (
+            <div className="mx-4 mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-white/15 bg-white/[0.04] px-4 py-2 text-sm sm:mx-8 lg:mx-10">
+              <span className="text-white">{role === "team" ? "View-only access" : "Owner access"}</span>
+              <span className="text-mist">{role === "team" ? "You can see everything; buttons that change things are switched off for you." : "Full control."}</span>
+              <SignOutStudio />
+            </div>
+          );
+        })()}
         {(() => {
           const d = diskUsage();
           if (!d || (d.freeBytes > 300e6 && d.freeBytes / d.totalBytes > 0.08)) return null;
