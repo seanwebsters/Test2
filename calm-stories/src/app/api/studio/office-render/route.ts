@@ -2,13 +2,14 @@ import { z } from "zod";
 import { parseBody, route } from "@/lib/api";
 import { requireEditor } from "@/lib/auth/session";
 import { badRequest, notFound } from "@/lib/errors";
-import { clearOfficeRender, makeOfficeRender, officeRender } from "@/lib/studio/office-render";
+import { clearOfficeRender, makeOfficeRender, officePeople, officeRender, officeRenderInfo } from "@/lib/studio/office-render";
 
 export const maxDuration = 300;
 
 /** The photoreal office backdrop (staff only). */
-export const GET = route(async () => {
+export const GET = route(async (req) => {
   await requireEditor();
+  if (new URL(req.url).searchParams.has("info")) return { render: await officeRenderInfo(), people: await officePeople() };
   const r = await officeRender();
   if (!r) throw notFound();
   return new Response(new Uint8Array(r.data), { headers: { "content-type": "image/jpeg", "cache-control": "private, max-age=300" } });

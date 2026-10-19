@@ -228,12 +228,32 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
   const [photoOn, setPhotoOn] = useState(true);
   const [rendering, setRendering] = useState(false);
   const [renderErr, setRenderErr] = useState<string | null>(null);
+  const [sprites, setSprites] = useState<{ done: string[]; status: string; total: number; v: number } | null>(null);
+  const loadInfo = async () => {
+    const res = await fetch("/api/studio/office-render?info=1").catch(() => null);
+    if (!res?.ok) return null;
+    const info = (await res.json()) as { render: { updated_at: string } | null; people: { done: string[]; status: string; total: number; updated_at: string } | null };
+    if (info.render) setPhoto(`/api/studio/office-render?v=${encodeURIComponent(info.render.updated_at)}`);
+    if (info.people) setSprites({ ...info.people, v: Date.parse(info.people.updated_at) || 0 });
+    return info;
+  };
   useEffect(() => {
-    const url = `/api/studio/office-render?v=${Date.now()}`;
-    const img = new Image();
-    img.onload = () => setPhoto(url);
-    img.src = url;
+    void loadInfo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // While the 3D team is being made, check back every few seconds.
+  useEffect(() => {
+    if (sprites?.status !== "running") return;
+    const t = setInterval(() => void loadInfo(), 6000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sprites?.status]);
+  async function makePeople(redo = false) {
+    const res = await fetch("/api/studio/office-render/people", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ redo }) });
+    const json = (await res.json().catch(() => ({}))) as { error?: { message?: string } | string; done?: string[]; status?: string; total?: number };
+    if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : json.error?.message ?? `Couldn't start the 3D team (${res.status}).`);
+    setSprites({ done: json.done ?? [], status: json.status ?? "running", total: json.total ?? 0, v: Date.now() });
+  }
   async function makePhotoreal() {
     const svg = svgRef.current;
     if (!svg) return;
@@ -261,6 +281,7 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
       if (!res.ok) throw new Error(typeof json.error === "string" ? json.error : json.error?.message ?? `Render failed (${res.status}).`);
       setPhoto(`/api/studio/office-render?v=${Date.now()}`);
       setPhotoOn(true);
+      if (!sprites?.done.length) await makePeople();
     } catch (err) {
       setRenderErr(err instanceof Error ? err.message : String(err));
     } finally {
@@ -360,7 +381,14 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
           onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onOpen(p.def.key)}
         >
           {p.activity === "asking_for_help" && <ellipse cx="0" cy="2" rx="22" ry="9" fill="none" stroke="#ffc96b" strokeWidth="2" className="sims-pulse" />}
-          <Person def={p.def} pose={pose} activity={p.activity} />
+          {showPhoto && sprites?.done.includes(`${p.def.key}-${p.atDesk ? "work" : "rest"}`) ? (
+            <g className={cx(pose === "walk" && "sims-walk", pose === "nap" && "sims-breathe")}>
+              <ellipse cx="2" cy="3" rx="14" ry="5.5" fill="#1b2140" opacity="0.3" filter="url(#simsSoft)" />
+              <image href={`/api/studio/office-render/people/${p.def.key}-${p.atDesk ? "work" : "rest"}.png?v=${sprites.v}`} x={-24} y={-60} width={48} height={64} preserveAspectRatio="xMidYMax meet" />
+            </g>
+          ) : (
+            <Person def={p.def} pose={pose} activity={p.activity} />
+          )}
           {!p.atDesk && pose === "nap" && <text x="12" y="-56" fontSize="11" fill="#c9d6ff" className="sims-z">z</text>}
         </g>
       ),
@@ -377,16 +405,22 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
     <div className="overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(ellipse_at_50%_40%,#1d2752_0%,#0a1026_75%)]">
       <div className="flex flex-wrap items-center justify-end gap-2 border-b border-white/10 px-4 py-2 text-[12px]">
         {renderErr && <span className="mr-auto text-rose-300">{renderErr}</span>}
-        {rendering && <span className="mr-auto text-mist">Rendering a photoreal office with Nano Banana… (about 20–40s)</span>}
+        {rendering && <span className="mr-auto text-mist">Rendering the 3D office with Nano Banana… (about 20–40s)</span>}
+        {!rendering && sprites?.status === "running" && <span className="mr-auto text-mist">Making the 3D team… {sprites.done.length}/{sprites.total}</span>}
         {photo && (
           <div className="flex overflow-hidden rounded-full border border-white/15">
             <button onClick={() => setPhotoOn(false)} className={cx("px-3 py-1", !photoOn ? "bg-white/15 text-white" : "text-mist hover:text-white")}>Illustrated</button>
-            <button onClick={() => setPhotoOn(true)} className={cx("px-3 py-1", photoOn ? "bg-white/15 text-white" : "text-mist hover:text-white")}>Photoreal</button>
+            <button onClick={() => setPhotoOn(true)} className={cx("px-3 py-1", photoOn ? "bg-white/15 text-white" : "text-mist hover:text-white")}>3D</button>
           </div>
         )}
         <button onClick={makePhotoreal} disabled={rendering} className="rounded-full border border-white/15 px-3 py-1 text-white/90 hover:bg-white/10 disabled:opacity-50">
-          {rendering ? "Rendering…" : photo ? "Re-render photoreal" : "✨ Make it photoreal"}
+          {rendering ? "Rendering…" : photo ? "Re-render office" : "✨ Make it 3D"}
         </button>
+        {photo && sprites?.status !== "running" && (
+          <button onClick={() => makePeople(Boolean(sprites?.done.length && sprites.done.length >= sprites.total)).catch((e) => setRenderErr(e instanceof Error ? e.message : String(e)))} className="rounded-full border border-white/15 px-3 py-1 text-white/90 hover:bg-white/10">
+            {sprites?.done.length ? (sprites.done.length >= sprites.total ? "Redo 3D team" : "Finish 3D team") : "Make 3D team"}
+          </button>
+        )}
       </div>
       <svg ref={svgRef} viewBox={`0 0 ${VW} ${VH}`} className="sims-office block w-full" role="img" aria-label="The AI team in the studio">
         <defs>
