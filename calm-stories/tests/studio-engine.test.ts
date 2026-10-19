@@ -452,3 +452,48 @@ describe("Ask the studio", () => {
     expect(seen).toContain("Disk full"); // the Quick fix diagnosis is included too
   });
 });
+
+describe("public approved-stories feed", () => {
+  it("lists only approved, released stories with absolute URLs and serves their audio publicly", async () => {
+    const db = freshDb();
+    const { getStorage } = await import("@/lib/storage");
+    const { GET } = await import("@/app/api/approved-stories/route");
+    const audio = await import("@/app/api/approved-stories/[id]/audio/route");
+    const series = (await db.list("series"))[0]!;
+    const base = (await db.list("episodes", { where: { series_id: series.id } }))[0]!;
+    await getStorage().put("audio/test/master.mp3", Buffer.from("ID3fakeaudio"), "audio/mpeg");
+    const asset = await db.insert("audio_assets", { ...(await db.list("audio_assets"))[0]!, id: "aud_master_1", kind: "produced", storage_key: "audio/test/master.mp3", mime_type: "audio/mpeg", duration_seconds: 612.4 });
+    const past = new Date(Date.now() - 3600_000).toISOString();
+    const future = new Date(Date.now() + 86_400_000).toISOString();
+    const ep = (id: string, extra: Record<string, unknown>) => db.insert("episodes", { ...base, id, title: id, summary: `About ${id}`, audio_asset_id: asset.id, artwork_url: "/api/art/art_x?v=1200w", ...extra } as never);
+    for (const e of await db.list("episodes")) await db.remove("episodes", e.id); // only our test episodes
+    await ep("live", { status: "published", published_at: past, release_at: past });
+    await ep("scheduled", { status: "approved", published_at: null, release_at: future });
+    await ep("in_review", { status: "in_review", published_at: null });
+    await ep("no_audio", { status: "published", published_at: past, audio_asset_id: null });
+
+    const res = await GET(new Request("http://localhost:8080/api/approved-stories", { headers: { "x-forwarded-host": "studio.example.app", "x-forwarded-proto": "https" } }));
+    expect(res.headers.get("access-control-allow-origin")).toBe("*");
+    const { stories } = (await res.json()) as { stories: Record<string, unknown>[] };
+    expect(stories).toEqual([
+      {
+        id: "live",
+        title: "live",
+        seriesTitle: series.title,
+        description: "About live",
+        coverUrl: "https://studio.example.app/api/art/art_x?v=1200w",
+        audioUrl: "https://studio.example.app/api/approved-stories/live/audio",
+        durationSeconds: 612,
+        publishedAt: past,
+      },
+    ]);
+    const ok = await audio.GET(new Request("https://studio.example.app/api/approved-stories/live/audio"), { params: Promise.resolve({ id: "live" }) });
+    expect(ok.status).toBe(200);
+    expect(ok.headers.get("content-type")).toBe("audio/mpeg");
+    expect(ok.headers.get("access-control-allow-origin")).toBe("*");
+    for (const id of ["scheduled", "in_review", "no_audio", "nope"]) {
+      const r = await audio.GET(new Request(`https://x/api/approved-stories/${id}/audio`), { params: Promise.resolve({ id }) });
+      expect(r.status, id).toBe(404);
+    }
+  });
+});

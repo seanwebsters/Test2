@@ -86,3 +86,15 @@ Set `STORAGE_BACKEND=r2`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS
 ## Durable orchestration
 
 The built-in engine is durable: state lives in the database, and steps are idempotent, resumable functions. To run it on Trigger.dev (or Inngest, or a queue worker), schedule a task every 30–60 s that calls `tick({ wait: true })` from `@/lib/studio`. Long steps (scene narration, mastering) then run on that worker rather than in a web request.
+
+## Public approved-stories feed (for another front end)
+
+`GET /api/approved-stories` returns the stories a human has approved and whose release time has passed, newest first. No sign-in is needed, and CORS is open, so another site (for example a Lovable front end) can call it directly:
+
+```json
+{ "stories": [ { "id": "ep_…", "title": "…", "seriesTitle": "…", "description": "…", "coverUrl": "https://…/api/art/…", "audioUrl": "https://…/api/approved-stories/ep_…/audio", "durationSeconds": 612, "publishedAt": "2026-10-19T20:00:00.000Z" } ] }
+```
+
+* `audioUrl` streams with Range support (seeking), and only for approved, released stories (anything else returns 404). These stories are playable by anyone with the link, regardless of Premium.
+* Links are absolute. They're built from the proxy's forwarded host; set `PUBLIC_BASE_URL` to force a domain.
+* Responses are cached for 60 seconds.
