@@ -7,7 +7,7 @@ import { PipelineStrip } from "@/components/studio/PipelineStrip";
 import { isStaff } from "@/app/admin/staff";
 import { AgentAvatar } from "@/components/studio/AgentAvatar";
 import { AdminAction } from "@/components/admin/AdminAction";
-import { avatarClips, getAvatar } from "@/lib/studio/avatars";
+import { avatarClips, avatarProgress } from "@/lib/studio/avatars";
 import { AGENT_BY_KEY } from "@/lib/studio/agents";
 import type { AgentActivity } from "@/lib/studio/types";
 
@@ -32,7 +32,7 @@ export default async function TeamPage() {
   const run = (await db.list("workflow_runs", { where: { status: ["running", "awaiting_approval", "blocked", "paused"] }, orderBy: { column: "updated_at", ascending: false }, limit: 1 }))[0];
   const steps = run ? await db.list("workflow_steps", { where: { run_id: run.id } }) : [];
   const clips = await avatarClips();
-  const test = await getAvatar("lead_writer");
+  const filming = await avatarProgress();
   return (
     <div className="space-y-8">
       <header className="flex flex-wrap items-center gap-4">
@@ -47,17 +47,19 @@ export default async function TeamPage() {
       <section className="rounded-3xl border border-lavender/30 bg-lavender/[0.05] p-5">
         <div className="flex flex-wrap items-center gap-3">
           <div className="min-w-0 flex-1">
-            <h2 className="font-serif text-2xl text-white">Animated agents (test)</h2>
+            <h2 className="font-serif text-2xl text-white">Real-person agents</h2>
             <p className="text-sm text-mist">
-              Films the Lead Writer as a photoreal person in four poses (resting, working, thinking, needs you) with Nano Banana and Kling on fal – about $0.90, takes ~5–10 minutes. Refresh to see progress.
+              Films every agent as a photoreal person in four poses (resting, working, thinking, needs you) – each in their own bedroom, or all together in one cosy little office. About $0.90 per agent (~$14 for everyone); takes roughly 30–60 minutes. Refresh to see progress; anyone not finished keeps their drawing.
             </p>
-            {test && (
-              <p className={test.status === "failed" ? "mt-1 text-sm text-rose-300" : "mt-1 text-sm text-lavender"}>
-                {test.status === "ready" ? "Ready – the Lead Writer below is now filmed." : test.status === "failed" ? `Failed: ${test.error}` : `Working… ${test.step} (${Object.keys(test.clips).length}/4 clips)`}
-              </p>
-            )}
+            <p className="mt-1 text-sm text-lavender">
+              {filming.ready}/{filming.total} filmed{filming.generating ? ` · ${filming.generating} in progress` : ""}
+              {filming.failed.length ? <span className="text-rose-300"> · {filming.failed.length} failed: {filming.failed[0]!.error.slice(0, 140)}</span> : null}
+            </p>
           </div>
-          <AdminAction endpoint="/api/studio/avatars" body={{ agent: "lead_writer" }} label={test ? "Make it again" : "Make test avatar"} pendingLabel="Starting…" className="btn-primary btn-sm" />
+          <div className="flex flex-wrap gap-2">
+            <AdminAction endpoint="/api/studio/avatars" body={{ all: true, scene: "office" }} label="Film everyone – little office" pendingLabel="Starting…" confirmText="Film every agent in the shared office? About $14 of fal credits." className="btn-primary btn-sm" />
+            <AdminAction endpoint="/api/studio/avatars" body={{ all: true, scene: "bedroom" }} label="Film everyone – bedrooms" pendingLabel="Starting…" confirmText="Film every agent in their bedroom? About $14 of fal credits." className="btn-ghost btn-sm" />
+          </div>
         </div>
       </section>
       <TeamRoom initial={team} clips={clips} />

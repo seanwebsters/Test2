@@ -7,7 +7,7 @@ import { getStorage } from "@/lib/storage";
 export const GET = route<{ params: Promise<{ agent: string; file: string }> }>(async (_req, { params }) => {
   await requireEditor();
   const { agent, file } = await params;
-  if (!/^[a-z_]+$/.test(agent) || !/^(still\.png|(resting|working|thinking|needs_you)\.mp4)$/.test(file)) throw notFound();
+  if (!/^[a-z_]+$/.test(agent) || !/^((bedroom-|office-)?still\.png|((bedroom|office)-)?(resting|working|thinking|needs_you)\.mp4)$/.test(file)) throw notFound();
   const f = await getStorage().get(`avatars/${agent}/${file}`);
   if (!f) throw notFound();
   return new Response(new Uint8Array(f.data), { headers: { "content-type": file.endsWith(".mp4") ? "video/mp4" : "image/png", "cache-control": "private, max-age=86400" } });

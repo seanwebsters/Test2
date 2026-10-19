@@ -316,7 +316,7 @@ describe("animated agents (test avatar)", () => {
       expect(submitted.every((s) => s.url === `https://queue.fal.run/${VIDEO_ENDPOINT}` && String(s.body.image_url).startsWith("data:image/") && s.body.duration === "5")).toBe(true);
       expect(String(submitted.find((s) => String(s.body.prompt).includes("asleep"))?.body.prompt)).toContain("breathing");
       const clips = await avatarClips();
-      expect(clips.lead_writer?.working).toMatch(/^\/api\/studio\/avatars\/lead_writer\/working\.mp4\?v=/);
+      expect(clips.lead_writer?.working).toMatch(/^\/api\/studio\/avatars\/lead_writer\/bedroom-working\.mp4\?v=/);
       expect(clips.worldbuilder).toBeUndefined(); // everyone else keeps the drawn bedroom
     } finally {
       vi.unstubAllGlobals();
