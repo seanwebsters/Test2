@@ -163,6 +163,8 @@ async function addSteps(runId: string, steps: NewStep[]) {
 
 const PROVIDER_NEEDS = /(_API_KEY|^FAL_KEY|^elevenlabs:|^casting$)/;
 const PROVIDER_RETRY_MS = 5 * 60_000;
+/** Steps not limited by the run budget: narration, sound, mastering, the episode cover and final QC. */
+const UNCAPPED_STEP = /^(audio\.|qc\.|art\.cover_)/;
 
 const g = globalThis as unknown as { __studioRunning?: Set<string>; __studioTimer?: NodeJS.Timeout | null; __studioLocks?: Map<string, Promise<unknown>> };
 const running = (g.__studioRunning ??= new Set<string>());
@@ -236,7 +238,8 @@ async function startReadySteps(now: Date): Promise<Promise<void>[]> {
       // Steps blocked on a provider (missing key, missing permission, no voice yet) retry by
       // themselves every few minutes, so fixing the key in the host is enough – no Resume needed.
       // Budget blocks still wait for a human.
-      if (s.status === "blocked" && s.needs && PROVIDER_NEEDS.test(s.needs) && now.getTime() - new Date(s.updated_at).getTime() > PROVIDER_RETRY_MS) {
+      const uncappedBudgetBlock = s.status === "blocked" && s.needs === "budget" && UNCAPPED_STEP.test(s.type);
+      if (uncappedBudgetBlock || (s.status === "blocked" && s.needs && PROVIDER_NEEDS.test(s.needs) && now.getTime() - new Date(s.updated_at).getTime() > PROVIDER_RETRY_MS)) {
         await db.update("workflow_steps", s.id, { status: "pending", updated_at: nowIso() });
         s.status = "pending";
       }
@@ -289,6 +292,7 @@ async function executeStep(run: WorkflowRun, step: WorkflowStep) {
     });
   };
   const ensureBudget = async (estimate: number) => {
+    if (UNCAPPED_STEP.test(step.type)) return; // audio and final QC run until provider credits run out
     const cur = (await db.get("workflow_runs", run.id))!;
     if (cur.cost_cents + estimate > cur.budget_cents) {
       throw new BudgetError(`Run budget reached ($${(cur.cost_cents / 100).toFixed(2)} of $${(cur.budget_cents / 100).toFixed(2)}). Raise the budget and resume.`);

@@ -29,10 +29,10 @@ function elevenKey(): string {
 
 async function eleven<T>(ctx: StepContext, op: string, estimateCents: number, fn: (key: string) => Promise<T>, usage: { characters?: number; seconds?: number }): Promise<T> {
   const key = elevenKey();
-  await ctx.ensureBudget(estimateCents);
+  // Audio isn't capped by the run budget: it runs until the ElevenLabs credits run out
+  // (ElevenLabs then refuses and the step waits). Spend is still recorded for Analytics.
   try {
     const out = await fn(key);
-    await ctx.addCost(estimateCents);
     const settings = await getStudioSettings();
     await getDb().insert("usage_records", {
       id: newId("use"),

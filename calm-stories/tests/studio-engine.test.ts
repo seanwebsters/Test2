@@ -242,3 +242,20 @@ describe("sample catalogue", () => {
     expect(await db.count("listening_events")).toBe(0);
   });
 });
+
+describe("audio isn't capped by the run budget", () => {
+  it("lets narration run past the budget while writing still stops at it, and frees budget-blocked audio steps", async () => {
+    const db = freshDb();
+    const { registerHandler } = await import("@/lib/studio/engine");
+    registerHandler("audio.testnarrate", async (ctx) => { await ctx.ensureBudget(500); return { summary: "narrated" }; });
+    registerHandler("ep.testwrite", async (ctx) => { await ctx.ensureBudget(500); return { summary: "written" }; });
+    const step = (key: string, type: string) => ({ key, type, agent: "audio_producer" as const, label: key, activity: "typing" as const, deps: [] });
+    const { run } = await createRun({ kind: "episode_production", title: "Budget", budget_cents: 100, created_by: "usr_calm-editor", steps: [step("narrate", "audio.testnarrate"), step("write", "ep.testwrite")] });
+    // An audio step that was blocked on budget before this change:
+    const narrate = (await db.findOne("workflow_steps", { run_id: run.id, key: "narrate" }))!;
+    await db.update("workflow_steps", narrate.id, { status: "blocked", needs: "budget", error: "Run budget reached" });
+    await drain();
+    expect((await db.findOne("workflow_steps", { run_id: run.id, key: "narrate" }))!.status).toBe("succeeded");
+    expect((await db.findOne("workflow_steps", { run_id: run.id, key: "write" }))!.needs).toBe("budget");
+  });
+});
