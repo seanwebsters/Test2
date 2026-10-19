@@ -204,3 +204,25 @@ describe("house narrator voice", () => {
     expect(findVoiceByName(voices, "Nobody")).toBeNull();
   });
 });
+
+describe("provider blocks clear themselves", () => {
+  it("retries a step blocked on a provider key a few minutes later, without Resume", async () => {
+    const db = freshDb();
+    const { registerHandler } = await import("@/lib/studio/engine");
+    const { BlockedError } = await import("@/lib/studio/errors");
+    let keyFixed = false;
+    registerHandler("test.voice", async () => {
+      if (!keyFixed) throw new BlockedError("ELEVENLABS_API_KEY", "missing permission");
+      return { summary: "narrated" };
+    });
+    const { run } = await createRun({ kind: "series_development", title: "Voice", budget_cents: 100, created_by: "usr_calm-editor", steps: [{ key: "voice", type: "test.voice", agent: "audio_producer", label: "Narrate", activity: "typing", deps: [] }] });
+    await drain();
+    expect((await db.findOne("workflow_steps", { run_id: run.id, key: "voice" }))!.status).toBe("blocked");
+    keyFixed = true; // the key is fixed in the host's settings
+    await drain(); // too soon: still blocked
+    expect((await db.findOne("workflow_steps", { run_id: run.id, key: "voice" }))!.status).toBe("blocked");
+    await drain({ now: new Date(Date.now() + 6 * 60_000) });
+    expect((await db.findOne("workflow_steps", { run_id: run.id, key: "voice" }))!.status).toBe("succeeded");
+    expect((await db.get("workflow_runs", run.id))!.status).toBe("succeeded");
+  });
+});

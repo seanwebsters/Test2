@@ -161,6 +161,9 @@ async function addSteps(runId: string, steps: NewStep[]) {
 /* Ticking                                                             */
 /* ------------------------------------------------------------------ */
 
+const PROVIDER_NEEDS = /(_API_KEY|^FAL_KEY|^elevenlabs:|^casting$)/;
+const PROVIDER_RETRY_MS = 5 * 60_000;
+
 const g = globalThis as unknown as { __studioRunning?: Set<string>; __studioTimer?: NodeJS.Timeout | null; __studioLocks?: Map<string, Promise<unknown>> };
 const running = (g.__studioRunning ??= new Set<string>());
 const locks = (g.__studioLocks ??= new Map());
@@ -227,6 +230,13 @@ async function startReadySteps(now: Date): Promise<Promise<void>[]> {
     // Recover steps orphaned by a restart.
     for (const s of steps) {
       if (s.status === "running" && !running.has(s.id) && s.started_at && now.getTime() - new Date(s.started_at).getTime() > 20 * 60_000) {
+        await db.update("workflow_steps", s.id, { status: "pending", updated_at: nowIso() });
+        s.status = "pending";
+      }
+      // Steps blocked on a provider (missing key, missing permission, no voice yet) retry by
+      // themselves every few minutes, so fixing the key in the host is enough – no Resume needed.
+      // Budget blocks still wait for a human.
+      if (s.status === "blocked" && s.needs && PROVIDER_NEEDS.test(s.needs) && now.getTime() - new Date(s.updated_at).getTime() > PROVIDER_RETRY_MS) {
         await db.update("workflow_steps", s.id, { status: "pending", updated_at: nowIso() });
         s.status = "pending";
       }
