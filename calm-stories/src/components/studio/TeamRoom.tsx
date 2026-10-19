@@ -6,6 +6,7 @@ import type { AgentState } from "@/lib/studio/team";
 import { AgentAvatar, type AvatarClips } from "./AgentAvatar";
 import { StudioOffice } from "./StudioOffice";
 import { SimsOffice } from "./SimsOffice";
+import { StudioInbox } from "./StudioInbox";
 import { AgentDrawer } from "./AgentDrawer";
 import { cx } from "@/lib/util";
 
@@ -54,6 +55,7 @@ export function TeamRoom({ initial, compact, clips }: { initial: AgentState[]; c
     return (
       <>
         {toggle}
+        <StudioInbox agents={agents} onOpen={(k) => setOpen(k)} />
         <SimsOffice agents={agents} onOpen={(k) => setOpen(k)} />
         {open && <AgentDrawer agentKey={open} onClose={() => setOpen(null)} />}
       </>

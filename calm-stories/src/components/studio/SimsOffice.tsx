@@ -647,7 +647,7 @@ export function SimsOffice({ agents, onOpen }: { agents: AgentState[]; onOpen: (
         })}
         {/* thought bubbles on top */}
         {people.map((p) => {
-          const text = p.activity === "asking_for_help" ? (p.def.human ? "Your approvals" : `Needs you: ${short(p.s?.needs ?? p.s?.task?.label ?? "help", 16)}`) : p.atDesk && p.s?.task ? short(p.s.task.label) : p.activity === "thinking" ? "Thinking…" : null;
+          const text = p.activity === "asking_for_help" ? "✉️ Email for you" : p.atDesk && p.s?.task ? short(p.s.task.label) : p.activity === "thinking" ? "Thinking…" : null;
           if (!text || walking[p.def.key]) return null;
           const [x, y] = iso(p.spot[0], p.spot[1]);
           return (

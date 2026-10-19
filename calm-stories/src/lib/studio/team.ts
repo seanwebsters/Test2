@@ -6,7 +6,7 @@ import type { AgentActivity, AgentKey, Deliverable, WorkflowStep } from "./types
 export interface AgentState {
   key: AgentKey;
   activity: AgentActivity;
-  task: { label: string; run_id: string; run_title: string; step_key: string } | null;
+  task: { label: string; run_id: string; run_title: string; step_key: string; since?: string; kind?: "gate" | "blocked" } | null;
   needs: string | null;
   last_output: string | null;
   next: { agent: AgentKey; label: string }[];
@@ -60,7 +60,7 @@ export async function getTeamState(now = new Date()): Promise<AgentState[]> {
     return {
       key: a.key,
       activity,
-      task: current ? { label: current.label, run_id: current.run_id, run_title: runTitle(current.run_id), step_key: current.key } : null,
+      task: current ? { label: current.label, run_id: current.run_id, run_title: runTitle(current.run_id), step_key: current.key, since: current.updated_at, kind: current === blocked ? "blocked" : current === gate ? "gate" : undefined } : null,
       needs: blocked?.needs ?? (gate ? "your decision" : null),
       last_output: lastDone.get(a.key)?.reasoning || lastDone.get(a.key)?.title || null,
       next,
