@@ -47,17 +47,18 @@ export const env = {
   /** Temporary: the footer "dev" link opens the studio without a login. Set DEV_ACCESS=off to disable. */
   get devAccess(): boolean {
     // The open "dev" link switches off automatically once the studio is password-protected.
-    return opt("DEV_ACCESS") !== "off" && (opt("AUTH_PROVIDER") ?? "demo") === "demo" && !opt("STUDIO_OWNER_PASSWORD");
+    return opt("DEV_ACCESS") !== "off" && (opt("AUTH_PROVIDER") ?? "demo") === "demo" && opt("STUDIO_LOCK") === "off";
   },
-  /** Owner (full control) and team (view-only) passwords for the studio. Setting the owner password locks the studio. */
+  /** Owner (full control) and team (view-only) passwords. Without STUDIO_OWNER_PASSWORD the built-in owner passcode is used. */
   get studioOwnerPassword(): string | undefined {
     return opt("STUDIO_OWNER_PASSWORD");
   },
   get studioTeamPassword(): string | undefined {
     return opt("STUDIO_TEAM_PASSWORD");
   },
+  /** The studio is always locked (Sean's passcode); STUDIO_LOCK=off only for local development. */
   get studioLocked(): boolean {
-    return Boolean(opt("STUDIO_OWNER_PASSWORD"));
+    return opt("STUDIO_LOCK") !== "off";
   },
 
   supabaseUrl: opt("SUPABASE_URL") ?? opt("NEXT_PUBLIC_SUPABASE_URL"),

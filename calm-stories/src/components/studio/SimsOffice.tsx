@@ -189,7 +189,69 @@ function Person({ def, pose, activity }: { def: AgentDefinition; pose: "seated" 
 }
 
 /** Floating crescent-moon mood gem (our own – not a plumbob). */
-export function SimsOffice({ agents, onOpen, canEdit = true }: { agents: AgentState[]; onOpen: (key: AgentKey) => void; canEdit?: boolean }) {
+export type ReviewItem = { id: string; title: string; series: string; cover: string | null; status: "in_review" | "changes_requested" | "approved" };
+
+const REVIEW_LABEL: Record<ReviewItem["status"], string> = { in_review: "In review", changes_requested: "Changes", approved: "Approved" };
+
+/** Draw HTML-ish content on the front face of a panel that runs along gx at a fixed gy (pixel units on the panel). */
+const faceMatrix = (gx: number, gy: number, zTop: number) => {
+  const [x, y] = iso(gx, gy, zTop);
+  return `matrix(1 0.5 0 1 ${x.toFixed(1)} ${y.toFixed(1)})`;
+};
+
+function ReviewRoom({ review }: { review: ReviewItem[] }) {
+  const feature = review.find((r) => r.status === "in_review") ?? review[0];
+  const W = 8.2 * 32, H = 1.7 * 32; // big screen face in px
+  return (
+    <g className="sims-live">
+      {/* big screen */}
+      <a href={feature ? "/studio/releases" : "/studio/approvals"}>
+        <g transform={faceMatrix(2.4, 12.34, 2.08)}>
+          <defs>
+            <linearGradient id="simsScreenSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#1d2a6b" /><stop offset="1" stopColor="#4b3a78" /></linearGradient>
+            <linearGradient id="simsScreenFade" x1="0" y1="0" x2="1" y2="0"><stop offset="0.35" stopColor="#0b1030" stopOpacity="0" /><stop offset="1" stopColor="#0b1030" stopOpacity="0.75" /></linearGradient>
+          </defs>
+          <rect width={W} height={H} fill="url(#simsScreenSky)" />
+          {feature?.cover ? <image href={feature.cover} width={W} height={H} preserveAspectRatio="xMidYMid slice" /> : <><circle cx={W * 0.25} cy={H * 0.32} r="6" fill="#f3eaff" /><path d={`M0 ${H} L${W * 0.18} ${H * 0.55} L${W * 0.32} ${H * 0.78} L${W * 0.48} ${H * 0.45} L${W * 0.7} ${H} Z`} fill="#141b45" opacity="0.9" /></>}
+          <rect width={W} height={H} fill="url(#simsScreenFade)" />
+          <text x={W - 10} y={H * 0.42} textAnchor="end" className="sims-screen-title">{feature ? short(feature.title, 26) : "Nothing to review"}</text>
+          <text x={W - 10} y={H * 0.42 + 13} textAnchor="end" className="sims-screen-sub">{feature ? `${short(feature.series, 30)} · ${REVIEW_LABEL[feature.status]}` : "New stories appear here"}</text>
+        </g>
+      </a>
+      {/* stories ready for review */}
+      <a href="/studio/releases">
+        <g transform={faceMatrix(13.1, 12.32, 2.0)}>
+          <text x="6" y="11" className="sims-wall-title">Stories ready for review</text>
+          {review.slice(0, 4).map((r, i) => (
+            <g key={r.id} transform={`translate(${8 + i * 58} 17)`}>
+              <rect width="48" height="30" rx="2" fill="#2c3a7a" />
+              {r.cover ? <image href={r.cover} width="48" height="30" preserveAspectRatio="xMidYMid slice" /> : <><circle cx="12" cy="9" r="3" fill="#f3eaff" /><path d="M0 30 L14 16 L24 24 L34 12 L48 30Z" fill="#141b45" /></>}
+              <text x="24" y="38" textAnchor="middle" className="sims-wall-label">{REVIEW_LABEL[r.status]}</text>
+            </g>
+          ))}
+          {review.length === 0 && <text x="6" y="30" className="sims-wall-label">All caught up</text>}
+        </g>
+      </a>
+      {/* you, on the sofa, facing the screen */}
+      {(() => {
+        const [x, y] = iso(5.6, 15.55);
+        return (
+          <g transform={`translate(${x} ${y})`} pointerEvents="none">
+            <rect x="-9" y="-26" width="18" height="16" rx="6" fill="#2b2f45" />
+            <circle cx="0" cy="-34" r="9" fill="#3a2a1e" />
+            <path d="M-9 -34 a9 9 0 0 1 18 0 q-4 6 -9 7 q-5 -1 -9 -7z" fill="#2a1d14" />
+            <g transform="translate(0 -56)">
+              <rect x="-13" y="-8" width="26" height="15" rx="7.5" fill="#1b2140" opacity="0.85" />
+              <text y="3" textAnchor="middle" className="sims-you">You</text>
+            </g>
+          </g>
+        );
+      })()}
+    </g>
+  );
+}
+
+export function SimsOffice({ agents, onOpen, canEdit = true, review = [], legend = true }: { agents: AgentState[]; onOpen: (key: AgentKey) => void; canEdit?: boolean; review?: ReviewItem[]; legend?: boolean }) {
   const st = (k: AgentKey) => agents.find((a) => a.key === k);
   // Walking: when someone moves between desk and lounge, show the walk cycle for the trip.
   const prevAt = useRef<Partial<Record<AgentKey, boolean>>>({});
@@ -225,11 +287,13 @@ export function SimsOffice({ agents, onOpen, canEdit = true }: { agents: AgentSt
   const [renderErr, setRenderErr] = useState<string | null>(null);
   const [sprites, setSprites] = useState<{ done: string[]; status: string; total: number; v: number } | null>(null);
   const [anims, setAnims] = useState<{ status: string; clips: Record<string, { aspect: number }>; total: number; error?: string; v: number } | null>(null);
-  type Meta = { updated_at: string; prompt?: string } | null;
+  type Meta = { updated_at: string; prompt?: string; layout?: number } | null;
+  const [layout, setLayout] = useState<{ saved?: number; draft?: number }>({});
   const loadInfo = async () => {
     const res = await fetch("/api/studio/office-render?info=1").catch(() => null);
     if (!res?.ok) return null;
     const info = (await res.json()) as { saved: Meta; draft: Meta; people: { done: string[]; status: string; total: number; updated_at: string } | null; anims: { status: string; clips: Record<string, { aspect: number }>; total: number; error?: string; updated_at: string } | null };
+    setLayout({ saved: info.saved?.layout, draft: info.draft?.layout });
     setPhoto(info.saved ? `/api/studio/office-render?v=${encodeURIComponent(info.saved.updated_at)}` : null);
     setDraft(info.draft ? { url: `/api/studio/office-render?draft=1&v=${encodeURIComponent(info.draft.updated_at)}`, prompt: info.draft.prompt } : null);
     if (info.people) setSprites({ ...info.people, v: Date.parse(info.people.updated_at) || 0 });
@@ -262,7 +326,7 @@ export function SimsOffice({ agents, onOpen, canEdit = true }: { agents: AgentSt
     const svg = svgRef.current;
     if (!svg) throw new Error("The office isn't on screen.");
     const clone = svg.cloneNode(true) as SVGSVGElement;
-    clone.querySelectorAll(".sims-person, .sims-name, .sims-bubble-wrap, .sims-photo").forEach((n) => n.remove());
+    clone.querySelectorAll(".sims-person, .sims-name, .sims-bubble-wrap, .sims-photo, .sims-live").forEach((n) => n.remove());
     clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
     clone.setAttribute("width", String(VW));
     clone.setAttribute("height", String(VH));
@@ -331,6 +395,8 @@ export function SimsOffice({ agents, onOpen, canEdit = true }: { agents: AgentSt
     }
   }
   const showPhoto = Boolean(backdrop && photoOn);
+  // Renders made before the review room existed don't have the screen/wall, so don't paint over their sofas.
+  const reviewBaked = !showPhoto || (draft ? layout.draft : layout.saved) === 2;
 
   const items: Drawable[] = [];
   const shadows: ReactNode[] = [];
@@ -346,21 +412,22 @@ export function SimsOffice({ agents, onOpen, canEdit = true }: { agents: AgentSt
     items.push({ depth: seat[0] + seat[1] - 0.2, key: `chair-${k}`, node: <g><Box gx={seat[0] - 0.28} gy={seat[1] - 0.28} w={0.56} d={0.56} h={0.12} z={0.26} top="#3a3d4f" left="#26283a" right="#2f3244" /><Box gx={seat[0] - 0.04} gy={seat[1] - 0.04} w={0.08} d={0.08} h={0.26} top="#8e93a6" left="#6c7086" right="#7b8096" /><Box gx={seat[0] - 0.28} gy={seat[1] - 0.32} w={0.56} d={0.1} h={0.55} z={0.38} top="#3a3d4f" left="#26283a" right="#2f3244" /></g> });
   }
   shadow(18.4, 2.2, 3.2, 2.2);
-  shadow(1.4, 13.0, 4, 0.9); shadow(6.8, 13.0, 4, 0.9); shadow(13.4, 13.0, 4, 0.9);
+  shadow(3.0, 15.3, 3.6, 0.9); shadow(7.0, 15.3, 3.6, 0.9);
   shadow(11.4, 12.95, 1.4, 1.0, 0.28);
   // Story table + chairs
   items.push({ depth: 19 + 3 + 2.4, key: "story-table", node: <g><Box gx={18.4} gy={2.2} w={3.2} d={2.2} h={0.5} top="#f4f5fa" left="#cfd2e0" right="#e1e4ef" /><Box gx={19.3} gy={2.9} w={1.2} d={0.8} h={0.04} z={0.5} top="#f3eaff" left="#cfc6ee" right="#ddd4f7" /></g> });
   // Quality gate arch
   items.push({ depth: 1.2 + 9.6 + 0.4, key: "gate", node: <g><Box gx={0.8} gy={9.2} w={0.25} d={0.25} h={1.6} top="#f4f5fa" left="#cfd2e0" right="#e1e4ef" /><Box gx={0.8} gy={10.6} w={0.25} d={0.25} h={1.6} top="#f4f5fa" left="#cfd2e0" right="#e1e4ef" /><Box gx={0.8} gy={9.2} w={0.25} d={1.65} h={0.2} z={1.6} top="#f4f5fa" left="#cfd2e0" right="#e1e4ef" /></g> });
-  // Lounge: rug, sofas, beanbags, fireplace, bookshelf, tea table
-  const sofa = (gx: number, gy: number, len: number, key: string) => items.push({ depth: gx + gy + 0.2, key, node: <g><Box gx={gx} gy={gy} w={len} d={0.9} h={0.32} top="#d5d8e4" left="#a5a9bd" right="#b8bccd" /><Box gx={gx} gy={gy} w={len} d={0.28} h={0.72} top="#e2e5ef" left="#a5a9bd" right="#b8bccd" />{Array.from({ length: Math.floor(len) }, (_, i) => <Box key={i} gx={gx + i + 0.08} gy={gy + 0.32} w={0.84} d={0.5} h={0.06} z={0.32} top="#e9ebf3" left="#b8bccd" right="#c9ccda" />)}<Box gx={gx + 0.3} gy={gy + 0.3} w={0.35} d={0.12} h={0.3} z={0.38} top="#c7b8ff" left="#8a7be0" right="#a99bf4" /></g> });
-  sofa(1.4, 13.0, 4.0, "sofa-1");
-  sofa(6.8, 13.0, 4.0, "sofa-2");
-  sofa(13.4, 13.0, 4.0, "sofa-3");
-  for (const [i, [x, y]] of ([[3.4, 16.2], [8.0, 16.3], [11.0, 16.3], [14.0, 16.3], [17.0, 16.3], [20.3, 16.6]] as [number, number][]).entries())
-    items.push({ depth: x + y - 0.4, key: `bean-${i}`, node: <ellipse cx={iso(x, y)[0]} cy={iso(x, y)[1] - 4} rx="19" ry="9.5" fill={["#e9ebf3", "#c7b8ff", "#cfd2e0", "#a9c8ef"][i % 4]} /> });
-  // a soft rug in the lounge
-  items.unshift({ depth: -1, key: "rug", node: <polygon points={pts([iso(5, 14.4), iso(19, 14.4), iso(19, 17.4), iso(5, 17.4)])} fill="#f7f3ec" opacity="0.7" /> });
+  // Review room (front of the studio): a big screen showing the story up for review, a wall of
+  // stories by status, and sofas facing the screen where you sit to listen and approve.
+  const reviewSofa = (gx: number, gy: number, len: number, key: string) => items.push({ depth: gx + gy + 0.9, key, node: <g><Box gx={gx} gy={gy} w={len} d={0.9} h={0.32} top="#d5d8e4" left="#a5a9bd" right="#b8bccd" /><Box gx={gx} gy={gy + 0.62} w={len} d={0.28} h={0.72} top="#e2e5ef" left="#a5a9bd" right="#b8bccd" />{Array.from({ length: Math.floor(len) }, (_, i) => <Box key={i} gx={gx + i + 0.08} gy={gy + 0.08} w={0.84} d={0.5} h={0.06} z={0.32} top="#e9ebf3" left="#b8bccd" right="#c9ccda" />)}</g> });
+  reviewSofa(3.0, 15.3, 3.6, "sofa-1");
+  reviewSofa(7.0, 15.3, 3.6, "sofa-2");
+  items.push({ depth: 6 + 14.3, key: "review-table", node: <g><Box gx={4.6} gy={13.9} w={3.6} d={0.8} h={0.32} top="#f4f5fa" left="#cfd2e0" right="#e1e4ef" /><Box gx={5.0} gy={14.1} w={0.3} d={0.3} h={0.12} z={0.32} top="#ffffff" left="#d4d7e3" right="#e4e6ef" /><circle cx={iso(5.15, 14.25, 0.6)[0]} cy={iso(5.15, 14.25, 0.6)[1]} r="7" fill="url(#simsLeaf)" /></g> });
+  // screen + wall frames (live content is drawn on top separately)
+  items.push({ depth: 2.5 + 12.3, key: "review-screen", node: <g><Box gx={2.3} gy={12.2} w={8.4} d={0.14} h={1.85} z={0.3} top="#2a2f45" left="#1b1f30" right="#22273a" /><Box gx={5.9} gy={12.2} w={1.2} d={0.3} h={0.3} top="#d9dce8" left="#b9bdcf" right="#c9cddd" /></g> });
+  items.push({ depth: 12.8 + 12.3, key: "review-wall", node: <Box gx={13.0} gy={12.2} w={7.6} d={0.1} h={1.7} z={0.35} top="#2a2f45" left="#1e2338" right="#22273a" /> });
+  items.push({ depth: 13 + 13.4, key: "review-shelf", node: <Box gx={13.2} gy={12.5} w={7.2} d={0.5} h={0.32} top="#f4f5fa" left="#cfd2e0" right="#e1e4ef" /> });
   items.push({ depth: 0.6 + 14.2, key: "fire", node: <g><Box gx={0.05} gy={14.4} w={0.6} d={2.2} h={1.3} top="#f4f5fa" left="#cfd2e0" right="#e1e4ef" /><polygon points={pts([iso(0.66, 14.7, 0.35), iso(0.66, 16.3, 0.35), iso(0.66, 16.3, 0.6), iso(0.66, 14.7, 0.6)])} fill="#1b1e30" /><polygon points={pts([iso(0.66, 14.8, 0.38), iso(0.66, 16.2, 0.38), iso(0.66, 16.2, 0.55), iso(0.66, 14.8, 0.55)])} fill="#ff9a5c" className="sims-fire" /><circle cx={iso(1.4, 15.5)[0]} cy={iso(1.4, 15.5)[1]} r="46" fill="url(#simsLamp)" className="sims-glow" /></g> });
   items.push({ depth: 0.5 + 12.4, key: "shelf", node: <g><Box gx={0.05} gy={12.3} w={0.45} d={1.6} h={1.8} top="#f4f5fa" left="#cfd2e0" right="#e1e4ef" />{[12.6, 13.1, 13.6].map((y) => { const [sx, sy] = iso(0.3, y, 1.85); return <g key={y}><circle cx={sx} cy={sy - 4} r="7" fill="#3f9470" /><circle cx={sx + 4} cy={sy - 8} r="4" fill="#5bbf8c" /><path d={`M${sx - 4} ${sy} q-3 14 1 26`} stroke="#3f9470" strokeWidth="3" fill="none" strokeLinecap="round" /></g>; })}</g> });
   // Indoor trees in white planters
@@ -455,7 +522,7 @@ export function SimsOffice({ agents, onOpen, canEdit = true }: { agents: AgentSt
   const backRight = [iso(0, 0), iso(GX, 0), iso(GX, 0, wallH), iso(0, 0, wallH)] as [number, number][];
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(ellipse_at_50%_40%,#1d2752_0%,#0a1026_75%)]">
+    <div className="overflow-hidden rounded-3xl border border-white/10" style={{ background: "linear-gradient(180deg, #7d93ea 0%, #a39be6 34%, #d5b0dd 60%, #b4b7ec 82%, #8fa6ee 100%)" }}>
       {canEdit && (
       <div className="space-y-2 border-b border-white/10 px-4 py-3 text-[12px]">
         <form
@@ -516,6 +583,7 @@ export function SimsOffice({ agents, onOpen, canEdit = true }: { agents: AgentSt
             : sprites?.status === "running" ? `Making the 3D team… ${sprites.done.length}/${sprites.total}`
             : anims?.status === "running" ? `Animating the team one by one with Kling… ${Object.keys(anims.clips).length}/${anims.total} (about $0.35 each)`
             : anims?.status === "failed" && anims.error ? `Some animations failed: ${anims.error}`
+            : photo && !reviewBaked ? "New: a review room with a big screen. Press “New office render” (then Save) to add it to your 3D office."
             : photo ? "Only you can see these controls – your team sees just the office." : "Type a look (optional) and press Make it 3D."}
         </p>
       </div>
@@ -535,7 +603,7 @@ export function SimsOffice({ agents, onOpen, canEdit = true }: { agents: AgentSt
           <filter id="simsSunBlur" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="6" /></filter>
           <linearGradient id="calmTee" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#60ade6" /><stop offset="1" stopColor="#6467e1" /></linearGradient>
         </defs>
-        {showPhoto && <image className="sims-photo" href={backdrop!} x={-(PW - VW) / 2} y={0} width={PW} height={VH} preserveAspectRatio="none" />}
+        {showPhoto && <image className="sims-photo" style={{ filter: "drop-shadow(0 28px 34px rgba(38, 28, 96, 0.38))" }} href={backdrop!} x={-(PW - VW) / 2} y={0} width={PW} height={VH} preserveAspectRatio="none" />}
         {!showPhoto && <>
         {/* walls */}
         <polygon points={pts(backLeft)} fill="url(#simsWallL)" />
@@ -602,6 +670,8 @@ export function SimsOffice({ agents, onOpen, canEdit = true }: { agents: AgentSt
         </>}
         {/* everything else, back to front (just the people over the photo) */}
         {items.filter((it) => !showPhoto || it.key.startsWith("person-")).map((it) => <g key={it.key}>{it.node}</g>)}
+        {/* live review room content (kept out of the 3D render snapshot, drawn over both looks) */}
+        {reviewBaked && <ReviewRoom review={review} />}
         {/* name tags on top */}
         {people.map((p) => {
           const [x, y] = iso(p.spot[0], p.spot[1]);
@@ -624,7 +694,7 @@ export function SimsOffice({ agents, onOpen, canEdit = true }: { agents: AgentSt
           );
         })}
       </svg>
-      <ul className="flex flex-wrap gap-x-4 gap-y-1 border-t border-white/10 px-4 py-3 text-[12px]">
+      {legend && <ul className="flex flex-wrap gap-x-4 gap-y-1 border-t border-white/10 px-4 py-3 text-[12px]">
         {people.map(({ def, activity }) => (
           <li key={def.key}>
             <button onClick={() => onOpen(def.key)} className="flex items-center gap-1.5 hover:text-white">
@@ -634,7 +704,7 @@ export function SimsOffice({ agents, onOpen, canEdit = true }: { agents: AgentSt
             </button>
           </li>
         ))}
-      </ul>
+      </ul>}
     </div>
   );
 }

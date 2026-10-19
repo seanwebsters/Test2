@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { AGENT_BY_KEY } from "@/lib/studio/agents";
 import type { AgentKey } from "@/lib/studio/types";
 import { cx, formatCents, relativeTime } from "@/lib/util";
-import { AgentBedroom } from "./AgentBedroom";
+import { AgentFace } from "./AgentFace";
 
 interface Detail {
   agent: { key: AgentKey; name: string; title: string; human: boolean };
@@ -50,7 +50,7 @@ export function AgentDrawer({ agentKey, onClose }: { agentKey: string; onClose: 
           <button onClick={onClose} className="rounded-full px-3 py-1 text-mist hover:bg-white/5" aria-label="Close">✕</button>
         </div>
         <div className="mt-4 overflow-hidden rounded-3xl border border-white/10">
-          <AgentBedroom agent={def} activity={(d?.state?.activity as never) ?? "sleeping"} className="block w-full" />
+          <AgentFace agent={def} activity={(d?.state?.activity as never) ?? "sleeping"} size="lg" className="w-full" />
         </div>
         {err && <p className="mt-4 text-rose-300">{err}</p>}
         {d && (

@@ -37,7 +37,7 @@ export function StudioInbox({ agents, onOpen }: { agents: AgentState[]; onOpen: 
     .sort((x, y) => (y.since ?? "").localeCompare(x.since ?? ""));
 
   return (
-    <section className="mb-4 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03]">
+    <section className="overflow-hidden rounded-3xl border border-white/10 bg-[#0e1430]">
       <header className="flex items-center gap-2 border-b border-white/10 px-4 py-2.5">
         <span aria-hidden>✉️</span>
         <h2 className="text-sm font-medium text-white">Inbox</h2>

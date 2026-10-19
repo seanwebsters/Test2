@@ -104,8 +104,8 @@ export default async function StudioLayout({ children }: { children: React.React
           if (!env.studioLocked || !role) return null;
           return (
             <div className="mx-4 mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-white/15 bg-white/[0.04] px-4 py-2 text-sm sm:mx-8 lg:mx-10">
-              <span className="text-white">{role === "team" ? "View-only access" : "Owner access"}</span>
-              <span className="text-mist">{role === "team" ? "You can see everything; buttons that change things are switched off for you." : "Full control."}</span>
+              <span className="text-white">{role === "team" ? "View only" : "Sean access"}</span>
+              <span className="text-mist">{role === "team" ? "You’re watching the AI Team. Everything else in the studio is Sean access only." : "Full control."}</span>
               <SignOutStudio />
             </div>
           );

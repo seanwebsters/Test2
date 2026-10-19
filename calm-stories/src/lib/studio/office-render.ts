@@ -21,7 +21,7 @@ const PROMPT = [
   "Style: warm dusk evening mood, golden glowing table lamps and warm globe floor lamps everywhere casting soft pools of light, honey oak wooden floors, cream and white furniture, white desks with iMac-style monitors and silver laptops, black mesh office chairs, cosy cream sofas with cushions, soft round rugs,",
   "frameless glass partition walls with thin black frames, abundant lush greenery – potted plants on every surface, indoor trees, trailing ivy along the top of the walls, a big central tree in a round planter,",
   "floor-to-ceiling windows showing a soft purple-pink dusk city skyline, bookshelves with books and plants, a fireplace with a glowing fire in the lounge, a white glowing neon 'Calm' script sign on the back wall.",
-  "Soft global illumination, ambient occlusion, gentle bloom on lights, rich warm colours with lavender and blue accents, crisp clean edges. Keep the dark navy background outside the room. No people, no characters, no other text.",
+  "Soft global illumination, ambient occlusion, gentle bloom on lights, rich warm colours with lavender and blue accents, crisp clean edges. The area outside the room must be one plain, flat, solid dark navy (#0a1026) colour with no stars, gradient or texture. No people, no characters, no other text.",
 ].join(" ");
 
 const SKIN = (hex: string) => {
@@ -152,11 +152,71 @@ const FILE: Record<Which, { img: string; meta: string }> = {
   saved: { img: KEY, meta: META },
   draft: { img: "office/draft.jpg", meta: "office/draft.json" },
 };
-type RenderMeta = { updated_at: string; prompt?: string };
+type RenderMeta = { updated_at: string; prompt?: string; layout?: number };
+/** Bump when the office layout changes, so old renders (without e.g. the review room) can be spotted. */
+export const OFFICE_LAYOUT = 2;
 
 export async function officeRender(which: Which = "saved"): Promise<{ data: Buffer } | null> {
   const f = await getStorage().get(FILE[which].img);
   return f ? { data: f.data } : null;
+}
+
+/**
+ * The render with the plain background around the building made transparent,
+ * so the office floats on the page's gradient. Flood-fills from the edges over
+ * pixels close to the corner colour; cached per render.
+ */
+export async function officeRenderCutout(which: Which = "saved"): Promise<Buffer | null> {
+  const meta = await readMeta(which);
+  const cacheKey = `office/${which}-cutout.png`, cacheMeta = `office/${which}-cutout.json`;
+  const cached = await getStorage().get(cacheMeta);
+  if (meta && cached && (JSON.parse(cached.data.toString()) as { of: string }).of === meta.updated_at) {
+    const png = await getStorage().get(cacheKey);
+    if (png) return png.data;
+  }
+  const src = await officeRender(which);
+  if (!src) return null;
+  const png = await cutout(src.data);
+  await getStorage().put(cacheKey, png, "image/png");
+  await getStorage().put(cacheMeta, Buffer.from(JSON.stringify({ of: meta?.updated_at ?? "" })), "application/json");
+  return png;
+}
+
+export async function cutout(img: Buffer, tolerance = 40): Promise<Buffer> {
+  const { data, info } = await sharp(img).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const W = info.width, H = info.height;
+  const at = (x: number, y: number) => (y * W + x) * 3;
+  // background colour: average of the four corners
+  const corners = [at(2, 2), at(W - 3, 2), at(2, H - 3), at(W - 3, H - 3)];
+  const bg = [0, 1, 2].map((c) => corners.reduce((sum, i) => sum + data[i + c]!, 0) / 4);
+  const near = (p: number) => {
+    const i = p * 3;
+    const dr = data[i]! - bg[0]!, dg = data[i + 1]! - bg[1]!, db = data[i + 2]! - bg[2]!;
+    return dr * dr + dg * dg + db * db < tolerance * tolerance;
+  };
+  const mask = new Uint8Array(W * H).fill(255); // 255 = keep
+  const stack: number[] = [];
+  for (let x = 0; x < W; x++) stack.push(x, (H - 1) * W + x);
+  for (let y = 0; y < H; y++) stack.push(y * W, y * W + W - 1);
+  while (stack.length) {
+    const p = stack.pop()!;
+    if (mask[p] === 0 || !near(p)) continue;
+    mask[p] = 0;
+    const x = p % W;
+    if (x > 0) stack.push(p - 1);
+    if (x < W - 1) stack.push(p + 1);
+    if (p >= W) stack.push(p - W);
+    if (p < W * (H - 1)) stack.push(p + W);
+  }
+  const alpha = await sharp(Buffer.from(mask), { raw: { width: W, height: H, channels: 1 } }).blur(0.8).extractChannel(0).raw().toBuffer();
+  const rgba = Buffer.alloc(W * H * 4);
+  for (let p = 0, q = 0; p < W * H; p++, q += 4) {
+    rgba[q] = data[p * 3]!;
+    rgba[q + 1] = data[p * 3 + 1]!;
+    rgba[q + 2] = data[p * 3 + 2]!;
+    rgba[q + 3] = alpha[p]!;
+  }
+  return sharp(rgba, { raw: { width: W, height: H, channels: 4 } }).png({ compressionLevel: 9 }).toBuffer();
 }
 
 async function readMeta(which: Which): Promise<RenderMeta | null> {
@@ -193,7 +253,8 @@ export async function makeOfficeRender(input: { snapshot?: Buffer; prompt?: stri
   const settings = await getStudioSettings();
   const img = await falNanoBanana(env.falKey, { prompt, endpoint: settings.fal_image_endpoint, aspectRatio: "16:9", references: [{ mimeType: "image/png", data: ref }] });
   const jpg = await sharp(img.data).resize({ width: 2400, withoutEnlargement: true }).jpeg({ quality: 88, mozjpeg: true }).toBuffer();
-  const meta: RenderMeta = { updated_at: nowIso(), ...(extra ? { prompt: extra } : {}) };
+  const prevLayout = input.from === "draft" ? ((await readMeta("draft")) ?? (await readMeta("saved")))?.layout : OFFICE_LAYOUT;
+  const meta: RenderMeta = { updated_at: nowIso(), layout: prevLayout, ...(extra ? { prompt: extra } : {}) };
   await getStorage().put(FILE.draft.img, jpg, "image/jpeg");
   await getStorage().put(FILE.draft.meta, Buffer.from(JSON.stringify({ ...meta, cost_cents: img.cost_cents })), "application/json");
   return meta;

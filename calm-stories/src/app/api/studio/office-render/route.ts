@@ -2,7 +2,7 @@ import { z } from "zod";
 import { parseBody, route } from "@/lib/api";
 import { requireEditor } from "@/lib/auth/session";
 import { badRequest, notFound } from "@/lib/errors";
-import { clearOfficeRender, discardOfficeDraft, makeOfficeRender, officeAnims, officePeople, officeRender, officeRenderInfo, saveOfficeDraft } from "@/lib/studio/office-render";
+import { clearOfficeRender, discardOfficeDraft, makeOfficeRender, officeAnims, officePeople, officeRenderCutout, officeRenderInfo, saveOfficeDraft } from "@/lib/studio/office-render";
 
 export const maxDuration = 300;
 
@@ -11,9 +11,9 @@ export const GET = route(async (req) => {
   await requireEditor();
   const q = new URL(req.url).searchParams;
   if (q.has("info")) return { ...(await officeRenderInfo()), people: await officePeople(), anims: await officeAnims() };
-  const r = await officeRender(q.has("draft") ? "draft" : "saved");
-  if (!r) throw notFound();
-  return new Response(new Uint8Array(r.data), { headers: { "content-type": "image/jpeg", "cache-control": "private, max-age=300" } });
+  const png = await officeRenderCutout(q.has("draft") ? "draft" : "saved");
+  if (!png) throw notFound();
+  return new Response(new Uint8Array(png), { headers: { "content-type": "image/png", "cache-control": "private, max-age=3600" } });
 });
 
 const Body = z.discriminatedUnion("action", [

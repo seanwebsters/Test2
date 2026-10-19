@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { AGENTS } from "@/lib/studio/agents";
 import type { AgentState } from "@/lib/studio/team";
-import { AgentAvatar, type AvatarClips } from "./AgentAvatar";
-import { SimsOffice } from "./SimsOffice";
+import { AgentFace } from "./AgentFace";
+import { SimsOffice, type ReviewItem } from "./SimsOffice";
 import { StudioInbox } from "./StudioInbox";
 import { AgentDrawer } from "./AgentDrawer";
 import { cx } from "@/lib/util";
@@ -20,9 +20,12 @@ const ACTIVITY_LABEL: Record<string, string> = {
 };
 
 /** Live AI Team room. Polls real workflow state; every pose reflects a real step. */
-export function TeamRoom({ initial, compact, clips, canEdit = true }: { initial: AgentState[]; compact?: boolean; clips?: Record<string, AvatarClips>; canEdit?: boolean }) {
+export function TeamRoom({ initial, compact, canEdit = false, review }: { initial: AgentState[]; compact?: boolean; canEdit?: boolean; review?: ReviewItem[] }) {
   const [agents, setAgents] = useState(initial);
   const [open, setOpen] = useState<string | null>(null);
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const [editing, setEditing] = useState(canEdit);
+  const mail = agents.filter((a) => a.activity === "asking_for_help").length;
   // The full page shows only the 3D studio; the compact card (overview page) keeps the rooms grid.
   const view = compact ? "rooms" : "studio";
   useEffect(() => {
@@ -45,8 +48,28 @@ export function TeamRoom({ initial, compact, clips, canEdit = true }: { initial:
   if (view === "studio")
     return (
       <>
-        <StudioInbox agents={agents} onOpen={(k) => setOpen(k)} />
-        <SimsOffice agents={agents} onOpen={(k) => setOpen(k)} canEdit={canEdit} />
+        <div className="relative mb-3 flex flex-wrap items-center gap-2">
+          <button onClick={() => setInboxOpen((o) => !o)} className={cx("inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm", mail ? "border-amber-300/50 bg-amber-300/10 text-amber-100 hover:bg-amber-300/20" : "border-white/15 text-white/90 hover:bg-white/10")} aria-expanded={inboxOpen}>
+            ✉️ Emails
+            <span className={cx("rounded-full px-2 py-0.5 text-[11px]", mail ? "bg-amber-300 text-[#2a1a00]" : "bg-white/10 text-mist")}>{mail || "0"}</span>
+          </button>
+          {canEdit && (
+            <button onClick={() => setEditing((e) => !e)} className={cx("rounded-full border px-4 py-2 text-sm", editing ? "border-lavender/50 bg-lavender/15 text-white" : "border-white/15 text-mist hover:bg-white/10 hover:text-white")}>
+              {editing ? "Done editing" : "✏️ Edit office"}
+            </button>
+          )}
+          {inboxOpen && (
+            <div className="absolute left-0 top-full z-30 mt-2 w-[min(560px,92vw)] shadow-2xl shadow-black/50">
+              <StudioInbox agents={agents} onOpen={(k) => { setInboxOpen(false); setOpen(k); }} />
+            </div>
+          )}
+        </div>
+        <SimsOffice agents={agents} onOpen={(k) => setOpen(k)} canEdit={canEdit && editing} review={review} legend={false} />
+        {!canEdit && (
+          <div className="mt-4 flex justify-center">
+            <a href="/studio/releases" className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-[#141a3a] shadow-lg shadow-black/30 hover:bg-white/90">Review &amp; Approve</a>
+          </div>
+        )}
         {open && <AgentDrawer agentKey={open} onClose={() => setOpen(null)} />}
       </>
     );
@@ -65,7 +88,7 @@ export function TeamRoom({ initial, compact, clips, canEdit = true }: { initial:
                   activity === "asking_for_help" ? "border-amber-300/50 shadow-[0_0_30px_-10px_rgba(255,201,107,0.6)]" : activity === "sleeping" ? "border-white/10" : "border-lavender/40 shadow-glow",
                 )}
               >
-                <AgentAvatar agent={def} activity={activity} clips={clips?.[def.key]} className="block w-full" />
+                <AgentFace agent={def} activity={activity} className="w-full" />
                 <div className="relative mx-2 -mt-7 mb-2 rounded-2xl border border-white/10 bg-[#0d1230]/90 p-3 backdrop-blur-md">
                   <div className="flex items-center gap-2">
                     <span className="grid h-7 w-7 place-items-center rounded-full text-[13px]" style={{ background: def.bedroom.blanket, color: def.bedroom.accent }}>

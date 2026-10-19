@@ -23,7 +23,10 @@ export default async function StudioSettingsPage() {
   const profiles = await Promise.all(AGENTS.filter((a) => !a.human).map(async (a) => ({ def: a, profile: await getAgentProfile(a.key) })));
   return (
     <div className="space-y-10">
-      <h1 className="font-serif text-5xl text-white">Settings</h1>
+      <div className="flex flex-wrap items-center gap-4">
+        <h1 className="font-serif text-5xl text-white">Settings</h1>
+        <a href="/studio/office-editor" className="ml-auto rounded-xl border border-lavender/40 px-4 py-2 font-serif text-white hover:bg-lavender/10">Edit the 3D office →</a>
+      </div>
       {(() => {
         const d = diskUsage({ breakdown: true });
         if (!d) return null;

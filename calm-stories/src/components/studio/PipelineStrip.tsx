@@ -2,7 +2,7 @@ import { AGENT_BY_KEY } from "@/lib/studio/agents";
 import type { Stage } from "@/lib/studio/pipeline-view";
 import type { AgentActivity } from "@/lib/studio/types";
 import { cx } from "@/lib/util";
-import { AgentBedroom } from "./AgentBedroom";
+import { AgentFace } from "./AgentFace";
 
 const ACT: Record<Stage["status"], AgentActivity> = {
   completed: "sleeping",
@@ -21,7 +21,7 @@ export function PipelineStrip({ stages }: { stages: Stage[] }) {
       {stages.map((s, i) => (
         <li key={s.key} className="flex shrink-0 items-center gap-2">
           <div className={cx("w-[148px] overflow-hidden rounded-2xl border bg-[#0c1226]", s.status === "in_progress" ? "border-lavender/60 shadow-glow" : s.status === "awaiting" || s.status === "blocked" ? "border-amber-300/50" : s.status === "failed" ? "border-rose-400/50" : "border-white/10")}>
-            <AgentBedroom agent={AGENT_BY_KEY[s.agent]} activity={s.status === "in_progress" && s.key === "review" ? "reading" : ACT[s.status]} className={cx("block w-full", s.status === "pending" && "opacity-60")} />
+            <AgentFace agent={AGENT_BY_KEY[s.agent]} activity={s.status === "in_progress" && s.key === "review" ? "reading" : ACT[s.status]} className={cx("w-full", s.status === "pending" && "opacity-60")} />
             <div className="px-2.5 pb-2.5 pt-1 text-center">
               <div className="font-serif text-[16px] leading-tight text-white">{s.label}</div>
               <div className="text-[11px] text-mist">{s.sub}</div>

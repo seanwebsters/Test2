@@ -1,11 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/lib/env";
-import { ACCESS_COOKIE, readAccess, TEAM_ALLOWED_WRITES } from "@/lib/auth/studio-access";
+import { ACCESS_COOKIE, ACCESS_MAX_AGE, accessToken, readAccess, TEAM_ALLOWED_WRITES, teamMayView } from "@/lib/auth/studio-access";
 
 /**
- * Studio lock (active once STUDIO_OWNER_PASSWORD is set):
- *  - studio and admin pages need the studio password (owner or team);
- *  - studio/admin APIs refuse changes from a team (view-only) login;
+ * Studio lock:
+ *  - the AI Team page is the team's view-only window (open with the link, or
+ *    behind STUDIO_TEAM_PASSWORD when that's set);
+ *  - every other studio/admin page and API needs Sean's owner passcode;
+ *  - team (view-only) visitors can't change anything;
  *  - the open /dev link and the cron trigger are closed (cron needs CRON_SECRET).
  * Redirects use the public host so they work behind Railway's proxy.
  */
@@ -24,11 +26,24 @@ export function middleware(req: NextRequest) {
     return ok ? NextResponse.next() : json(401, "Unauthorized");
   }
 
-  const role = readAccess(req.cookies.get(ACCESS_COOKIE)?.value);
+  let role = readAccess(req.cookies.get(ACCESS_COOKIE)?.value);
   const isApi = path.startsWith("/api/");
-  if (!role) return isApi ? json(401, "Enter the studio password first.") : redirect(`/studio-login?next=${encodeURIComponent(path + req.nextUrl.search)}`);
   const write = !["GET", "HEAD", "OPTIONS"].includes(req.method);
-  if (role === "team" && write && !TEAM_ALLOWED_WRITES.includes(path)) return json(403, "View-only access – ask the studio owner to make changes.");
+  const login = () => (isApi ? json(401, "Sean access only – enter the passcode first.") : redirect(`/studio-login?next=${encodeURIComponent(path + req.nextUrl.search)}`));
+  // Without a team password, the AI Team page is open: visitors get a view-only pass automatically.
+  if (!role && !env.studioTeamPassword && teamMayView(path) && !write) {
+    const token = accessToken("team");
+    const headers = new Headers(req.headers);
+    headers.set("cookie", `${req.headers.get("cookie") ? `${req.headers.get("cookie")}; ` : ""}${ACCESS_COOKIE}=${token}`);
+    const res = NextResponse.next({ request: { headers } });
+    res.cookies.set(ACCESS_COOKIE, token, { httpOnly: true, sameSite: "lax", secure: proto === "https", path: "/", maxAge: ACCESS_MAX_AGE });
+    return res;
+  }
+  if (!role) return login();
+  if (role === "team") {
+    if (!teamMayView(path)) return login(); // Sean access only
+    if (write && !TEAM_ALLOWED_WRITES.includes(path)) return json(403, "View-only access – ask Sean to make changes.");
+  }
   return NextResponse.next();
 }
 

@@ -57,9 +57,12 @@ Steps are idempotent and their state lives in the database, so several workers c
 
 ## Sharing the studio safely
 
-Set these in Railway → Test2 → Variables:
+The studio is always locked:
 
-* `STUDIO_OWNER_PASSWORD`: full control (you). Setting it locks the studio and closes the open "dev" link and the demo admin sign-in.
-* `STUDIO_TEAM_PASSWORD`: view-only. Teammates can see everything (agents, pipeline, scripts, art, audio, releases) but every change is refused. They can still use "Ask the studio".
+* **AI Team page** (`/studio/team`): the team's view-only window. Open to anyone with the link, unless `STUDIO_TEAM_PASSWORD` is set, in which case that code is needed. Nothing on it can be changed.
+* **Everything else** (all other studio and admin pages and APIs): Sean access only, behind the owner passcode. The passcode is built in and stored only as a slow salted hash. Set `STUDIO_OWNER_PASSWORD` in Railway to replace it.
+* The 3D office is edited at `/studio/office-editor` (Settings → Edit the 3D office), which is owner only.
+
+Cookies are signed with `SESSION_SECRET`, or else a random key kept on the data volume. `STUDIO_LOCK=off` turns the lock off, for local development only.
 
 People enter the password at `/studio-login`. Changing a password signs out everyone who used the old one. The cron endpoint then needs `CRON_SECRET`. The public site and `/api/approved-stories` stay open.

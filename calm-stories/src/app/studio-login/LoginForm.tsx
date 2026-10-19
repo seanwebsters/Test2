@@ -22,7 +22,7 @@ export function LoginForm({ next }: { next: string }) {
         }
       }}
     >
-      <input type="password" autoFocus required className="input w-full" placeholder="Studio password" value={pw} onChange={(e) => setPw(e.target.value)} aria-label="Studio password" />
+      <input type="password" autoFocus required className="input w-full" placeholder="Passcode" inputMode="numeric" value={pw} onChange={(e) => setPw(e.target.value)} aria-label="Passcode" />
       <button className="btn-primary w-full" disabled={busy}>{busy ? "Checking…" : "Enter the studio"}</button>
       {err && <p role="alert" className="text-sm text-rose-300">{err}</p>}
     </form>
