@@ -4,6 +4,7 @@ import { studioBoard, type BoardItem, type Lane } from "@/lib/studio/now";
 import { cx, formatCents, relativeTime } from "@/lib/util";
 import { AutoRefresh } from "./AutoRefresh";
 import { AdminAction } from "@/components/admin/AdminAction";
+import { AskStudio } from "@/components/studio/AskStudio";
 
 export const metadata = { title: "Now" };
 export const dynamic = "force-dynamic";
@@ -59,6 +60,7 @@ export default async function NowPage() {
         <h1 className="font-serif text-5xl text-white">Now</h1>
         <p className="text-sm text-mist">Every series and episode in one place, sorted by what&rsquo;s happening. Updates every few seconds; click any card for the full detail.</p>
       </header>
+      <AskStudio />
       <ul className="flex flex-wrap gap-2 text-sm">
         {LANES.map((l) => (
           <li key={l.lane} className={cx("rounded-full border px-3 py-1 text-white", l.tone)}>{l.title}: <b>{board[l.lane].length}</b></li>

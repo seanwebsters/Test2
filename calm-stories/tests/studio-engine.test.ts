@@ -431,3 +431,24 @@ describe("Quick fix", () => {
     expect((await db.get("workflow_runs", r2.id))!.status).toBe("running");
   });
 });
+
+describe("Ask the studio", () => {
+  it("answers from a live snapshot that includes the real disk size and current errors", async () => {
+    const { askStudio } = await import("@/lib/studio/ask");
+    const db = freshDb();
+    const { run } = await createRun({ kind: "episode_production", title: "Full disk ep", budget_cents: 300, created_by: "usr_calm-editor", steps: [{ key: "a", type: "audio.scene", agent: "audio_producer", label: "Narrate and mix scene 5", activity: "typing", deps: [] }] });
+    const s = (await db.findOne("workflow_steps", { run_id: run.id, key: "a" }))!;
+    await db.update("workflow_steps", s.id, { status: "failed", error: "ENOSPC: no space left on device, mkdir '/data/storage/audio/x'" });
+    let seen = "";
+    setClaudeTransport(async (req: TransportRequest) => {
+      seen = req.system.map((b) => b.text).join("\n") + "\n" + JSON.stringify(req.content);
+      return { text: "Your volume is full.", model: req.model, usage: { input_tokens: 10, output_tokens: 5, cache_read_tokens: 0, cache_write_tokens: 0, web_searches: 0 } };
+    });
+    const res = await askStudio("Why does it say the disk is full?");
+    expect(res.answer).toBe("Your volume is full.");
+    expect(seen).toMatch(/Disk the app sees: [\d.]+ GB total/);
+    expect(seen).toContain("ENOSPC: no space left on device");
+    expect(seen).toContain("Why does it say the disk is full?");
+    expect(seen).toContain("Disk full"); // the Quick fix diagnosis is included too
+  });
+});
