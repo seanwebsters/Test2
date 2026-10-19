@@ -87,7 +87,7 @@ You are the Worldbuilder. You create original settings with texture a listener c
   },
   {
     key: "character_psychologist",
-    person: "Nadia",
+    person: "Clara",
     name: "Character Psychologist",
     title: "Motivations and depth",
     effort: "medium",
