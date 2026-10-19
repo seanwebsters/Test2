@@ -19,6 +19,14 @@ export const env = {
     | "test",
   dataBackend: (opt("DATA_BACKEND") ?? "local") as "local" | "supabase",
   // Serverless platforms (Vercel) only allow writes under /tmp.
+  /** Why saved data won't survive a restart on this host, or null if it will. */
+  get storageWarning(): string | null {
+    if (opt("DATA_BACKEND") === "supabase" || opt("DATA_DIR")) return null;
+    if (process.env.RAILWAY_PROJECT_ID && !opt("RAILWAY_VOLUME_MOUNT_PATH"))
+      return "No Railway volume is attached, so everything the agents make is wiped whenever the app restarts or updates. In Railway: + Add → Volume → attach it to this service (mount path /data).";
+    if (process.env.VERCEL) return "Vercel can't keep the studio's data – it is wiped constantly. Run the studio on Railway with a volume instead.";
+    return null;
+  },
   // Railway volumes expose their mount path; Vercel only has a throwaway /tmp.
   dataDir: opt("DATA_DIR") ?? opt("RAILWAY_VOLUME_MOUNT_PATH") ?? (process.env.VERCEL ? "/tmp/calm-stories" : ".data"),
   get sessionSecret(): string {

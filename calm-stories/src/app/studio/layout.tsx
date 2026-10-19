@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db";
 import { SceneArt } from "@/components/art/SceneArt";
 import { StudioNav } from "@/components/studio/StudioNav";
 import { AGENT_BY_KEY } from "@/lib/studio/agents";
+import { env } from "@/lib/env";
 import "@/lib/studio";
 
 export const metadata = { title: { default: "Sleep Stories Studio", template: "%s · Sleep Stories Studio" } };
@@ -85,6 +86,12 @@ export default async function StudioLayout({ children }: { children: React.React
           <Link href="/studio/approvals" className="ml-auto text-sm text-lavender">Approvals</Link>
           <Link href="/studio/team" className="text-sm text-mist">Team</Link>
         </div>
+        {env.storageWarning && (
+          <div className="mx-4 mt-4 rounded-2xl border border-amber-300/50 bg-amber-400/10 px-4 py-3 text-sm sm:mx-8 lg:mx-10" role="alert">
+            <div className="font-semibold text-amber-200">Not saving permanently</div>
+            <p className="mt-1 text-amber-100/90">{env.storageWarning}</p>
+          </div>
+        )}
         {problems.length > 0 && (
           <div className="mx-4 mt-4 rounded-2xl border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm sm:mx-8 lg:mx-10" role="alert">
             <div className="font-semibold text-rose-200">Something is stopping the studio</div>
