@@ -9,8 +9,9 @@
                              bonsai, fountain, cherry, chimepost, crystals, koi, starlantern, cottage, boat
      "tree:<type>"           palm, round, meadow, magic, pine, cherry
      "node:<kind>"           wild, rock, shell, moss, crystal
-     "crop:<crop>:<stage>"   stage 0 seed, 1 sprout, 2 growing, 3 ripe
+     "crop:<crop>:<stage>"   stage 0 seed, 1 sprout, 2 growing, 3 ripe ("crop:any:<stage>" covers every crop)
      "sign"                  region signpost
+     "icon:<item>"           item, coins, hearts and serenity icons used in menus
 
    Fields
      src     image path, relative to this folder (transparent PNG or WebP, cropped tight to the artwork)
@@ -64,4 +65,16 @@ const SKIN = {
   "d:starlantern": { src: "skin/decor/starlantern.png" },
   "d:boat": { src: "skin/decor/boat.png" },
   "d:bonsai": { src: "skin/decor/bonsai.png" },
+  "crop:strawberry:3": { src: "skin/crops/strawberry.png", lift: 0.3 },
+  "crop:carrot:3": { src: "skin/crops/carrot.png", lift: 0.3 },
+  "crop:tea:3": { src: "skin/crops/tea.png", lift: 0.3 },
+  "crop:sunflower:3": { src: "skin/crops/sunflower.png", lift: 0.3 },
+  "crop:chamomile:3": { src: "skin/crops/chamomile.png", lift: 0.3 },
+  "crop:lavender:3": { src: "skin/crops/lavender.png", lift: 0.3 },
+  "crop:mint:3": { src: "skin/crops/mint.png", lift: 0.3 },
+  "crop:rose:3": { src: "skin/crops/rose.png", lift: 0.3 },
+  "crop:pumpkin:3": { src: "skin/crops/pumpkin.png", lift: 0.3 },
+  "crop:starbloom:3": { src: "skin/crops/starbloom.png", lift: 0.3 },
+  "crop:any:2": { src: "skin/crops/growing.png", lift: 0.32, scale: 0.68 },
+  "crop:any:1": { src: "skin/crops/growing.png", lift: 0.38, scale: 0.4 },
 };

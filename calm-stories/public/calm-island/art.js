@@ -642,7 +642,10 @@ function iconCanvas(id, px = 64) {
   const key = id + px;
   if (iconCache[key]) return iconCache[key];
   const cv = document.createElement("canvas"); cv.width = cv.height = px;
-  const c = cv.getContext("2d"); const sv = [G]; G = c;
+  const c = cv.getContext("2d");
+  const painted = typeof SKINNED !== "undefined" && SKINNED["icon:" + id];
+  if (painted) { const im = painted.cv, k = (px * 0.92) / Math.max(im.width, im.height); c.drawImage(im, (px - im.width * k) / 2, (px - im.height * k) / 2, im.width * k, im.height * k); return (iconCache[key] = cv); }
+  const sv = [G]; G = c;
   const s = px / 44; c.save(); c.shadowColor = "rgba(70,40,60,.22)"; c.shadowBlur = 3 * s; c.shadowOffsetY = 1.5 * s;
   (ICON_DRAW[id] || ICON_DRAW.seed)(px / 2, px / 2, s);
   c.restore(); [G] = sv;

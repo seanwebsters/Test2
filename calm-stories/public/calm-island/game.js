@@ -639,7 +639,7 @@ function objSprite(o) {
   return null;
 }
 const plotSprite = () => skinSprite("b:plot") || sprite("plot", 1, 1, 0.5, () => { box(0.06, 0.06, 0, 0.88, 0.88, 0.07, "#9b6b4e", { top: "#8a5c43" }); for (let k = 1; k < 4; k++) line(P(0.12, 0.06 + k * 0.22, 0.07), P(0.92, 0.06 + k * 0.22, 0.07), "rgba(60,35,25,.35)", 1.4); for (let k = 1; k < 4; k++) line(P(0.12, 0.08 + k * 0.22, 0.07), P(0.92, 0.08 + k * 0.22, 0.07), "rgba(255,220,180,.12)", 1); });
-const cropSprite = (id, st) => skinSprite(`crop:${id}:${st}`) || sprite("c" + id + st, 1, 1, 2.2, () => drawCrop(id, st));
+const cropSprite = (id, st) => skinSprite(`crop:${id}:${st}`) || skinSprite(`crop:any:${st}`) || sprite("c" + id + st, 1, 1, 2.2, () => drawCrop(id, st));
 let CLOUDS = [];
 function cloudSprites() {
   CLOUDS = [0, 1, 2].map((v) => { const cvs = document.createElement("canvas"); cvs.width = 220 * SPR; cvs.height = 120 * SPR; const c = cvs.getContext("2d"); c.scale(SPR, SPR); const sv = [G, OX, OY]; G = c; c.translate(110, 64); drawCloud(v * 9 + 1); [G, OX, OY] = sv; return cvs; });
