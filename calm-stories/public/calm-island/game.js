@@ -12,7 +12,7 @@ const LAND = new Set(["g", "s", "p", "r"]);
 const MAXB = { plot: 36, beehive: 3, coop: 2, goatpen: 2 };
 const BH = { home: 2.2, board: 1.15, teahouse: 1.9, beehive: 1, florist: 1.6, coop: 0.95, bakery: 2.15, workshop: 1.7, greenhouse: 1.6, goatpen: 0.9, meditation: 0.55, bathhouse: 1.45, lighthouse: 5, plot: 0.12 };
 const DH = { arch: 1.35, umbrella: 1.7, cherry: 2.7, fairylights: 1.15, chimepost: 1.2, starlantern: 1.1, fountain: 1, lantern: 1, cottage: 1, flowerbed: 0.45, koi: 0.3, mushrooms: 0.4 };
-const CANOPY = { palm: 2.55, round: 1.55, meadow: 1.55, magic: 1.55, cherry: 1.55, pine: 1.45 };
+const CANOPY = { jungle0: 0.6, jungle1: 0.7, jungle2: 0.6, jungle3: 0.6, jungle4: 0.6, jungle5: 1.5, palm: 2.55, round: 1.55, meadow: 1.55, magic: 1.55, cherry: 1.55, pine: 1.45 };
 const TREE_H = { palm: 3.2, round: 2.7, meadow: 2.7, magic: 2.9, pine: 2.9, cherry: 2.7 };
 const PATH_COST = 3;
 const fmt = (n) => (n >= 10000 ? (n / 1000).toFixed(1) + "k" : String(Math.floor(n)));
@@ -31,8 +31,8 @@ function genTerrain() {
     if (s <= 0 || x < 1 || y < 1 || x > N - 2 || y > N - 2) continue;
     const i = y * N + x, id = REGIONS[bi].id;
     RG[i] = bi;
-    let t = s < 1.15 ? "s" : "g", h = t === "s" ? 0.25 : 0.5;
-    if (id === "beach" && s < 3.2) { t = "s"; h = 0.25; }
+    let t = s < 1.15 ? "s" : "g", h = 0.5;
+    if (id === "beach" && s < 3.2) { t = "s"; h = 0.5; }
     if (id === "mountain") { const k = clamp(best / REGIONS[bi].r, 0, 1); h = 0.5 + Math.round(k * 2.4 * 4) / 4; t = h >= 2 || s < 1.15 ? "r" : "g"; }
     if (id === "springs") { h = 0.5 + Math.round(clamp(best, 0, 1.2) * 0.5 * 4) / 4; t = s < 1.15 ? "r" : "g"; if (best > 2.1) { t = "h"; h -= 0.12; } }
     if (id === "village" && t === "g" && (x === 15 || y === 26)) t = "p";
@@ -121,7 +121,7 @@ function texFace(pat, side, x, y, z0, z1) {
   G.restore();
 }
 function topTex(t, reg) {
-  if (t === "g") return texPat(reg === "forest" ? "tex:forest" : reg === "meadow" ? "tex:meadow" : "tex:grass") || texPat("tex:grass");
+  if (t === "g") return reg === "forest" ? texPat("tex:forest", 70) : reg === "meadow" ? texPat("tex:meadow", 60) : texPat("tex:grass", 45);
   if (t === "s") return texPat("tex:sand");
   if (t === "p") return texPat("tex:path", 80);
   if (t === "r" || t === "c") return texPat("tex:rock");
@@ -168,6 +168,12 @@ function drawTile(x, y) {
     texTop(tp, x, y, h);
     if (t === "g" && !["garden", "meadow", "forest"].includes(reg)) { G.globalAlpha = 0.14; poly([P(x, y, h), P(x + 1, y, h), P(x + 1, y + 1, h), P(x, y + 1, h)], REGIONS[RG[i]].grass); G.globalAlpha = 1; }
     if ("ofh".includes(t)) { G.globalAlpha = t === "h" ? 0.4 : 0.2; poly([P(x, y, h), P(x + 1, y, h), P(x + 1, y + 1, h), P(x, y + 1, h)], t === "h" ? "#c8f4ec" : "#bff2f2"); G.globalAlpha = 1; }
+    if (t === "g" && SKINNED["scatter:0"] && R() < (reg === "meadow" ? 0.7 : reg === "forest" ? 0.25 : 0.45)) {
+      for (let k = 0, n = 1 + (R() < 0.4 ? 1 : 0); k < n; k++) {
+        const im = SKINNED["scatter:" + (R() < 0.5 ? 0 : 1)].cv, w = 13 + R() * 8, hh = w * (im.height / im.width);
+        const [px, py] = P(x + 0.2 + R() * 0.6, y + 0.2 + R() * 0.6, h); G.drawImage(im, px - w / 2, py - hh + 2, w, hh);
+      }
+    }
     if (h > 0.6 && t !== "h") { G.globalAlpha = Math.min(0.12, (h - 0.5) * 0.05); poly([P(x, y, h), P(x + 1, y, h), P(x + 1, y + 1, h), P(x, y + 1, h)], "#fffaf0"); G.globalAlpha = 1; }
     return;
   }
@@ -247,6 +253,22 @@ function newObjects() {
   });
   return { objs, nid };
 }
+function growJungle() {
+  rebuildOcc();
+  const R = rnd(777), near = (x, y) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const o = objById.get(occ[(y + dy) * N + x + dx]); if (o && (o.k === "b" || o.k === "sign")) return true; } return false; };
+  for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) {
+    const i = y * N + x; if (!["g", "s"].includes(T[i]) || occ[i] || RG[i] < 0) continue;
+    const reg = REGIONS[RG[i]].id; if (reg === "village" || reg === "mountain") continue;
+    if (x >= 15 && x <= 21 && y >= 15 && y <= 21) continue;
+    let coast = false; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (T[(y + dy) * N + x + dx] === "w") coast = true;
+    const p = coast ? (T[i] === "s" ? 0.4 : 0.8) : reg === "garden" ? 0.55 : reg === "forest" ? 0.25 : reg === "meadow" || reg === "point" ? 0.12 : 0.07;
+    if (R() > p || near(x, y)) continue;
+    const kinds = T[i] === "s" ? [0, 3, 4] : reg === "forest" ? [0, 0, 1, 3, 5] : [0, 1, 2, 3, 4, 5];
+    S.objs.push({ id: S.nid++, k: "tree", t: "jungle" + kinds[Math.floor(R() * kinds.length)], x, y, w: 1, d: 1, seed: Math.floor(R() * 1000) });
+    occ[i] = -1;
+  }
+  S.jungle = 2; rebuildOcc();
+}
 function orderValue(items) { let v = 0; for (const k in items) v += ITEMS[k].value * items[k]; return v; }
 function makeOrder(who, items) { const v = orderValue(items); const craft = Object.keys(items).some((k) => ITEMS[k].kind === "craft"); return { who, items, coins: Math.round(v * 1.45 + 4), hearts: craft ? 2 : 1 }; }
 function newGame() {
@@ -257,7 +279,7 @@ function newGame() {
     regions: { garden: true }, tmod: {}, objs, nid, orders: [makeOrder("apricus", { strawberry: 2 }), makeOrder("apricus", { carrot: 2, wood: 2 }), null], orderNext: [0, 0, now() + 25000],
     friends: { apricus: 0 }, chatT: {}, lighthouse: 0, lhGiven: {}, finale: false, intro: false, sfx: true, music: true, stats: { deliver: 0, harvest: 0, made: 0 },
   };
-  genTerrain();
+  genTerrain(); growJungle();
 }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* storage unavailable */ } }
 function load() {
@@ -448,7 +470,8 @@ function gather(o) {
   const gain = {};
   if (o.k === "tree") {
     if (o.cd && now() < o.cd) { toast(`This tree is resting · ${fmtT(o.cd - now())}`); o.shake = 0.3; return; }
-    gain.wood = 1 + (Math.random() < 0.5 ? 1 : 0); if (o.t === "palm" && Math.random() < 0.35) gain.coconut = 1;
+    if (o.t.startsWith("jungle")) gain.fibre = 1 + (Math.random() < 0.5 ? 1 : 0); else gain.wood = 1 + (Math.random() < 0.5 ? 1 : 0);
+    if (o.t === "palm" && Math.random() < 0.35) gain.coconut = 1;
     o.cd = now() + 45000; o.shake = 1; sfx("wood");
     for (let k = 0; k < 6; k++) U.fx.push({ type: "leaf", x: x + (Math.random() - 0.5) * 40, y: y - 60 - Math.random() * 30, vx: (Math.random() - 0.5) * 30, vy: 10 + Math.random() * 20, life: 1.4, max: 1.4, c: o.t === "cherry" ? "#f6b6cc" : o.t === "magic" ? "#7fd0b8" : "#6cbb5e" });
   } else {
@@ -670,7 +693,7 @@ const skinKey = (o) => (o.k === "b" ? (o.t === "lighthouse" ? `b:lighthouse:${S.
 function objSprite(o) {
   const sk = skinSprite(skinKey(o), o.w || 1, o.d || 1); if (sk) return sk;
   switch (o.k) {
-    case "tree": { const v = o.seed % 4; return sprite("t" + o.t + v, 1, 1, 5, () => (o.t === "palm" ? drawPalm(v * 31 + 7) : o.t === "pine" ? drawPine(v * 13 + 3) : drawRoundTree(v * 17 + 5, PAL[o.t]))); }
+    case "tree": { const v = o.seed % 4; if (o.t.startsWith("jungle")) return sprite("tjungle", 1, 1, 2, drawBush); return sprite("t" + o.t + v, 1, 1, 5, () => (o.t === "palm" ? drawPalm(v * 31 + 7) : o.t === "pine" ? drawPine(v * 13 + 3) : drawRoundTree(v * 17 + 5, PAL[o.t]))); }
     case "wild": return sprite("wild", 1, 1, 1.5, drawBush);
     case "rock": return sprite("rock" + (o.seed % 2), 1, 1, 1.5, () => drawRock(o.seed % 2 ? "#b6b0c2" : "#c3bba9"));
     case "shell": return sprite("shell", 1, 1, 1, drawShell);
@@ -709,7 +732,9 @@ function portrait(ch, size = 120) {
   const c = document.createElement("canvas"); c.width = c.height = size * 2; const g = c.getContext("2d"); g.scale(2, 2);
   const gr = g.createRadialGradient(size / 2, size * 0.45, 4, size / 2, size / 2, size * 0.55); gr.addColorStop(0, shade(ch.body, 0.55)); gr.addColorStop(1, shade(ch.body, 0.2));
   g.fillStyle = gr; g.beginPath(); g.arc(size / 2, size / 2, size / 2, 0, 7); g.fill();
-  drawCalmling(g, size / 2, size * 0.84, ch, 0.6, { scale: size / 44, noShadow: true, happy: true });
+  const pc = SKINNED["calm:" + ch.id];
+  if (pc) drawPaintedCalmling(g, pc.cv, size / 2, size * 0.95, 0, { h: size * 0.86, noShadow: true });
+  else drawCalmling(g, size / 2, size * 0.84, ch, 0.6, { scale: size / 44, noShadow: true, happy: true });
   return (portraits[key] = c.toDataURL());
 }
 
@@ -779,6 +804,11 @@ function render(t, dt) {
   drawGhost(t);
   drawFx(dt);
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const sun = ctx.createRadialGradient(VW * 0.15, -VH * 0.1, 0, VW * 0.15, -VH * 0.1, Math.max(VW, VH) * 1.1);
+  sun.addColorStop(0, "rgba(255,236,186,.22)"); sun.addColorStop(0.5, "rgba(255,230,180,.06)"); sun.addColorStop(1, "rgba(255,230,180,0)");
+  ctx.fillStyle = sun; ctx.fillRect(0, 0, VW, VH);
+  const vg = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * 0.45, VW / 2, VH / 2, Math.max(VW, VH) * 0.8);
+  vg.addColorStop(0, "rgba(20,40,40,0)"); vg.addColorStop(1, "rgba(20,40,40,.16)"); ctx.fillStyle = vg; ctx.fillRect(0, 0, VW, VH);
   drawFliers(dt);
 }
 function drawObj(o, t, dt) {
@@ -914,17 +944,41 @@ function buildFog() {
   FOG = [];
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const i = y * N + x; if (RG[i] < 0 || RG[i] === 0) continue; if (T[i] === "w" || (x + y) % 2) continue; const edge = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => RG[(y + dy) * N + x + dx] !== RG[i]); FOG.push({ x, y, r: REGIONS[RG[i]].id, v: (x * 3 + y) % 3, s: (edge ? 0.5 : 0.68) + ((x * 13 + y * 7) % 5) / 16, p: x * 0.7 + y }); }
 }
-function drawFog(t) {
-  const pn = performance.now();
+/* Fog: a soft cached haze bank over locked regions, topped with a few large painted clouds. */
+let FOGC = null, FOGKEY = "";
+function fogCache() {
+  const key = REGIONS.filter((R) => !S.regions[R.id]).map((R) => R.id).join(",");
+  if (FOGC && FOGKEY === key) return FOGC;
+  FOGKEY = key; const sc = Math.min(1.25, DPR), w = TER.w, h = TER.h + 200;
+  const c = FOGC && FOGC.cv || document.createElement("canvas"); c.width = Math.ceil(w * sc); c.height = Math.ceil(h * sc);
+  const g = c.getContext("2d"); g.setTransform(sc, 0, 0, sc, -TER.x * sc, (-TER.y + 200) * sc);
+  const edgeOf = (f) => { for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const j = (f.y + dy) * N + f.x + dx, R = REGIONS[RG[j]]; if (R && S.regions[R.id] && T[j] !== "w") return true; } return false; };
   for (const f of FOG) {
-    let a = 1, up = 0, sc = f.s;
-    if (S.regions[f.r]) { const u = U.unlocking[f.r]; if (!u) continue; const k = (pn - u) / 1800; if (k >= 1) continue; a = 1 - k; up = k * 50; sc *= 1 + k * 0.6; }
-    const [x, y] = P(f.x + 0.5, f.y + 0.5, HT[f.y * N + f.x] + 0.9);
-    const img = CLOUDS[f.v]; ctx.globalAlpha = 0.94 * a;
-    const cw = 220 * sc, ch = cw * (img.height / img.width);
-    ctx.drawImage(img, x - cw / 2 + Math.sin(t * 0.3 + f.p) * 8, y - ch * 0.55 - up, cw, ch);
+    if (S.regions[f.r]) continue;
+    f.edge = edgeOf(f); const rr = f.edge ? 55 : 95;
+    const [x, y] = P(f.x + 0.5, f.y + 0.5, HT[f.y * N + f.x] + 0.6);
+    const gr = g.createRadialGradient(x, y, 0, x, y, rr); gr.addColorStop(0, "rgba(255,252,248,.95)"); gr.addColorStop(0.55, "rgba(250,246,252,.7)"); gr.addColorStop(1, "rgba(245,242,252,0)");
+    g.fillStyle = gr; g.beginPath(); g.arc(x, y, rr, 0, 7); g.fill();
   }
-  ctx.globalAlpha = 1;
+  FOG.forEach((f, i) => {
+    if (S.regions[f.r] || i % 3 || f.edge) return;
+    const img = CLOUDS[f.v], [x, y] = P(f.x + 0.5, f.y + 0.5, HT[f.y * N + f.x] + 1.1), cw = 230 * f.s, ch = cw * (img.height / img.width);
+    g.globalAlpha = 0.85; g.drawImage(img, x - cw / 2, y - ch * 0.6, cw, ch);
+  });
+  g.globalAlpha = 1;
+  return (FOGC = { cv: c, x: TER.x, y: TER.y - 200, w, h });
+}
+function drawFog(t) {
+  const pn = performance.now(), fc = fogCache();
+  ctx.save(); ctx.globalAlpha = 0.96; ctx.drawImage(fc.cv, fc.x + Math.sin(t * 0.15) * 6, fc.y, fc.w, fc.h); ctx.restore();
+  FOG.forEach((f, i) => {
+    const u = U.unlocking[f.r]; if (!u || !S.regions[f.r]) return;
+    const k = (pn - u) / 1800; if (k >= 1) return;
+    const [x, y] = P(f.x + 0.5, f.y + 0.5, HT[f.y * N + f.x] + 0.6);
+    const gr = ctx.createRadialGradient(x, y - k * 50, 0, x, y - k * 50, 95 * (1 + k * 0.6)); gr.addColorStop(0, `rgba(255,252,248,${0.9 * (1 - k)})`); gr.addColorStop(1, "rgba(255,252,248,0)");
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y - k * 50, 95 * (1 + k * 0.6), 0, 7); ctx.fill();
+    if (i % 3 === 0) { const img = CLOUDS[f.v], cw = 230 * f.s * (1 + k * 0.6), ch = cw * (img.height / img.width); ctx.globalAlpha = 0.85 * (1 - k); ctx.drawImage(img, x - cw / 2, y - ch * 0.6 - k * 60, cw, ch); ctx.globalAlpha = 1; }
+  });
 }
 function drawSign(o, t) {
   const z = groundZ(o.x, o.y), [x, y] = P(o.x, o.y, z), s = objSprite(o);
@@ -938,8 +992,23 @@ function drawSign(o, t) {
   // padlock / sparkle
   if (ready) star(bx - w / 2 + 10, yy, 5, "#fff6c9"); else { ctx.strokeStyle = "#9a8fa6"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(bx - w / 2 + 10, yy - 2, 3, Math.PI, 0); ctx.stroke(); ctx.fillStyle = "#9a8fa6"; ctx.fillRect(bx - w / 2 + 6, yy - 2, 8, 6); }
 }
+/* Painted Calmlings: breathe, squash on landing, lean into a walk, bounce when happy. */
+function drawPaintedCalmling(g, img, x, y, t, o) {
+  const h = o.h || 46, w = h * (img.width / img.height), hop = o.hop || 0, ph = o.phase || 0;
+  const breathe = Math.sin(t * 2.2 + ph) * 0.022, land = hop < 1.5 && o.walking ? 0.05 : 0, happy = o.happy ? Math.abs(Math.sin(t * 9)) * 5 : 0;
+  if (!o.noShadow) { g.save(); g.globalAlpha = 0.22 - hop * 0.008; g.beginPath(); g.ellipse(x, y, w * 0.36, w * 0.13, 0, 0, 7); g.fillStyle = "#2b3a3a"; g.fill(); g.restore(); }
+  g.save(); g.translate(x, y - hop - happy); g.rotate((o.lean || 0) * 0.06 + (o.wave ? Math.sin(t * 10) * 0.06 : 0));
+  g.scale(1 + land - breathe * 0.6, 1 - land + breathe); g.drawImage(img, -w / 2, -h, w, h); g.restore();
+}
 function drawCL(c, t) {
   const z = groundZ(c.x, c.y), [x, y] = P(c.x, c.y, z);
+  const pc = SKINNED["calm:" + c.ch.id];
+  if (pc) {
+    const lean = c.path.length ? clamp((c.path[0][0] + 0.5 - c.x - (c.path[0][1] + 0.5 - c.y)) * 2, -1, 1) : 0;
+    drawPaintedCalmling(ctx, pc.cv, x, y + 2, t, { hop: c.hop * 2, phase: c.phase, wave: c.wave > 0, happy: c.happy > 0, lean, walking: c.path.length > 0 });
+    if (c.happy > 0 && Math.random() < 0.03) U.fx.push({ type: "heart", x: x + (Math.random() - 0.5) * 14, y: y - 48, vy: -22, life: 1.4, max: 1.4 });
+    return;
+  }
   drawCalmling(ctx, x, y + 2, c.ch, t, { hop: c.hop * 2, blink: c.blink > 0, wave: c.wave > 0, happy: c.happy > 0, phase: c.phase, scale: 0.92, look: c.path.length ? clamp((c.path[0][0] + 0.5 - c.x - (c.path[0][1] + 0.5 - c.y)) * 3, -1.5, 1.5) : 0 });
   if (c.happy > 0 && Math.random() < 0.03) U.fx.push({ type: "heart", x: x + (Math.random() - 0.5) * 14, y: y - 34, vy: -22, life: 1.4, max: 1.4 });
 }
@@ -1017,7 +1086,7 @@ const drag = { active: false, pointers: new Map(), mode: null, sx: 0, sy: 0, lx:
 function pickAt(sx, sy) {
   const [wx, wy] = screenToWorld(sx, sy);
   let best = null, bd = -1e9;
-  for (const c of CL) { const z = groundZ(c.x, c.y), [x, y] = P(c.x, c.y, z); if (Math.abs(wx - x) < 15 && wy < y + 4 && wy > y - 34) { const d = c.x + c.y + 0.6; if (d > bd) { bd = d; best = { c }; } } }
+  for (const c of CL) { const z = groundZ(c.x, c.y), [x, y] = P(c.x, c.y, z); if (Math.abs(wx - x) < 19 && wy < y + 4 && wy > y - 48) { const d = c.x + c.y + 0.6; if (d > bd) { bd = d; best = { c }; } } }
   const inPoly = (pts) => { let ins = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const [xi, yi] = pts[i], [xj, yj] = pts[j]; if (yi > wy !== yj > wy && wx < ((xj - xi) * (wy - yi)) / (yj - yi) + xi) ins = !ins; } return ins; };
   for (const o of S.objs) {
     if (o.t === "plot") continue;
@@ -1403,6 +1472,7 @@ function boot() {
   resize(); cloudSprites();
   if (!load()) newGame();
   if (!S.tmod) S.tmod = {};
+  if ((S.jungle || 0) < 2) { S.objs = S.objs.filter((o) => !(o.k === "tree" && o.t.startsWith("jungle"))); growJungle(); }
   const board = S.objs.find((o) => o.t === "board");
   if (board && board.x === 18 && board.y === 15 && !S.objs.some((o) => o !== board && o.x === 19 && o.y === 15)) board.x = 19;
   bootWorld();
