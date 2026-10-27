@@ -159,7 +159,7 @@ function newObjects() {
   const add = (o) => { o.id = nid++; o.w = o.w || 1; o.d = o.d || 1; objs.push(o); for (let dx = 0; dx < o.w; dx++) for (let dy = 0; dy < o.d; dy++) taken.add((o.y + dy) * N + o.x + dx); return o; };
   const free = (x, y, w = 1, d = 1) => { for (let dx = 0; dx < w; dx++) for (let dy = 0; dy < d; dy++) { const i = (y + dy) * N + x + dx; if (x + dx >= N || y + dy >= N || taken.has(i) || !["g", "s", "r"].includes(T[i])) return false; } return true; };
   add({ k: "b", t: "home", x: 16, y: 15, w: 2, d: 2 });
-  add({ k: "b", t: "board", x: 18, y: 15 });
+  add({ k: "b", t: "board", x: 19, y: 15 });
   const t0 = now();
   [[19, 18], [20, 18], [19, 19], [20, 19]].forEach(([x, y], k) => add({ k: "b", t: "plot", x, y, crop: k < 2 ? { id: "strawberry", t0: t0 - (k ? 9000 : 30000), dur: 20000 } : null }));
   add({ k: "d", t: "flowerbed", x: 15, y: 16 }); add({ k: "d", t: "flowerbed", x: 18, y: 16 });
@@ -456,7 +456,18 @@ function unlockRegion(id) {
   closeSheet(); updateHUD(); checkLevel(); save();
   panTo(...P(R.cx, R.cy, 0.5), 1200);
 }
-function canPlace(x, y, w, d, ignore) {
+// Buildings keep a clear one-tile ring of space from every other building.
+const isBuilding = (o) => o && o.k === "b" && o.t !== "plot";
+function buildingGapOk(x, y, w, d, ignore) {
+  for (let ty = y - 1; ty <= y + d; ty++) for (let tx = x - 1; tx <= x + w; tx++) {
+    if (tx < 0 || ty < 0 || tx >= N || ty >= N) continue;
+    const o = objById.get(occ[ty * N + tx]);
+    if (isBuilding(o) && o !== ignore) return false;
+  }
+  return true;
+}
+function canPlace(x, y, w, d, ignore, kind, t) {
+  if (kind === "b" && t !== "plot" && !buildingGapOk(x, y, w, d, ignore)) return false;
   for (let dx = 0; dx < w; dx++) for (let dy = 0; dy < d; dy++) {
     const tx = x + dx, ty = y + dy; if (tx < 0 || ty < 0 || tx >= N || ty >= N) return false;
     const i = ty * N + tx;
@@ -469,7 +480,7 @@ function startPlace(kind, t, at) {
   closeSheet(); closePopup(); U.brush = null; U.pathBrush = false; renderBrush();
   const w = kind === "b" ? BUILDINGS[t].w : 1, d = kind === "b" ? BUILDINGS[t].d : 1;
   let [x, y] = at || screenToTile(VW / 2, VH / 2);
-  if (!at) { const sp = findSpot(x, y, w, d); if (sp) [x, y] = sp; }
+  if (!at) { const sp = findSpot(x, y, w, d, kind, t); if (sp) [x, y] = sp; }
   U.place = { kind, t, x, y, w, d, moving: null };
   renderPlacebar();
 }
@@ -478,13 +489,13 @@ function startMove(o) {
   U.place = { kind: o.k, t: o.t, x: o.x, y: o.y, w: o.w, d: o.d, moving: o };
   renderPlacebar();
 }
-function findSpot(cx, cy, w, d) {
-  for (let r = 0; r < 12; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; if (canPlace(cx + dx, cy + dy, w, d)) return [cx + dx, cy + dy]; }
+function findSpot(cx, cy, w, d, kind, t) {
+  for (let r = 0; r < 14; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; if (canPlace(cx + dx, cy + dy, w, d, null, kind, t)) return [cx + dx, cy + dy]; }
   return null;
 }
 function confirmPlace() {
   const p = U.place; if (!p) return;
-  if (!canPlace(p.x, p.y, p.w, p.d, p.moving)) return toast("That spot isn't free. Choose an open patch of land.");
+  if (!canPlace(p.x, p.y, p.w, p.d, p.moving, p.kind, p.t)) return toast(p.kind === "b" && p.t !== "plot" && !buildingGapOk(p.x, p.y, p.w, p.d, p.moving) ? "Leave a tile of space between buildings." : "That spot isn't free. Choose an open patch of land.");
   if (p.moving) { p.moving.x = p.x; p.moving.y = p.y; sfx("build"); }
   else {
     const cost = p.kind === "b" ? BUILDINGS[p.t].cost : DECOR[p.t].cost;
@@ -591,7 +602,29 @@ function panTo(wx, wy, ms = 900, z) { U.camAnim = { fx: cam.x, fy: cam.y, fz: ca
 const SP = {};
 const PAL = { round: ["#77c06a", "#6bb563", "#86c972"], meadow: ["#a6cf62", "#97c65b", "#b8d970"], magic: Object.assign(["#4fa58f", "#5ab09a", "#8f7ccf", "#62b8a4"], { accent: "#e6fff7" }), cherry: Object.assign(["#f6b6cc", "#f9c7d8", "#efa1bd"], { accent: "#fff0f5" }) };
 function sprite(key, w, d, hu, fn) { return SP[key] || (SP[key] = makeSprite(w, d, hu, fn)); }
+/* Painted skin: images listed in skin.js replace the code-drawn art key by key. */
+const SKINNED = {};
+function loadSkin(done) {
+  const list = typeof SKIN === "undefined" ? {} : SKIN, keys = Object.keys(list); let left = keys.length;
+  if (!left) return done();
+  const finish = () => { if (--left === 0) done(); };
+  for (const k of keys) {
+    const e = list[k], img = new Image();
+    img.onload = () => { const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext("2d").drawImage(img, 0, 0); SKINNED[k] = { cv: c, e, fit: {} }; finish(); };
+    img.onerror = () => { console.warn(`Skin image not found: ${e.src}`); finish(); };
+    img.src = e.src;
+  }
+}
+function skinSprite(key, w = 1, d = 1) {
+  const s = SKINNED[key]; if (!s) return null;
+  const f = w + "x" + d; if (s.fit[f]) return s.fit[f];
+  // Fit the image to its own footprint: never wider than the ground it stands on, base resting on the front edge.
+  const W = (w + d) * HW * (s.e.scale ?? (key.startsWith("b:") ? 0.8 : 0.86)), H = s.cv.height * (W / s.cv.width), lift = s.e.lift ?? 0.12;
+  return (s.fit[f] = { cv: s.cv, w: W, h: H, ox: W / 2 - ((w - d) / 2) * HW, oy: H - (w + d) * HH * (1 - lift) });
+}
+const skinKey = (o) => (o.k === "b" ? (o.t === "lighthouse" ? `b:lighthouse:${S.lighthouse}` : `b:${o.t}`) : o.k === "d" ? `d:${o.t}` : o.k === "tree" ? `tree:${o.t}` : o.k === "sign" ? "sign" : `node:${o.k}`);
 function objSprite(o) {
+  const sk = skinSprite(skinKey(o), o.w || 1, o.d || 1); if (sk) return sk;
   switch (o.k) {
     case "tree": { const v = o.seed % 4; return sprite("t" + o.t + v, 1, 1, 5, () => (o.t === "palm" ? drawPalm(v * 31 + 7) : o.t === "pine" ? drawPine(v * 13 + 3) : drawRoundTree(v * 17 + 5, PAL[o.t]))); }
     case "wild": return sprite("wild", 1, 1, 1.5, drawBush);
@@ -605,8 +638,8 @@ function objSprite(o) {
   }
   return null;
 }
-const plotSprite = () => sprite("plot", 1, 1, 0.5, () => { box(0.06, 0.06, 0, 0.88, 0.88, 0.07, "#9b6b4e", { top: "#8a5c43" }); for (let k = 1; k < 4; k++) line(P(0.12, 0.06 + k * 0.22, 0.07), P(0.92, 0.06 + k * 0.22, 0.07), "rgba(60,35,25,.35)", 1.4); for (let k = 1; k < 4; k++) line(P(0.12, 0.08 + k * 0.22, 0.07), P(0.92, 0.08 + k * 0.22, 0.07), "rgba(255,220,180,.12)", 1); });
-const cropSprite = (id, st) => sprite("c" + id + st, 1, 1, 2.2, () => drawCrop(id, st));
+const plotSprite = () => skinSprite("b:plot") || sprite("plot", 1, 1, 0.5, () => { box(0.06, 0.06, 0, 0.88, 0.88, 0.07, "#9b6b4e", { top: "#8a5c43" }); for (let k = 1; k < 4; k++) line(P(0.12, 0.06 + k * 0.22, 0.07), P(0.92, 0.06 + k * 0.22, 0.07), "rgba(60,35,25,.35)", 1.4); for (let k = 1; k < 4; k++) line(P(0.12, 0.08 + k * 0.22, 0.07), P(0.92, 0.08 + k * 0.22, 0.07), "rgba(255,220,180,.12)", 1); });
+const cropSprite = (id, st) => skinSprite(`crop:${id}:${st}`) || sprite("c" + id + st, 1, 1, 2.2, () => drawCrop(id, st));
 let CLOUDS = [];
 function cloudSprites() {
   CLOUDS = [0, 1, 2].map((v) => { const cvs = document.createElement("canvas"); cvs.width = 220 * SPR; cvs.height = 120 * SPR; const c = cvs.getContext("2d"); c.scale(SPR, SPR); const sv = [G, OX, OY]; G = c; c.translate(110, 64); drawCloud(v * 9 + 1); [G, OX, OY] = sv; return cvs; });
@@ -726,7 +759,8 @@ function drawObj(o, t, dt) {
 }
 function smoke(x, y, k = 1) { if (Math.random() < 0.05 * k) U.fx.push({ type: "smoke", x, y, vx: 6 + Math.random() * 4, vy: -14, life: 3, max: 3 }); }
 function drawBuildingLive(o, t, z) {
-  const P2 = (u, v, h) => P(o.x + u, o.y + v, z + h);
+  const P2 = (u, v, h) => P(o.x + u, o.y + v, z + h), painted = !!SKINNED[skinKey(o)];
+  if (painted) { drawPaintedLive(o, t, z, P2); return; }
   if (o.t === "home") { const [cx, cy] = P2(1.37, 0.54, 2.15); smoke(cx, cy); }
   if (o.t === "bakery") { const [cx, cy] = P2(0.56, 0.56, 2.18); smoke(cx, cy, 1.6); }
   if (o.t === "bathhouse") { const [cx, cy] = P2(1.05, 1.42, 0.4); if (Math.random() < 0.12) U.fx.push({ type: "steam", x: cx + (Math.random() - 0.5) * 30, y: cy, vx: 0, vy: -12, life: 2.4, max: 2.4 }); }
@@ -735,7 +769,7 @@ function drawBuildingLive(o, t, z) {
   if (o.t === "goatpen") { const u = 1.2 + Math.sin(t * 0.25) * 0.35, v = 1.25 + Math.cos(t * 0.2) * 0.3; const [gx, gy] = P2(u, v, 0); const nod = Math.sin(t * 2) * 1.2; ell(gx, gy, 11, 3.5, "rgba(40,50,40,.15)"); for (const dx of [-6, -2, 3, 7]) G.fillRect(gx + dx - 1, gy - 7, 2, 7); ball(gx, gy - 11, 9, "#f7f3ea", 0.15); ball(gx + 9, gy - 16 + nod, 5, "#f7f3ea", 0.15); line([gx + 7, gy - 20 + nod], [gx + 5, gy - 25 + nod], "#9b8a7a", 1.6); line([gx + 11, gy - 20 + nod], [gx + 12, gy - 25 + nod], "#9b8a7a", 1.6); circ(gx + 11, gy - 16 + nod, 0.9, "#2f2a3a"); }
   if (o.t === "teahouse") for (const [u, v] of [[0.1, 2.0], [2.0, 2.0]]) { const [lx, ly] = P2(u, v, 0.66); G.globalAlpha = 0.25 + Math.sin(t * 2 + u) * 0.08; circ(lx, ly, 10, "#ffcf8a"); G.globalAlpha = 1; }
   if (o.t === "lighthouse" && S.lighthouse >= 3) {
-    const [lx, ly] = P2(0.95, 0.95, 3.95);
+    const [lx, ly] = P2(1, 1, U.paintedLH ? 5.7 : 3.95);
     const g = G.createRadialGradient(lx, ly, 2, lx, ly, 60); g.addColorStop(0, "rgba(255,244,190,.9)"); g.addColorStop(1, "rgba(255,244,190,0)"); G.fillStyle = g; G.beginPath(); G.arc(lx, ly, 60, 0, 7); G.fill();
     const a = t * 0.8; G.save(); G.translate(lx, ly); G.scale(1, 0.5); G.rotate(a);
     const bg = G.createLinearGradient(0, 0, 420, 0); bg.addColorStop(0, "rgba(255,246,200,.55)"); bg.addColorStop(1, "rgba(255,246,200,0)");
@@ -752,6 +786,17 @@ function drawBuildingLive(o, t, z) {
     else if (q.length) { const j = q[0], k = clamp((tn - j.s) / (j.e - j.s), 0, 1); const [bx, by] = P2(o.w / 2, o.d / 2, (BH[o.t] || 1) + 0.3); G.beginPath(); G.arc(bx, by, 9, 0, 7); G.fillStyle = "rgba(255,250,241,.92)"; G.fill(); G.beginPath(); G.arc(bx, by, 7, -Math.PI / 2, -Math.PI / 2 + k * Math.PI * 2); G.strokeStyle = "#7fb39b"; G.lineWidth = 3; G.stroke(); }
   }
 }
+/* Overlays kept for painted art: animals, production bubbles and the lighthouse beam. */
+function drawPaintedLive(o, t, z, P2) {
+  const keep = ["beehive", "lighthouse"];
+  if (keep.includes(o.t)) { const k = skinKey(o), sv = SKINNED[k]; delete SKINNED[k]; U.paintedLH = o.t === "lighthouse"; try { drawBuildingLive(o, t, z); } finally { SKINNED[k] = sv; U.paintedLH = false; } return; }
+  if (o.t === "board" && S.orders.some(canDeliver)) bubble(...P2(0.5, 0.5, 1.6), t, "!", null);
+  if (BUILDINGS[o.t] && BUILDINGS[o.t].recipes) {
+    const q = o.q || [], tn = now(), done = q.filter((j) => j.e <= tn), h = (BH[o.t] || 1) + 0.35;
+    if (done.length) bubble(...P2(o.w / 2, o.d / 2, h), t, done.length > 1 ? done.length : "", iconCanvas(BUILDINGS[o.t].recipes[done[0].r].out, 48));
+    else if (q.length) { const j = q[0], k = clamp((tn - j.s) / (j.e - j.s), 0, 1); const [bx, by] = P2(o.w / 2, o.d / 2, h - 0.05); G.beginPath(); G.arc(bx, by, 9, 0, 7); G.fillStyle = "rgba(255,250,241,.92)"; G.fill(); G.beginPath(); G.arc(bx, by, 7, -Math.PI / 2, -Math.PI / 2 + k * Math.PI * 2); G.strokeStyle = "#7fb39b"; G.lineWidth = 3; G.stroke(); }
+  }
+}
 function bubble(x, y, t, label, img) {
   const by = y + Math.sin(t * 3) * 2.5;
   G.save(); G.shadowColor = "rgba(60,40,70,.25)"; G.shadowBlur = 6; G.shadowOffsetY = 2;
@@ -761,6 +806,7 @@ function bubble(x, y, t, label, img) {
   if (label) { if (!img) { G.fillStyle = "#ef8a6f"; G.font = "800 17px Nunito, system-ui, sans-serif"; G.textAlign = "center"; G.fillText(String(label), x, by + 2); } else { circ(x + 11, by - 14, 6.5, "#ef8a6f"); G.fillStyle = "#fff"; G.font = "800 9px Nunito, system-ui, sans-serif"; G.textAlign = "center"; G.fillText(String(label), x + 11, by - 11); } }
 }
 function drawDecorLive(o, t, z) {
+  if (SKINNED[skinKey(o)]) return;
   const P2 = (u, v, h) => P(o.x + u, o.y + v, z + h);
   if (o.t === "fairylights") { const a = P2(0.15, 0.5, 1.0), b = P2(0.85, 0.5, 1.0); for (let i = 0; i <= 8; i++) { const k = i / 8, x = a[0] + (b[0] - a[0]) * k, y = a[1] + (b[1] - a[1]) * k + Math.sin(k * Math.PI) * 12; const tw = 0.6 + Math.sin(t * 3 + i) * 0.4; G.globalAlpha = 0.35 * tw; circ(x, y + 2, 5, ["#ffe39e", "#ffc6d6", "#cfe9ff"][i % 3]); G.globalAlpha = 1; circ(x, y + 2, 1.8, ["#ffe39e", "#ffc6d6", "#cfe9ff"][i % 3]); } }
   if (o.t === "lantern" || o.t === "starlantern") { const [lx, ly] = P2(0.5, 0.5, o.t === "lantern" ? 0.65 : 1.05); G.globalAlpha = 0.22 + Math.sin(t * 2 + o.id) * 0.06; circ(lx, ly, 14, "#ffd98a"); G.globalAlpha = 1; if (o.t === "starlantern") { const yy = ly + Math.sin(t * 2) * 2; G.globalAlpha = 0.4; circ(lx, yy, 9, "#fff3b0"); G.globalAlpha = 1; star(lx, yy, 7, "#ffd86b", "#fff7d6"); } }
@@ -867,7 +913,7 @@ function drawHint(t) {
 function nearest(fn) { let best = null, bd = 1e9; for (const o of S.objs) if (fn(o)) { const d = Math.hypot(o.x - 17, o.y - 17); if (d < bd) { bd = d; best = o; } } return best; }
 function drawGhost(t) {
   const p = U.place; if (!p) return;
-  const ok = canPlace(p.x, p.y, p.w, p.d, p.moving);
+  const ok = canPlace(p.x, p.y, p.w, p.d, p.moving, p.kind, p.t);
   for (let dx = 0; dx < p.w; dx++) for (let dy = 0; dy < p.d; dy++) { const x = p.x + dx, y = p.y + dy; if (x < 0 || y < 0 || x >= N || y >= N) continue; const h = HT[y * N + x]; poly([P(x, y, h), P(x + 1, y, h), P(x + 1, y + 1, h), P(x, y + 1, h)], ok ? "rgba(140,230,170,.45)" : "rgba(240,120,120,.45)", ok ? "#e9fff0" : "#ffe1e1", 2); }
   const fake = p.moving || { k: p.kind, t: p.t, w: p.w, d: p.d, x: p.x, y: p.y };
   const s = p.t === "plot" ? plotSprite() : objSprite(fake); if (!s) return;
@@ -1056,9 +1102,9 @@ function closeSheet() { $("#sheet").classList.remove("open"); $("#sheet").hidden
 function renderPlacebar() {
   const p = U.place, el = $("#placebar");
   if (!p) { el.hidden = true; return; }
-  const name = p.kind === "b" ? BUILDINGS[p.t].name : DECOR[p.t].name, ok = canPlace(p.x, p.y, p.w, p.d, p.moving);
+  const name = p.kind === "b" ? BUILDINGS[p.t].name : DECOR[p.t].name, ok = canPlace(p.x, p.y, p.w, p.d, p.moving, p.kind, p.t);
   el.hidden = false;
-  el.innerHTML = `<div><b>${p.moving ? "Moving" : "Placing"} ${name}</b><span>${ok ? "Tap or drag to choose a spot" : "That spot is taken. Try open land."}</span>${!p.moving ? `<span class="cost">${costHTML(p.kind === "b" ? BUILDINGS[p.t].cost : DECOR[p.t].cost)}</span>` : ""}</div><button class="btn round" data-act="cancelplace" aria-label="Cancel">✕</button><button class="btn round primary" data-act="confirmplace" ${ok ? "" : "disabled"} aria-label="Place here">✓</button>`;
+  el.innerHTML = `<div><b>${p.moving ? "Moving" : "Placing"} ${name}</b><span>${ok ? "Tap or drag to choose a spot" : p.kind === "b" && p.t !== "plot" && !buildingGapOk(p.x, p.y, p.w, p.d, p.moving) ? "Too close. Leave a tile of space between buildings." : "That spot is taken. Try open land."}</span>${!p.moving ? `<span class="cost">${costHTML(p.kind === "b" ? BUILDINGS[p.t].cost : DECOR[p.t].cost)}</span>` : ""}</div><button class="btn round" data-act="cancelplace" aria-label="Cancel">✕</button><button class="btn round primary" data-act="confirmplace" ${ok ? "" : "disabled"} aria-label="Place here">✓</button>`;
 }
 function renderBrush() {
   const el = $("#brushbar");
@@ -1299,10 +1345,13 @@ function showIntro() {
   $("#introArt").src = portrait(CH.apricus, 160);
   $("#introBtn").textContent = S.intro ? "Return to the island" : "Begin";
 }
-function start() {
+function start() { loadSkin(boot); }
+function boot() {
   resize(); cloudSprites();
   if (!load()) newGame();
   if (!S.tmod) S.tmod = {};
+  const board = S.objs.find((o) => o.t === "board");
+  if (board && board.x === 18 && board.y === 15 && !S.objs.some((o) => o !== board && o.x === 19 && o.y === 15)) board.x = 19;
   bootWorld();
   $("#pCoins img").src = iconURL("coins"); $("#pHearts img").src = iconURL("hearts"); $("#pSerenity img").src = iconURL("serenity");
   showIntro();
