@@ -98,6 +98,37 @@ function buildTerrain() {
   for (let s = 0; s < 2 * N - 1; s++) for (let x = 0; x <= s; x++) { const y = s - x; if (x < N && y < N && T[y * N + x] !== "w") drawTile(x, y); }
   [G, OX, OY] = sv;
 }
+/* Painted ground: seamless textures (mirrored so edges always meet) mapped onto the isometric planes. */
+const PAT = {};
+function texPat(key, perTile = 100) {
+  const k = key + perTile; if (PAT[k] !== undefined) return PAT[k];
+  const s = typeof SKINNED !== "undefined" && SKINNED[key]; if (!s) return (PAT[k] = null);
+  const w = s.cv.width, h = s.cv.height, c = document.createElement("canvas"); c.width = w * 2; c.height = h * 2;
+  const g = c.getContext("2d");
+  for (const [sx, sy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) { g.save(); g.translate(sx < 0 ? 2 * w : 0, sy < 0 ? 2 * h : 0); g.scale(sx, sy); g.drawImage(s.cv, 0, 0); g.restore(); }
+  const p = g.createPattern(c, "repeat"); p.setTransform(new DOMMatrix().scale(perTile ? 1 / perTile : 1));
+  return (PAT[k] = p);
+}
+function texTop(pat, x, y, h) {
+  G.save(); G.beginPath(); const q = [P(x, y, h), P(x + 1, y, h), P(x + 1, y + 1, h), P(x, y + 1, h)];
+  G.moveTo(q[0][0], q[0][1] - 0.4); G.lineTo(q[1][0] + 0.6, q[1][1]); G.lineTo(q[2][0], q[2][1] + 0.4); G.lineTo(q[3][0] - 0.6, q[3][1]); G.closePath(); G.clip();
+  const [ox, oy] = P(0, 0, h); G.transform(HW, HH, -HW, HH, ox, oy); G.fillStyle = pat; G.fillRect(x - 0.05, y - 0.05, 1.1, 1.1); G.restore();
+}
+function texFace(pat, side, x, y, z0, z1) {
+  G.save();
+  if (side === "y") { const [ox, oy] = P(0, y + 1, 0); G.transform(HW, HH, 0, -ZS, ox, oy); G.fillStyle = pat; G.fillRect(x, z0, 1, z1 - z0); }
+  else { const [ox, oy] = P(x + 1, 0, 0); G.transform(-HW, HH, 0, -ZS, ox, oy); G.fillStyle = pat; G.fillRect(y, z0, 1, z1 - z0); }
+  G.restore();
+}
+function topTex(t, reg) {
+  if (t === "g") return texPat(reg === "forest" ? "tex:forest" : reg === "meadow" ? "tex:meadow" : "tex:grass") || texPat("tex:grass");
+  if (t === "s") return texPat("tex:sand");
+  if (t === "p") return texPat("tex:path", 80);
+  if (t === "r" || t === "c") return texPat("tex:rock");
+  if (t === "o" || t === "f" || t === "h") return texPat("tex:water", 140);
+  return null;
+}
+const sideTex = (t) => ("gop".includes(t) ? texPat("tex:cliff", 90) : t === "s" ? texPat("tex:sand") : texPat("tex:stone", 90));
 function drawTile(x, y) {
   const i = y * N + x, t = T[i];
   if (t === "w") {
@@ -109,24 +140,37 @@ function drawTile(x, y) {
   const nb = (j, ok) => (ok && T[j] !== "w" ? HT[j] : -0.3);
   const hl = nb(i + N, y + 1 < N), hr = nb(i + 1, x + 1 < N);
   const side = SIDE[t];
-  const face = (pts, col, low) => {
+  const face = (pts, col, low, sd, z0) => {
     const g = G.createLinearGradient(0, pts[0][1], 0, pts[3][1] + 4);
     g.addColorStop(0, col); g.addColorStop(0.7, shade(col, -0.12)); g.addColorStop(1, low < 0 ? "#6fb6b5" : shade(col, -0.2));
     poly(pts, g, EDGE, 0.6);
+    const st = sideTex(t); if (!st) return;
+    texFace(st, sd, x, y, z0, h);
+    const o = G.createLinearGradient(0, pts[0][1], 0, pts[3][1] + 4);
+    o.addColorStop(0, sd === "x" ? "rgba(40,30,60,.22)" : "rgba(40,30,60,.04)"); o.addColorStop(0.75, sd === "x" ? "rgba(40,30,60,.32)" : "rgba(40,30,60,.16)"); o.addColorStop(1, low < 0 ? "rgba(90,190,195,.85)" : "rgba(40,30,60,.3)");
+    poly(pts, o, EDGE, 0.6);
   };
   if (hl < h) {
-    face([P(x, y + 1, h), P(x + 1, y + 1, h), P(x + 1, y + 1, hl), P(x, y + 1, hl)], side, hl);
+    face([P(x, y + 1, h), P(x + 1, y + 1, h), P(x + 1, y + 1, hl), P(x, y + 1, hl)], side, hl, "y", hl);
     if (t === "g") poly([P(x, y + 1, h), P(x + 1, y + 1, h), P(x + 1, y + 1, h - 0.07), P(x, y + 1, h - 0.07)], shade(tileTop(x, y), -0.12));
     if (t === "c" || t === "f" || t === "r") for (let k = 1; k < (h - hl) * 3; k++) line(P(x + 0.05, y + 1, h - k / 3), P(x + 0.95, y + 1, h - k / 3 + 0.05), "rgba(70,60,90,.15)", 0.8);
   }
   if (hr < h) {
-    face([P(x + 1, y, h), P(x + 1, y + 1, h), P(x + 1, y + 1, hr), P(x + 1, y, hr)], shade(side, -0.14), hr);
+    face([P(x + 1, y, h), P(x + 1, y + 1, h), P(x + 1, y + 1, hr), P(x + 1, y, hr)], shade(side, -0.14), hr, "x", hr);
     if (t === "g") poly([P(x + 1, y, h), P(x + 1, y + 1, h), P(x + 1, y + 1, h - 0.07), P(x + 1, y, h - 0.07)], shade(tileTop(x, y), -0.2));
     if (t === "c" || t === "f" || t === "r") for (let k = 1; k < (h - hr) * 3; k++) line(P(x + 1, y + 0.05, h - k / 3), P(x + 1, y + 0.95, h - k / 3 + 0.05), "rgba(60,50,80,.18)", 0.8);
   }
   const top = tileTop(x, y);
   poly([P(x, y, h), P(x + 1, y, h), P(x + 1, y + 1, h), P(x, y + 1, h)], top, "rgba(60,80,50,.06)", 0.6);
   const reg = REGIONS[RG[i]] ? REGIONS[RG[i]].id : "garden";
+  const tp = topTex(t, reg);
+  if (tp) {
+    texTop(tp, x, y, h);
+    if (t === "g" && !["garden", "meadow", "forest"].includes(reg)) { G.globalAlpha = 0.14; poly([P(x, y, h), P(x + 1, y, h), P(x + 1, y + 1, h), P(x, y + 1, h)], REGIONS[RG[i]].grass); G.globalAlpha = 1; }
+    if ("ofh".includes(t)) { G.globalAlpha = t === "h" ? 0.4 : 0.2; poly([P(x, y, h), P(x + 1, y, h), P(x + 1, y + 1, h), P(x, y + 1, h)], t === "h" ? "#c8f4ec" : "#bff2f2"); G.globalAlpha = 1; }
+    if (h > 0.6 && t !== "h") { G.globalAlpha = Math.min(0.12, (h - 0.5) * 0.05); poly([P(x, y, h), P(x + 1, y, h), P(x + 1, y + 1, h), P(x, y + 1, h)], "#fffaf0"); G.globalAlpha = 1; }
+    return;
+  }
   if (t === "g") {
     for (let k = 0; k < 4; k++) { const [px, py] = P(x + 0.15 + R() * 0.7, y + 0.15 + R() * 0.7, h); line([px, py], [px - 1.5, py - 3.5], shade(top, -0.14), 1); line([px + 1.5, py], [px + 2.5, py - 3], shade(top, -0.1), 1); }
     const fl = reg === "meadow" ? 0.7 : reg === "village" ? 0.4 : reg === "forest" ? 0.25 : 0.3;
@@ -638,10 +682,11 @@ function objSprite(o) {
   }
   return null;
 }
-const plotSprite = () => skinSprite("b:plot") || sprite("plot", 1, 1, 0.5, () => { box(0.06, 0.06, 0, 0.88, 0.88, 0.07, "#9b6b4e", { top: "#8a5c43" }); for (let k = 1; k < 4; k++) line(P(0.12, 0.06 + k * 0.22, 0.07), P(0.92, 0.06 + k * 0.22, 0.07), "rgba(60,35,25,.35)", 1.4); for (let k = 1; k < 4; k++) line(P(0.12, 0.08 + k * 0.22, 0.07), P(0.92, 0.08 + k * 0.22, 0.07), "rgba(255,220,180,.12)", 1); });
+const plotSprite = () => skinSprite("b:plot") || sprite("plot", 1, 1, 0.5, () => { box(0.06, 0.06, 0, 0.88, 0.88, 0.07, "#9b6b4e", { top: "#8a5c43" }); const sp = texPat("tex:soil", 80); if (sp) { G.save(); G.beginPath(); for (const [u, v] of [[0.06, 0.06], [0.94, 0.06], [0.94, 0.94], [0.06, 0.94]]) G.lineTo(...P(u, v, 0.07)); G.closePath(); G.clip(); const [ox, oy] = P(0, 0, 0.07); G.transform(HW, HH, -HW, HH, ox, oy); G.fillStyle = sp; G.fillRect(0, 0, 1, 1); G.restore(); return; } for (let k = 1; k < 4; k++) line(P(0.12, 0.06 + k * 0.22, 0.07), P(0.92, 0.06 + k * 0.22, 0.07), "rgba(60,35,25,.35)", 1.4); for (let k = 1; k < 4; k++) line(P(0.12, 0.08 + k * 0.22, 0.07), P(0.92, 0.08 + k * 0.22, 0.07), "rgba(255,220,180,.12)", 1); });
 const cropSprite = (id, st) => skinSprite(`crop:${id}:${st}`) || skinSprite(`crop:any:${st}`) || sprite("c" + id + st, 1, 1, 2.2, () => drawCrop(id, st));
 let CLOUDS = [];
 function cloudSprites() {
+  if (typeof SKINNED !== "undefined" && SKINNED["cloud:0"]) { CLOUDS = [0, 1, 2].map((v) => (SKINNED["cloud:" + v] || SKINNED["cloud:0"]).cv); return; }
   CLOUDS = [0, 1, 2].map((v) => { const cvs = document.createElement("canvas"); cvs.width = 220 * SPR; cvs.height = 120 * SPR; const c = cvs.getContext("2d"); c.scale(SPR, SPR); const sv = [G, OX, OY]; G = c; c.translate(110, 64); drawCloud(v * 9 + 1); [G, OX, OY] = sv; return cvs; });
 }
 const thumbs = {};
@@ -686,6 +731,13 @@ function render(t, dt) {
   ctx.fillStyle = bg; ctx.fillRect(0, 0, cv.width, cv.height);
   const z = cam.z * DPR;
   ctx.setTransform(z, 0, 0, z, DPR * (VW / 2 - cam.x * cam.z), DPR * (VH / 2 - cam.y * cam.z));
+  const wp = texPat("tex:water", 0);
+  if (wp) {
+    const sw = SKINNED["tex:water"].cv.width;
+    wp.setTransform(new DOMMatrix().translate(t * 0.04, t * 0.025).scale(3.2 / sw));
+    ctx.save(); ctx.transform(HW, HH, -HW, HH, 0, 0); ctx.fillStyle = wp; ctx.fillRect(-60, -60, N + 120, N + 120); ctx.restore();
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); const ov = ctx.createLinearGradient(0, 0, 0, cv.height); ov.addColorStop(0, "rgba(150,235,230,.18)"); ov.addColorStop(1, "rgba(30,110,150,.22)"); ctx.fillStyle = ov; ctx.fillRect(0, 0, cv.width, cv.height); ctx.restore();
+  }
   G = ctx; OX = 0; OY = 0;
   const [vx0, vy0] = screenToWorld(0, 0), [vx1, vy1] = screenToWorld(VW, VH);
   const vis = (x, y, m = 120) => x > vx0 - m && x < vx1 + m && y > vy0 - m && y < vy1 + m * 1.6;
@@ -695,13 +747,13 @@ function render(t, dt) {
   // wave rings around the island
   for (let k = 0; k < 2; k++) {
     const f = (t * 0.18 + k * 0.5) % 1, o = 0.1 + f * 0.45;
-    ctx.strokeStyle = `rgba(255,255,255,${Math.sin(f * Math.PI) * 0.16})`; ctx.lineWidth = 1.5; ctx.beginPath();
+    ctx.strokeStyle = `rgba(255,255,255,${Math.sin(f * Math.PI) * 0.07})`; ctx.lineWidth = 3; ctx.beginPath();
     for (const [x0, y0, x1, y1, nx, ny] of COAST) { const a = P(x0 + nx * o, y0 + ny * o, 0), b = P(x1 + nx * o, y1 + ny * o, 0); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); }
     ctx.stroke();
   }
   ctx.drawImage(TER.cv, TER.x, TER.y, TER.w, TER.h);
   // shore foam
-  ctx.strokeStyle = `rgba(255,255,255,${0.55 + Math.sin(t * 2) * 0.15})`; ctx.lineWidth = 2.6; ctx.lineCap = "round"; ctx.beginPath();
+  ctx.strokeStyle = `rgba(255,255,255,${0.32 + Math.sin(t * 2) * 0.1})`; ctx.lineWidth = 3.4; ctx.lineCap = "round"; ctx.beginPath();
   for (const [x0, y0, x1, y1, nx, ny] of COAST) { const o = 0.05 + Math.sin(t * 1.8 + x0 * 0.7 + y0) * 0.03; const a = P(x0 + nx * o, y0 + ny * o, 0), b = P(x1 + nx * o, y1 + ny * o, 0); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); }
   ctx.stroke();
   drawWaterFx(t);
@@ -869,7 +921,8 @@ function drawFog(t) {
     if (S.regions[f.r]) { const u = U.unlocking[f.r]; if (!u) continue; const k = (pn - u) / 1800; if (k >= 1) continue; a = 1 - k; up = k * 50; sc *= 1 + k * 0.6; }
     const [x, y] = P(f.x + 0.5, f.y + 0.5, HT[f.y * N + f.x] + 0.9);
     const img = CLOUDS[f.v]; ctx.globalAlpha = 0.94 * a;
-    ctx.drawImage(img, x - 110 * sc + Math.sin(t * 0.3 + f.p) * 8, y - 64 * sc - up, 220 * sc, 120 * sc);
+    const cw = 220 * sc, ch = cw * (img.height / img.width);
+    ctx.drawImage(img, x - cw / 2 + Math.sin(t * 0.3 + f.p) * 8, y - ch * 0.55 - up, cw, ch);
   }
   ctx.globalAlpha = 1;
 }

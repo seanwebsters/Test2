@@ -303,6 +303,15 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--coral); out
   .intro p.blurb { font-size: 14px; margin: 6px 0 12px; }
   .intro .names { margin-top: 10px; font-size: 13px; }
 }
+
+/* ---------- painted materials ---------- */
+.sheet-card { background: linear-gradient(180deg, rgba(255,250,241,.55), rgba(251,243,230,.75)), url("skin/ui/paper.png") center/260px repeat, var(--paper); }
+.popup, .placebar, .brushbar, .quests { background: linear-gradient(rgba(255,250,241,.62), rgba(255,250,241,.62)), url("skin/ui/paper.png") center/220px repeat; }
+.dock { background: linear-gradient(180deg, rgba(255,240,210,.35), rgba(160,105,50,.18)), url("skin/ui/wood.png") center/180px repeat; box-shadow: inset 0 2px 0 rgba(255,255,255,.45), inset 0 -3px 0 rgba(120,70,30,.25), 0 0 0 2px rgba(140,90,45,.45), var(--shadow); }
+.dock button { color: #4a3322; }
+.dock button:hover { background: rgba(255,248,232,.45); }
+.pill, .lvl { background: linear-gradient(180deg, rgba(255,246,226,.55), rgba(255,240,215,.4)), url("skin/ui/wood.png") center/160px repeat; box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 0 0 1.5px rgba(140,90,45,.4), var(--shadow); color: #4a3322; }
+.card, .order, .recipe, .item, .cl, .need, .slot, .unl, .newbie, .seed { background-color: rgba(255,253,248,.88); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
