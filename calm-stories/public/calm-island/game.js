@@ -106,7 +106,7 @@ function texPat(key, perTile = 100) {
   const w = s.cv.width, h = s.cv.height, c = document.createElement("canvas"); c.width = w * 2; c.height = h * 2;
   const g = c.getContext("2d");
   for (const [sx, sy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) { g.save(); g.translate(sx < 0 ? 2 * w : 0, sy < 0 ? 2 * h : 0); g.scale(sx, sy); g.drawImage(s.cv, 0, 0); g.restore(); }
-  const p = g.createPattern(c, "repeat"); p.setTransform(new DOMMatrix().scale(perTile ? 1 / perTile : 1));
+  const p = g.createPattern(c, "repeat"); p.setTransform(new DOMMatrix().scale(perTile ? 1 / perTile : 1)); p.src = c;
   return (PAT[k] = p);
 }
 function texTop(pat, x, y, h) {
@@ -708,10 +708,22 @@ function objSprite(o) {
 const plotSprite = () => skinSprite("b:plot") || sprite("plot", 1, 1, 0.5, () => { box(0.06, 0.06, 0, 0.88, 0.88, 0.07, "#9b6b4e", { top: "#8a5c43" }); const sp = texPat("tex:soil", 80); if (sp) { G.save(); G.beginPath(); for (const [u, v] of [[0.06, 0.06], [0.94, 0.06], [0.94, 0.94], [0.06, 0.94]]) G.lineTo(...P(u, v, 0.07)); G.closePath(); G.clip(); const [ox, oy] = P(0, 0, 0.07); G.transform(HW, HH, -HW, HH, ox, oy); G.fillStyle = sp; G.fillRect(0, 0, 1, 1); G.restore(); return; } for (let k = 1; k < 4; k++) line(P(0.12, 0.06 + k * 0.22, 0.07), P(0.92, 0.06 + k * 0.22, 0.07), "rgba(60,35,25,.35)", 1.4); for (let k = 1; k < 4; k++) line(P(0.12, 0.08 + k * 0.22, 0.07), P(0.92, 0.08 + k * 0.22, 0.07), "rgba(255,220,180,.12)", 1); });
 const cropSprite = (id, st) => skinSprite(`crop:${id}:${st}`) || skinSprite(`crop:any:${st}`) || sprite("c" + id + st, 1, 1, 2.2, () => drawCrop(id, st));
 let CLOUDS = [];
-function cloudSprites() {
-  if (typeof SKINNED !== "undefined" && SKINNED["cloud:0"]) { CLOUDS = [0, 1, 2].map((v) => (SKINNED["cloud:" + v] || SKINNED["cloud:0"]).cv); return; }
-  CLOUDS = [0, 1, 2].map((v) => { const cvs = document.createElement("canvas"); cvs.width = 220 * SPR; cvs.height = 120 * SPR; const c = cvs.getContext("2d"); c.scale(SPR, SPR); const sv = [G, OX, OY]; G = c; c.translate(110, 64); drawCloud(v * 9 + 1); [G, OX, OY] = sv; return cvs; });
+/* Soft cumulus clouds built from many feathered puffs: a lilac shadow underneath, a white body, a warm sunlit crown. */
+function makeCloud(seed, W = 260) {
+  const R = rnd(seed), H = W * 0.62, sc = 2, cvs = document.createElement("canvas"); cvs.width = W * sc; cvs.height = H * sc;
+  const g = cvs.getContext("2d"); g.scale(sc, sc);
+  const puffs = [], base = H * 0.72;
+  for (let i = 0; i < 9; i++) { const u = i / 8; puffs.push([W * (0.14 + u * 0.72) + (R() - 0.5) * 10, base - Math.sin(u * Math.PI) * H * 0.18 - R() * 8, W * (0.1 + Math.sin(u * Math.PI) * 0.09 + R() * 0.03)]); }
+  for (let i = 0; i < 6; i++) { const u = 0.25 + R() * 0.5; puffs.push([W * u, base - H * (0.32 + R() * 0.16), W * (0.12 + R() * 0.07)]); }
+  for (let i = 0; i < 7; i++) puffs.push([W * (0.12 + R() * 0.76), base + H * 0.05, W * (0.08 + R() * 0.04)]);
+  const blob = (x, y, r, c0, c1, a) => { const gr = g.createRadialGradient(x, y, r * 0.1, x, y, r); gr.addColorStop(0, c0); gr.addColorStop(0.62, c1); gr.addColorStop(1, "rgba(255,255,255,0)"); g.globalAlpha = a; g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); };
+  for (const [x, y, r] of puffs) blob(x + r * 0.08, y + r * 0.28, r * 1.05, "rgba(196,188,226,.9)", "rgba(206,200,232,.55)", 0.8);
+  for (const [x, y, r] of puffs) blob(x, y, r, "rgba(255,255,255,1)", "rgba(246,244,252,.9)", 1);
+  for (const [x, y, r] of puffs) if (y < base) blob(x - r * 0.25, y - r * 0.3, r * 0.6, "rgba(255,250,238,.95)", "rgba(255,246,232,.35)", 0.75);
+  g.globalAlpha = 1;
+  return cvs;
 }
+function cloudSprites() { CLOUDS = [11, 23, 37, 41].map((s, i) => makeCloud(s, [260, 230, 300, 200][i])); }
 const thumbs = {};
 function thumbOf(key, s) {
   if (thumbs[key]) return thumbs[key];
@@ -740,7 +752,7 @@ function portrait(ch, size = 120) {
 
 /* =================== rendering =================== */
 let tPrev = performance.now(), T0 = performance.now();
-const SPARK = Array.from({ length: 70 }, (_, i) => { const R = rnd(i * 13 + 5); return { x: (R() - 0.5) * N * HW * 2.4, y: R() * N * HH * 2.2 - 40, p: R() * 6, s: 0.6 + R() }; });
+const SPARK = Array.from({ length: 160 }, (_, i) => { const R = rnd(i * 13 + 5); return { x: (R() - 0.5) * N * HW * 2.4, y: R() * N * HH * 2.2 - 40, p: R() * 6, s: 0.6 + R() }; });
 function frame(tn) {
   const dt = Math.min(0.05, (tn - tPrev) / 1000); tPrev = tn; const t = (tn - T0) / 1000;
   if (U.camAnim) { const a = U.camAnim, k = clamp((tn - a.t0) / a.dur, 0, 1), e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; cam.x = a.fx + (a.tx - a.fx) * e; cam.y = a.fy + (a.ty - a.fy) * e; cam.z = a.fz + (a.tz - a.fz) * e; if (k >= 1) U.camAnim = null; }
@@ -761,26 +773,43 @@ function render(t, dt) {
     const sw = SKINNED["tex:water"].cv.width;
     wp.setTransform(new DOMMatrix().translate(t * 0.04, t * 0.025).scale(3.2 / sw));
     ctx.save(); ctx.transform(HW, HH, -HW, HH, 0, 0); ctx.fillStyle = wp; ctx.fillRect(-60, -60, N + 120, N + 120); ctx.restore();
+    if (!U.wp2) U.wp2 = ctx.createPattern(wp.src, "repeat");
+    U.wp2.setTransform(new DOMMatrix().translate(-t * 0.07, t * 0.05).rotate(37).scale(4.4 / sw));
+    ctx.save(); ctx.transform(HW, HH, -HW, HH, 0, 0); ctx.globalAlpha = 0.22; ctx.fillStyle = U.wp2; ctx.fillRect(-60, -60, N + 120, N + 120); ctx.restore();
+    // slow rolling swells: one pre-rendered soft band, drawn a few times
+    if (!U.swell) { const c = document.createElement("canvas"); c.width = 64; c.height = 4; const g = c.getContext("2d"); const gr = g.createLinearGradient(0, 0, 64, 0); gr.addColorStop(0, "rgba(255,255,255,0)"); gr.addColorStop(0.5, "rgba(255,255,255,.09)"); gr.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 4); U.swell = c; }
+    ctx.save(); ctx.transform(HW, HH, -HW, HH, 0, 0); ctx.rotate(Math.PI / 4);
+    for (let k = 0; k < 4; k++) { const d = ((t * 0.5 + k * 20) % 80) - 10; ctx.drawImage(U.swell, d * 1.414 - 4, -80, 8, 160); }
+    ctx.restore();
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); const ov = ctx.createLinearGradient(0, 0, 0, cv.height); ov.addColorStop(0, "rgba(150,235,230,.18)"); ov.addColorStop(1, "rgba(30,110,150,.22)"); ctx.fillStyle = ov; ctx.fillRect(0, 0, cv.width, cv.height); ctx.restore();
   }
   G = ctx; OX = 0; OY = 0;
   const [vx0, vy0] = screenToWorld(0, 0), [vx1, vy1] = screenToWorld(VW, VH);
   const vis = (x, y, m = 120) => x > vx0 - m && x < vx1 + m && y > vy0 - m && y < vy1 + m * 1.6;
   // ocean glints
-  for (const s of SPARK) { const a = Math.max(0, Math.sin(t * 1.3 + s.p)); if (a < 0.05 || !vis(s.x, s.y)) continue; ctx.globalAlpha = a * 0.7; ctx.fillStyle = "#ffffff"; ctx.fillRect(s.x - 5 * s.s, s.y, 10 * s.s, 1.4); ctx.fillRect(s.x - 1.5 * s.s, s.y - 1.2, 3 * s.s, 3.8); }
+  for (const s of SPARK) { const a = Math.pow(Math.max(0, Math.sin(t * (1.1 + s.s * 0.8) + s.p * 3)), 3); if (a < 0.05 || !vis(s.x, s.y)) continue; ctx.globalAlpha = a * 0.7; ctx.fillStyle = "#ffffff"; ctx.fillRect(s.x - 5 * s.s, s.y, 10 * s.s, 1.4); ctx.fillRect(s.x - 1.5 * s.s, s.y - 1.2, 3 * s.s, 3.8); }
   ctx.globalAlpha = 1;
   // wave rings around the island
-  for (let k = 0; k < 2; k++) {
-    const f = (t * 0.18 + k * 0.5) % 1, o = 0.1 + f * 0.45;
-    ctx.strokeStyle = `rgba(255,255,255,${Math.sin(f * Math.PI) * 0.07})`; ctx.lineWidth = 3; ctx.beginPath();
+  for (let k = 0; k < 3; k++) {
+    const f = 1 - ((t * 0.16 + k / 3) % 1), o = 0.06 + f * 0.7;
+    ctx.strokeStyle = `rgba(255,255,255,${Math.sin((1 - f) * Math.PI) * 0.22})`; ctx.lineWidth = 2 + (1 - f) * 3; ctx.lineCap = "round"; ctx.beginPath();
     for (const [x0, y0, x1, y1, nx, ny] of COAST) { const a = P(x0 + nx * o, y0 + ny * o, 0), b = P(x1 + nx * o, y1 + ny * o, 0); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); }
     ctx.stroke();
   }
   ctx.drawImage(TER.cv, TER.x, TER.y, TER.w, TER.h);
-  // shore foam
-  ctx.strokeStyle = `rgba(255,255,255,${0.32 + Math.sin(t * 2) * 0.1})`; ctx.lineWidth = 3.4; ctx.lineCap = "round"; ctx.beginPath();
-  for (const [x0, y0, x1, y1, nx, ny] of COAST) { const o = 0.05 + Math.sin(t * 1.8 + x0 * 0.7 + y0) * 0.03; const a = P(x0 + nx * o, y0 + ny * o, 0), b = P(x1 + nx * o, y1 + ny * o, 0); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); }
-  ctx.stroke();
+  // shore foam that laps in and out, with bubbles
+  ctx.lineCap = "round"; ctx.lineWidth = 3.6;
+  for (let band = 0; band < 2; band++) {
+    ctx.strokeStyle = `rgba(255,255,255,${band ? 0.22 : 0.42})`; ctx.beginPath();
+    for (const [x0, y0, x1, y1, nx, ny] of COAST) {
+      const ph = t * 1.4 + x0 * 0.9 + y0 * 0.6; if ((Math.sin(ph) > 0) !== !band) continue;
+      const o = 0.04 + (Math.sin(ph) * 0.5 + 0.5) * 0.12, a = P(x0 + nx * o, y0 + ny * o, 0), b = P(x1 + nx * o, y1 + ny * o, 0); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
+    }
+    ctx.stroke();
+  }
+  ctx.fillStyle = "rgba(255,255,255,.55)"; ctx.beginPath();
+  for (const [x0, y0, x1, y1, nx, ny] of COAST) { const ph = t * 2.4 + x0 * 1.3 + y0; if (Math.sin(ph) < 0.3) continue; const u = 0.5 + Math.sin(ph * 0.7) * 0.3, o = 0.16 + Math.sin(ph) * 0.05; const [bx, by] = P(x0 + (x1 - x0) * u + nx * o, y0 + (y1 - y0) * u + ny * o, 0); ctx.moveTo(bx + 2.2, by); ctx.ellipse(bx, by, 2.2, 1.1, 0, 0, 7); }
+  ctx.fill();
   drawWaterFx(t);
   // plots (flat)
   const ps = plotSprite();
@@ -799,6 +828,7 @@ function render(t, dt) {
   for (const e of list) e.o ? drawObj(e.o, t, dt) : drawCL(e.c, t);
   drawAmbient(t, dt);
   drawFog(t);
+  drawSkyClouds(t);
   for (const o of S.objs) if (o.k === "sign") drawSign(o, t);
   drawHint(t);
   drawGhost(t);
@@ -960,25 +990,40 @@ function fogCache() {
     const gr = g.createRadialGradient(x, y, 0, x, y, rr); gr.addColorStop(0, "rgba(255,252,248,.95)"); gr.addColorStop(0.55, "rgba(250,246,252,.7)"); gr.addColorStop(1, "rgba(245,242,252,0)");
     g.fillStyle = gr; g.beginPath(); g.arc(x, y, rr, 0, 7); g.fill();
   }
-  FOG.forEach((f, i) => {
-    if (S.regions[f.r] || i % 3 || f.edge) return;
-    const img = CLOUDS[f.v], [x, y] = P(f.x + 0.5, f.y + 0.5, HT[f.y * N + f.x] + 1.1), cw = 230 * f.s, ch = cw * (img.height / img.width);
-    g.globalAlpha = 0.85; g.drawImage(img, x - cw / 2, y - ch * 0.6, cw, ch);
-  });
   g.globalAlpha = 1;
   return (FOGC = { cv: c, x: TER.x, y: TER.y - 200, w, h });
 }
 function drawFog(t) {
   const pn = performance.now(), fc = fogCache();
-  ctx.save(); ctx.globalAlpha = 0.96; ctx.drawImage(fc.cv, fc.x + Math.sin(t * 0.15) * 6, fc.y, fc.w, fc.h); ctx.restore();
+  ctx.save(); ctx.globalAlpha = 0.94 + Math.sin(t * 0.4) * 0.03; ctx.drawImage(fc.cv, fc.x + Math.sin(t * 0.15) * 6, fc.y, fc.w, fc.h); ctx.restore();
+  const [vx0, vy0] = screenToWorld(-200, -200), [vx1, vy1] = screenToWorld(VW + 200, VH + 300);
+  FOG.forEach((f, i) => {
+    if (S.regions[f.r] || i % 3 || f.edge) return;
+    const img = CLOUDS[i % CLOUDS.length], [bx, by] = P(f.x + 0.5, f.y + 0.5, HT[f.y * N + f.x] + 1.1);
+    const x = bx + Math.sin(t * 0.11 + f.p) * 16 + Math.sin(t * 0.05 + f.p * 2) * 10, y = by + Math.sin(t * 0.33 + f.p) * 3.5;
+    if (x < vx0 || x > vx1 || y < vy0 || y > vy1) return;
+    const br = 1 + Math.sin(t * 0.25 + f.p * 1.7) * 0.035, cw = 250 * f.s * br, ch = cw * (img.height / img.width);
+    ctx.globalAlpha = 0.95; ctx.drawImage(img, x - cw / 2, y - ch * 0.65, cw, ch);
+  });
+  ctx.globalAlpha = 1;
   FOG.forEach((f, i) => {
     const u = U.unlocking[f.r]; if (!u || !S.regions[f.r]) return;
     const k = (pn - u) / 1800; if (k >= 1) return;
     const [x, y] = P(f.x + 0.5, f.y + 0.5, HT[f.y * N + f.x] + 0.6);
     const gr = ctx.createRadialGradient(x, y - k * 50, 0, x, y - k * 50, 95 * (1 + k * 0.6)); gr.addColorStop(0, `rgba(255,252,248,${0.9 * (1 - k)})`); gr.addColorStop(1, "rgba(255,252,248,0)");
     ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y - k * 50, 95 * (1 + k * 0.6), 0, 7); ctx.fill();
-    if (i % 3 === 0) { const img = CLOUDS[f.v], cw = 230 * f.s * (1 + k * 0.6), ch = cw * (img.height / img.width); ctx.globalAlpha = 0.85 * (1 - k); ctx.drawImage(img, x - cw / 2, y - ch * 0.6 - k * 60, cw, ch); ctx.globalAlpha = 1; }
+    if (i % 3 === 0) { const img = CLOUDS[i % CLOUDS.length], cw = 250 * f.s * (1 + k * 0.6), ch = cw * (img.height / img.width); ctx.globalAlpha = 0.85 * (1 - k); ctx.drawImage(img, x - cw / 2, y - ch * 0.6 - k * 60, cw, ch); ctx.globalAlpha = 1; }
   });
+}
+const SKY = Array.from({ length: 7 }, (_, i) => ({ p: i / 7, y: (i * 0.37) % 1, s: 0.8 + (i % 3) * 0.3, sp: 0.006 + (i % 4) * 0.002 }));
+function drawSkyClouds(t) {
+  const [x0, y0] = screenToWorld(0, 0), [x1, y1] = screenToWorld(VW, VH), span = (x1 - x0) + 700;
+  SKY.forEach((c, i) => {
+    const img = CLOUDS[i % CLOUDS.length], cw = 280 * c.s, ch = cw * (img.height / img.width);
+    const x = x0 - 350 + (((c.p + t * c.sp) % 1) * span), y = y0 + (y1 - y0) * c.y + Math.sin(t * 0.2 + i) * 6;
+    ctx.globalAlpha = 0.32; ctx.drawImage(img, x - cw / 2, y - ch / 2, cw, ch);
+  });
+  ctx.globalAlpha = 1;
 }
 function drawSign(o, t) {
   const z = groundZ(o.x, o.y), [x, y] = P(o.x, o.y, z), s = objSprite(o);
