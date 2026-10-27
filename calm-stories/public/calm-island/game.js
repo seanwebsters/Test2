@@ -189,7 +189,7 @@ function newObjects() {
   REGIONS.slice(1).forEach((Rg, ri) => {
     let best = null, bd = 1e9;
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-      const i = y * N + x; if (RG[i] !== ri + 1 || !["g", "s", "r", "p"].includes(T[i])) continue;
+      const i = y * N + x; if (RG[i] !== ri + 1 || !["g", "s", "r", "p"].includes(T[i]) || (x >= 18 && x <= 23 && y >= 16 && y <= 22)) continue;
       const adj = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => { const j = (y + dy) * N + x + dx; return RG[j] >= 0 && RG[j] !== ri + 1 && T[j] !== "w"; });
       const dd = Math.hypot(x - 17, y - 17) - (adj ? 4 : 0);
       if (dd < bd) { bd = dd; best = [x, y]; }
@@ -935,7 +935,7 @@ function pickAt(sx, sy) {
   }
   const [tx, ty] = screenToTile(sx, sy);
   const under = tx >= 0 && ty >= 0 && tx < N && ty < N ? objById.get(occ[ty * N + tx]) : null;
-  if (best && best.o && best.o.k === "tree" && under && (under.t === "plot" || ["wild", "rock", "shell", "moss", "crystal"].includes(under.k))) return { o: under };
+  if (best && best.o && (best.o.k === "tree" || best.o.k === "sign") && under && (under.t === "plot" || ["wild", "rock", "shell", "moss", "crystal"].includes(under.k))) return { o: under };
   if (best) return best;
   const id = tx >= 0 && ty >= 0 && tx < N && ty < N ? occ[ty * N + tx] : 0;
   return { tile: [tx, ty], o: id ? objById.get(id) : null };
@@ -1029,7 +1029,7 @@ function renderQuests() {
   const el = $("#quests");
   if (S.finale) { U.questHTML = null; el.innerHTML = `<p class="q-eyebrow">Chapter One complete</p><p class="q-done">The lighthouse shines. Keep tending your sanctuary while Hiraeth tells of the Far Isles.</p>`; updateHUD(); return; }
   const L = LV();
-  const html = `<p class="q-eyebrow">Level ${S.level} of 12</p><p class="q-title">${L.name}</p><ul>${L.quests.map((q, i) => { const ok = questDone(q, i); return `<li class="${ok ? "ok" : ""}"><i></i><span>${q.text}</span><b>${ok ? "" : questProgress(q, i)}</b></li>`; }).join("")}</ul>${S.levelReady ? `<button class="btn primary small glow" data-act="claim">Claim reward</button>` : ""}`;
+  const html = `<p class="q-eyebrow">Level ${S.level} of 12</p><p class="q-title">${L.name}</p><ul>${(() => { const next = L.quests.findIndex((q, i) => !questDone(q, i)); const left = L.quests.filter((q, i) => !questDone(q, i)).length; return L.quests.map((q, i) => { const ok = questDone(q, i); return `<li class="${ok ? "ok" : ""}${i === next ? " next" : ""}"><i></i><span>${q.text}</span><b>${ok ? "" : questProgress(q, i)}</b></li>`; }).join("") + (left > 1 ? `<li class="more"><span>+${left - 1} more · tap to see all</span></li>` : ""); })()}</ul>${S.levelReady ? `<button class="btn primary small glow" data-act="claim">Claim reward</button>` : ""}`;
   if (html !== U.questHTML) { U.questHTML = html; el.innerHTML = html; }
   updateHUD();
 }
@@ -1058,7 +1058,7 @@ function renderPlacebar() {
   if (!p) { el.hidden = true; return; }
   const name = p.kind === "b" ? BUILDINGS[p.t].name : DECOR[p.t].name, ok = canPlace(p.x, p.y, p.w, p.d, p.moving);
   el.hidden = false;
-  el.innerHTML = `<div><b>${p.moving ? "Moving" : "Placing"} ${name}</b><span>${ok ? "Tap or drag to choose a spot" : "That spot is taken. Try open land."}</span></div>${!p.moving ? `<span class="cost">${costHTML(p.kind === "b" ? BUILDINGS[p.t].cost : DECOR[p.t].cost)}</span>` : ""}<button class="btn round" data-act="cancelplace" aria-label="Cancel">✕</button><button class="btn round primary" data-act="confirmplace" ${ok ? "" : "disabled"} aria-label="Place here">✓</button>`;
+  el.innerHTML = `<div><b>${p.moving ? "Moving" : "Placing"} ${name}</b><span>${ok ? "Tap or drag to choose a spot" : "That spot is taken. Try open land."}</span>${!p.moving ? `<span class="cost">${costHTML(p.kind === "b" ? BUILDINGS[p.t].cost : DECOR[p.t].cost)}</span>` : ""}</div><button class="btn round" data-act="cancelplace" aria-label="Cancel">✕</button><button class="btn round primary" data-act="confirmplace" ${ok ? "" : "disabled"} aria-label="Place here">✓</button>`;
 }
 function renderBrush() {
   const el = $("#brushbar");
@@ -1200,7 +1200,7 @@ document.addEventListener("click", (e) => {
     case "pantry": openPantry(); break;
     case "calmlings": openCalmlings(); break;
     case "settings": openSettings(); break;
-    case "quests": $("#quests").classList.toggle("collapsed"); break;
+    case "quests": $("#quests").classList.toggle(window.innerWidth < 600 ? "open" : "collapsed"); break;
     case "tab": openBuild(b.dataset.tab); break;
     case "buy": { const kind = b.dataset.kind, t = b.dataset.t, cost = kind === "b" ? BUILDINGS[t].cost : DECOR[t].cost; if (!has(cost)) { toast("You need a little more for this."); break; } startPlace(kind, t); break; }
     case "pathbrush": closeSheet(); U.pathBrush = true; U.brush = null; renderBrush(); break;
@@ -1291,7 +1291,7 @@ function bootWorld() {
   CL.length = 0; U.fx = []; U.place = null; U.brush = null; U.pathBrush = false; renderPlacebar(); renderBrush();
   rebuildOcc(); buildTerrain(); buildFog();
   for (const c of arrived()) spawnCalmling(c);
-  const [hx, hy] = P(18, 18.5, 0.5); cam.x = hx; cam.y = hy - 20; cam.z = clamp(Math.min(VW, VH) / 520, 1, 1.6);
+  const [hx, hy] = P(18, 18.5, 0.5); cam.x = hx; cam.y = hy - (VW < 600 ? 50 : 20); cam.z = clamp(Math.min(VW, VH) / 520, 1, 1.6);
   refillOrders(); updateHUD(); renderQuests(); checkLevel();
 }
 function showIntro() {
