@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+/* Calm Studio tokens (mirrors src/lib/design-system/tokens.ts). */
+@theme {
+  --color-ivory: #f7f3ec;
+  --color-ivory-deep: #efe8dc;
+  --color-paper: #fbf9f5;
+  --color-midnight: #14213d;
+  --color-midnight-soft: #24324f;
+  --color-ink: #1b2440;
+  --color-muted: #6b6f7d;
+  --color-line: #e4ddd0;
+  --color-lavender: #b9aedc;
+  --color-lavender-soft: #e7e2f4;
+  --color-coastal: #7fa6c4;
+  --color-coastal-soft: #dde9f1;
+  --color-sage: #9db59a;
+  --color-sage-soft: #e3ebe0;
+  --color-peach: #e9b79a;
+  --color-peach-soft: #f6e4d8;
+  --color-rose: #c97b7b;
+
+  --font-display: "Fraunces Variable", "Iowan Old Style", Georgia, serif;
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+
+  --radius-xl: 1rem;
+  --radius-2xl: 1.375rem;
+  --radius-3xl: 1.75rem;
+
+  --shadow-soft: 0 1px 2px rgba(20, 33, 61, 0.04), 0 12px 32px -16px rgba(20, 33, 61, 0.18);
+  --shadow-lift: 0 2px 4px rgba(20, 33, 61, 0.04), 0 28px 60px -28px rgba(20, 33, 61, 0.35);
+
+  --ease-calm: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --animate-breathe: breathe 6s var(--ease-calm) infinite;
+  --animate-shimmer: shimmer 2.4s linear infinite;
+  @keyframes breathe {
+    0%, 100% { transform: scale(1); opacity: 0.7; }
+    50% { transform: scale(1.08); opacity: 1; }
+  }
+  @keyframes shimmer {
+    from { background-position: -200% 0; }
+    to { background-position: 200% 0; }
+  }
+}
+
+@layer base {
+  html {
+    background: var(--color-ivory);
+    color: var(--color-ink);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv11";
+    background:
+      radial-gradient(1200px 600px at 85% -10%, rgba(185, 174, 220, 0.22), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(157, 181, 154, 0.18), transparent 60%),
+      var(--color-ivory);
+    min-height: 100vh;
+  }
+  ::selection {
+    background: var(--color-lavender-soft);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-coastal);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@utility font-display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  letter-spacing: -0.02em;
+}
+
+@utility eyebrow {
+  font-size: 0.6875rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--color-muted);
+}
+
+@utility glass {
+  background: rgba(251, 249, 245, 0.72);
+  backdrop-filter: blur(16px) saturate(1.2);
+}
+
+@utility skeleton {
+  background: linear-gradient(90deg, var(--color-ivory-deep) 0%, var(--color-paper) 50%, var(--color-ivory-deep) 100%);
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+}

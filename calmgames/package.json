@@ -1,0 +1,53 @@
+{
+  "name": "calmgames",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "runtime": "node scripts/build-runtime.mjs",
+    "predev": "npm run runtime",
+    "dev": "next dev",
+    "prebuild": "npm run runtime",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run runtime && vitest run",
+    "test:e2e": "npm run runtime && playwright test"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
+    "@fontsource-variable/fraunces": "^5.3.0",
+    "@fontsource-variable/inter": "^5.3.0",
+    "@radix-ui/react-dialog": "^1.3.1",
+    "@radix-ui/react-slot": "^1.5.0",
+    "@radix-ui/react-tabs": "^1.2.1",
+    "@radix-ui/react-tooltip": "^1.4.1",
+    "@supabase/supabase-js": "^2.118.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "esbuild": "^0.28.2",
+    "framer-motion": "^14.7.1",
+    "jszip": "^3.10.2",
+    "lucide-react": "^1.62.0",
+    "next": "^16.4.3",
+    "phaser": "^3.90.0",
+    "playwright": "^1.63.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "server-only": "^0.0.1",
+    "tailwind-merge": "^3.7.0",
+    "zod": "^4.6.7",
+    "zustand": "^5.0.16"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "postcss": "^8.5.32",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

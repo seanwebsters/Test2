@@ -1,7 +1,10 @@
-# Calm Stories + Sleep Stories Studio
+# Calm studios
 
-All the code lives in [`calm-stories/`](calm-stories/). See [`calm-stories/README.md`](calm-stories/README.md) for setup.
+This repository holds two independent apps:
 
-**Deploying on Vercel:** set the project's Root Directory to `calm-stories`.
+- **[`calm-stories/`](calm-stories/)**: Calm Stories + Sleep Stories Studio. See [`calm-stories/README.md`](calm-stories/README.md).
+- **[`calmgames/`](calmgames/)**: Calm AI Game Studio, where six AI agents invent, build, test and refine calming HTML5 games. See [`calmgames/README.md`](calmgames/README.md).
+
+**Deploying Calm Stories on Vercel:** set the project's Root Directory to `calm-stories`.
 
 After changing environment variables in Vercel, redeploy (Deployments → ⋯ → Redeploy) or push any commit so they take effect.
