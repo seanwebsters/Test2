@@ -135,3 +135,12 @@ body.is-touch #prompt { display: none; }
 body.is-touch #prompt2 { display: none; }
 #btn-practise { right: max(24px, env(safe-area-inset-right)); bottom: max(196px, calc(env(safe-area-inset-bottom) + 172px)); width: auto !important; height: 50px; padding: 0 18px !important; border-radius: 99px !important; white-space: nowrap; }
 #breath-label { max-width: min(520px, 86vw); text-align: center; }
+
+/* ---- map, seeds, photo mode ---- */
+.map-card { width: min(680px, 100%); max-height: 94vh; text-align: left; padding: 24px; display: flex; flex-direction: column; }
+#map-canvas { width: 100%; height: auto; max-height: 68vh; object-fit: contain; border-radius: 22px; background: #dfeaf3; }
+#seeds { position: absolute; left: 20px; top: 14px; padding: 6px 12px; border-radius: 99px; font-size: 13px; font-weight: 700; color: var(--ink); background: rgba(255,255,255,.72); backdrop-filter: blur(8px); }
+body.is-touch #seeds { left: 50%; transform: translateX(-50%); }
+#btn-map { left: max(86px, calc(env(safe-area-inset-left) + 70px)); top: max(14px, env(safe-area-inset-top)); width: 62px; height: 62px; font-size: 13px !important; }
+#photo-bar { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 20px; border-radius: 99px; font-weight: 700; font-size: 14px; color: var(--ink); background: rgba(255,255,255,.86); box-shadow: 0 8px 26px rgba(20,70,130,.3); z-index: 5; }
+#photo-bar button { padding: 9px 18px; font-size: 14px; }

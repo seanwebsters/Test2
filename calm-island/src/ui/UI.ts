@@ -18,6 +18,8 @@ export interface LogEntry {
 }
 
 export interface UIHandlers {
+  onMap(): void;
+  onPhotoSave(): void;
   onLog(): void;
   onLogClose(): void;
   onPlay(): void;
@@ -40,6 +42,11 @@ export class UI {
     $('open-log').addEventListener('click', () => handlers.onLog());
     $('btn-log').addEventListener('click', () => handlers.onLog());
     $('log-close').addEventListener('click', () => handlers.onLogClose());
+    $('map-close').addEventListener('click', () => handlers.onLogClose());
+    $('photo-exit').addEventListener('click', () => handlers.onLogClose());
+    $('photo-save').addEventListener('click', () => handlers.onPhotoSave());
+    $('open-map').addEventListener('click', () => handlers.onMap());
+    $('btn-map').addEventListener('click', () => handlers.onMap());
     $('home').addEventListener('click', () => handlers.onHome());
     $('reset').addEventListener('click', () => {
       if (confirm('Forget your discoveries and start again in the garden?')) handlers.onReset();
@@ -100,7 +107,7 @@ export class UI {
   }
 
   showGame(): void {
-    for (const id of ['loading', 'start', 'menu', 'log']) $(id).classList.add('hidden');
+    for (const id of ['loading', 'start', 'menu', 'log', 'map', 'photo-bar']) $(id).classList.add('hidden');
     $('hud').classList.remove('hidden');
     $('touch').classList.toggle('hidden', !this.touch);
     $('hints').classList.remove('faded');
@@ -187,8 +194,26 @@ export class UI {
     $('log-close').focus();
   }
 
+  seeds(found: number, total: number): void {
+    $('seeds').classList.toggle('hidden', found === 0);
+    $('seeds').textContent = `✦ ${found} of ${total} calm seeds`;
+  }
+
+  showMap(caption: string): HTMLCanvasElement {
+    $('menu').classList.add('hidden');
+    $('map-count').textContent = caption;
+    $('map').classList.remove('hidden');
+    $('map-close').focus();
+    return $<HTMLCanvasElement>('map-canvas');
+  }
+
+  showPhoto(): void {
+    $('hud').classList.add('hidden');
+    $('photo-bar').classList.remove('hidden');
+  }
+
   get logOpen(): boolean {
-    return !$('log').classList.contains('hidden');
+    return !$('log').classList.contains('hidden') || !$('map').classList.contains('hidden') || !$('photo-bar').classList.contains('hidden');
   }
 
   showMenu(stats: string): void {

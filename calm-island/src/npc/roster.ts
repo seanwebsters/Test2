@@ -23,6 +23,8 @@ export interface Resident {
   practice: Practice;
   /** where they like to be, in island metres */
   home: [number, number];
+  /** only out and about between these hours (24 h clock; may wrap past midnight) */
+  hours?: [number, number];
   look: CalmlingLook;
 }
 
@@ -64,7 +66,7 @@ export const RESIDENTS: Resident[] = [
     look: { fur: 0x55555c, furLow: 0x7c7c84, belly: 0xbdbdc4, limbs: 0x56565e, iris: 0xdc8a1e, style: 'shaggy', extras: ['stick'] },
   },
   {
-    id: 'gokotta', name: 'Gökotta', home: [150, 62],
+    id: 'gokotta', name: 'Gökotta', home: [150, 62], hours: [5, 10.5],
     meaning: 'Swedish: rising early to hear the first birdsong',
     hello: 'You should hear this meadow at dawn!',
     story: "The first bird of the day sings alone for a whole minute. I never miss it.",
@@ -160,7 +162,7 @@ export const RESIDENTS: Resident[] = [
     look: { fur: 0xc4424f, limbs: 0xc4424f, paws: 0xfaf3f3, iris: 0xb05a9c, style: 'fluffy', extras: ['heart'] },
   },
   {
-    id: 'mangata', name: 'Mångata', home: [-58, 296],
+    id: 'mangata', name: 'Mångata', home: [-58, 296], hours: [19.5, 5.5],
     meaning: 'Swedish: the road of moonlight across water',
     hello: 'Come back at night. The sea lays out a path.',
     story: "On clear nights I walk the moon's road as far as the tide lets me.",

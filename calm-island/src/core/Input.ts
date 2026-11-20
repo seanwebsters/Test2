@@ -28,7 +28,7 @@ export class Input {
     canvas.addEventListener('mousedown', () => {
       if (!this.enabled) return;
       this.dragging = true;
-      this.requestLock();
+      if (!this.cameraOnly) this.requestLock();
     });
     window.addEventListener('mouseup', () => (this.dragging = false));
     window.addEventListener('mousemove', (e) => {
@@ -96,7 +96,7 @@ export class Input {
   moveAxis(out: { x: number; y: number }): number {
     out.x = 0;
     out.y = 0;
-    if (!this.enabled) return 0;
+    if (!this.enabled || this.cameraOnly) return 0;
     const k = this.keys;
     const arrows = !this.shift;
     out.x = (k.has('KeyD') || (arrows && k.has('ArrowRight')) ? 1 : 0) - (k.has('KeyA') || (arrows && k.has('ArrowLeft')) ? 1 : 0) + this.joyX;
@@ -136,6 +136,9 @@ export class Input {
   practisePressed(): boolean {
     return this.enabled && (this.pressed.has('KeyQ') || this.virtualHit.has('practise'));
   }
+
+  /** Photo mode keeps the camera controls but nothing else. */
+  cameraOnly = false;
 
   breathePressed(): boolean {
     return this.enabled && (this.pressed.has('KeyB') || this.virtualHit.has('breathe'));

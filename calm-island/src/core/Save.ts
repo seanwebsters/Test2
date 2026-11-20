@@ -17,6 +17,9 @@ export interface SaveData {
   /** ids of Calmlings whose practice you have completed */
   practices?: string[];
   garden?: { t: number; w: number }[];
+  seeds?: number[];
+  /** patches of the map cleared of mist: x, z, radius */
+  reveals?: number[][];
 }
 
 const KEY = 'calmlings.save.v1';
