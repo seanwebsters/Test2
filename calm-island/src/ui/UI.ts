@@ -17,7 +17,15 @@ export interface LogEntry {
   practice: string | null;
 }
 
+export interface JournalItem {
+  title: string;
+  hint: string;
+  done: boolean;
+}
+
 export interface UIHandlers {
+  onJournal(): void;
+  onPhoto(): void;
   onMap(): void;
   onPhotoSave(): void;
   onLog(): void;
@@ -46,6 +54,10 @@ export class UI {
     $('photo-exit').addEventListener('click', () => handlers.onLogClose());
     $('photo-save').addEventListener('click', () => handlers.onPhotoSave());
     $('open-map').addEventListener('click', () => handlers.onMap());
+    $('open-journal').addEventListener('click', () => handlers.onJournal());
+    $('btn-journal').addEventListener('click', () => handlers.onJournal());
+    $('journal-close').addEventListener('click', () => handlers.onLogClose());
+    $('btn-photo').addEventListener('click', () => handlers.onPhoto());
     $('btn-map').addEventListener('click', () => handlers.onMap());
     $('home').addEventListener('click', () => handlers.onHome());
     $('reset').addEventListener('click', () => {
@@ -109,7 +121,7 @@ export class UI {
   }
 
   showGame(): void {
-    for (const id of ['loading', 'start', 'menu', 'log', 'map', 'photo-bar']) $(id).classList.add('hidden');
+    for (const id of ['loading', 'start', 'menu', 'log', 'map', 'photo-bar', 'journal']) $(id).classList.add('hidden');
     $('hud').classList.remove('hidden');
     $('touch').classList.toggle('hidden', !this.touch);
     $('hints').classList.remove('faded');
@@ -201,6 +213,30 @@ export class UI {
     $('btn-skim').classList.toggle('hidden', !show);
   }
 
+  showJournal(items: JournalItem[]): void {
+    $('menu').classList.add('hidden');
+    const done = items.filter((i) => i.done).length;
+    $('journal-count').textContent = `${done} of ${items.length} done. No rush, and no order.`;
+    const list = $('journal-list');
+    list.replaceChildren();
+    for (const it of items) {
+      const row = document.createElement('div');
+      row.className = `j-item${it.done ? ' done' : ''}`;
+      const tick = document.createElement('span');
+      tick.className = 'tick';
+      tick.textContent = it.done ? '✓' : '○';
+      const text = document.createElement('span');
+      text.textContent = it.title;
+      const small = document.createElement('small');
+      small.textContent = it.hint;
+      text.append(small);
+      row.append(tick, text);
+      list.append(row);
+    }
+    $('journal').classList.remove('hidden');
+    $('journal-close').focus();
+  }
+
   seeds(found: number, total: number): void {
     $('seeds').classList.toggle('hidden', found === 0);
     $('seeds').textContent = `✦ ${found} of ${total} calm seeds`;
@@ -220,7 +256,7 @@ export class UI {
   }
 
   get logOpen(): boolean {
-    return !$('log').classList.contains('hidden') || !$('map').classList.contains('hidden') || !$('photo-bar').classList.contains('hidden');
+    return ['log', 'map', 'photo-bar', 'journal'].some((id) => !$(id).classList.contains('hidden'));
   }
 
   showMenu(stats: string): void {

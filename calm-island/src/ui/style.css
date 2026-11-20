@@ -146,3 +146,15 @@ body.is-touch #seeds { left: 50%; transform: translateX(-50%); }
 #photo-bar button { padding: 9px 18px; font-size: 14px; }
 
 #btn-skim { right: max(214px, calc(env(safe-area-inset-right) + 190px)); bottom: max(26px, env(safe-area-inset-bottom)); width: 70px; height: 70px; }
+
+/* ---- journal and extra touch buttons ---- */
+#journal-list { display: grid; gap: 6px; overflow-y: auto; padding: 2px; }
+.j-item { display: flex; gap: 12px; align-items: baseline; padding: 10px 14px; border-radius: 14px; background: #f1f7fd; font-weight: 600; }
+.j-item small { display: block; font-weight: 500; color: var(--soft); font-size: 13px; }
+.j-item .tick { width: 20px; flex: none; font-weight: 800; color: #b9cfe4; }
+.j-item.done { background: #e8f6ec; }
+.j-item.done .tick { color: #2f9a5a; }
+#btn-journal, #btn-photo, #btn-kite { top: max(14px, env(safe-area-inset-top)); width: 62px; height: 62px; font-size: 13px !important; }
+#btn-journal { left: max(156px, calc(env(safe-area-inset-left) + 140px)); }
+#btn-photo { left: max(226px, calc(env(safe-area-inset-left) + 210px)); }
+#btn-kite { left: max(296px, calc(env(safe-area-inset-left) + 280px)); }

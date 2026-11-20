@@ -144,6 +144,10 @@ export class Input {
     return this.enabled && (this.pressed.has('KeyF') || this.virtualHit.has('skim'));
   }
 
+  kitePressed(): boolean {
+    return this.enabled && (this.pressed.has('KeyK') || this.virtualHit.has('kite'));
+  }
+
   breathePressed(): boolean {
     return this.enabled && (this.pressed.has('KeyB') || this.virtualHit.has('breathe'));
   }

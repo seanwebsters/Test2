@@ -19,6 +19,10 @@ export interface SaveData {
   garden?: { t: number; w: number }[];
   seeds?: number[];
   bestSkips?: number;
+  viewpoints?: string[];
+  cairns?: number[];
+  /** one-off things done, for the journal */
+  flags?: string[];
   /** patches of the map cleared of mist: x, z, radius */
   reveals?: number[][];
 }

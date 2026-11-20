@@ -9,6 +9,7 @@ import { DayCycle } from '../world/DayCycle';
 import { Garden } from '../world/Garden';
 import { Seeds } from '../world/Seeds';
 import { Skimming } from '../world/Skimming';
+import { Cairns, Kite, Viewpoints } from '../world/Places';
 import { CELL, GRID, HALF, WORLD_SIZE } from '../world/islandMap';
 import { Weather } from '../world/Weather';
 import { Grass } from '../world/Grass';
@@ -74,6 +75,12 @@ export class Game {
   private seeds!: Seeds;
   private ambience = new Ambience();
   private skimming!: Skimming;
+  private viewpoints!: Viewpoints;
+  private cairns!: Cairns;
+  private kite = new Kite();
+  private rested = new Set<string>();
+  private flags = new Set<string>();
+  private hand = new THREE.Vector3();
   private bestSkips = 0;
   private waterNear = 0;
   private waterCheck = 0;
@@ -123,6 +130,8 @@ export class Game {
       onPlay: () => this.play(),
       onLog: () => this.openLog(),
       onMap: () => this.openMap(),
+      onJournal: () => this.openJournal(),
+      onPhoto: () => this.enterPhoto(),
       onPhotoSave: () => this.savePhoto(),
       onLogClose: () => this.play(),
       onResume: () => this.play(),
@@ -143,6 +152,11 @@ export class Game {
         this.learned.clear();
         this.garden.clear();
         this.seeds.reset();
+        this.rested.clear();
+        this.flags.clear();
+        this.cairns.load([]);
+        this.kite.flying = false;
+        this.bestSkips = 0;
         this.reveals = [[0, 0, 80]];
         this.ui.seeds(0, this.seeds.spots.length);
         this.endPractice();
@@ -170,7 +184,10 @@ export class Game {
     });
     window.addEventListener('keydown', (e) => {
       if (!this.ready || e.repeat) return;
-      if (e.code === 'KeyM') {
+      if (e.code === 'KeyJ') {
+        if (this.playing) this.openJournal();
+        else if (this.ui.logOpen && !this.photo) this.play();
+      } else if (e.code === 'KeyM') {
         if (this.playing) this.openMap();
         else if (this.ui.logOpen && !this.photo) this.play();
       } else if (e.code === 'KeyP') {
@@ -228,6 +245,9 @@ export class Game {
     this.garden = new Garden(this.island);
     this.seeds = new Seeds(this.island);
     this.skimming = new Skimming(this.island);
+    this.viewpoints = new Viewpoints(this.island);
+    this.cairns = new Cairns(this.island);
+    this.scene.add(this.viewpoints.group, this.cairns.group, this.kite.group);
     this.scene.add(this.skimming.group);
     this.scene.add(this.seeds.group);
     this.scene.add(this.garden.group, this.weather.mesh);
@@ -269,6 +289,9 @@ export class Game {
       this.seeds.load(save.seeds);
       if (save.reveals?.length) this.reveals = save.reveals;
       this.bestSkips = save.bestSkips ?? 0;
+      for (const id of save.viewpoints ?? []) this.rested.add(id);
+      for (const f of save.flags ?? []) this.flags.add(f);
+      this.cairns.load(save.cairns);
       const friend = this.npcs.find((n) => n.who.id === save.companion);
       if (friend) {
         this.setCompanion(friend);
@@ -370,6 +393,13 @@ export class Game {
       this.updateFriendship(dt);
       this.updatePractice(dt);
       this.updateShore(dt);
+      if (this.input.kitePressed()) {
+        this.kite.flying = !this.kite.flying;
+        if (this.kite.flying) this.flags.add('kite');
+      }
+      if (this.player.gliding) this.flags.add('glide');
+      if (this.day.night > 0.9) this.flags.add('night');
+      if (this.player.swimming) this.kite.flying = false;
       const seed = this.seeds.update(globalUniforms.uTime.value, this.player.pos);
       if (seed >= 0) {
         const n = this.seeds.foundIds.length;
@@ -429,6 +459,35 @@ export class Game {
         if (did === 'planted') this.ui.toast('', 'Seed planted', 'It grows while you are away. Come back and see.');
         if (did === 'watered') this.ui.toast('', 'Watered', 'That will help it along.');
         if (did) this.save();
+      }
+      return;
+    }
+    // resting logs and pebble towers, when nothing else is in reach
+    const view = best || this.practice ? null : this.viewpoints.near(p);
+    const cairn = best || this.practice || view ? -1 : this.cairns.near(p);
+    if (view || cairn >= 0) {
+      this.nearby = null;
+      this.ui.prompt2(null);
+      if (view) {
+        this.ui.prompt(this.player.sitting ? null : 'Rest and take in the view');
+        if (this.input.interactPressed() && this.player.sit()) {
+          const fresh = !this.rested.has(view.id);
+          this.rested.add(view.id);
+          this.player.yaw = view.yaw + Math.PI;
+          this.rig.yaw = view.yaw;
+          this.rig.pitch = 0.26;
+          this.rig.dist = 13;
+          if (fresh) this.reveal(view.x, view.z, 190);
+          this.ui.toast(fresh ? `Viewpoint · ${this.rested.size} of ${this.viewpoints.spots.length}` : 'Viewpoint', view.name, 'Stay as long as you like');
+          this.save();
+        }
+      } else {
+        this.ui.prompt(this.cairns.canAdd(cairn) ? 'Balance a pebble on top' : null);
+        if (this.input.interactPressed() && this.cairns.canAdd(cairn)) {
+          const n = this.cairns.add(cairn);
+          if (n === this.cairns.max) this.ui.toast('', 'A tidy little tower', 'Seven stones, perfectly balanced');
+          this.save();
+        }
       }
       return;
     }
@@ -715,6 +774,39 @@ export class Game {
     link.href = this.canvas.toDataURL('image/png');
     link.click();
     this.photosSaved++;
+    this.flags.add('photo');
+    this.save();
+  }
+
+  /** A gentle list of things the island offers; it ticks itself off as you go. */
+  openJournal(): void {
+    if (!this.ready) return;
+    this.playing = false;
+    this.input.enabled = false;
+    this.input.releaseLock();
+    this.stopBreathing();
+    this.endPractice();
+    this.ui.prompt(null);
+    this.ui.prompt2(null);
+    const best = Math.max(0, ...[...this.bonds.keys()].map((id) => this.hearts(id)));
+    this.ui.showJournal([
+      { title: 'Take three deep breaths', hint: 'Press B anywhere', done: this.breathsDone > 0 },
+      { title: 'Say hello to a Calmling', hint: 'Walk up to one and press E', done: this.met.size > 0 },
+      { title: 'Go for a walk with a friend', hint: 'Press E again to invite them', done: best >= 1 },
+      { title: 'Hear a friend’s story', hint: 'Keep walking together until two hearts fill', done: best >= 2 },
+      { title: 'Learn a practice', hint: 'Press Q beside a Calmling you have met', done: this.learned.size > 0 },
+      { title: 'Glide', hint: 'Jump from somewhere high and keep holding Space', done: this.flags.has('glide') },
+      { title: 'Rest at a viewpoint', hint: 'Look for a mossy log with a view', done: this.rested.size > 0 },
+      { title: 'Plant a seed in the garden', hint: 'Find the soil plots near where you began', done: this.garden.serialize().some((g) => g.t > 0) },
+      { title: 'See your flower in bloom', hint: 'It takes a few hours. Come back later', done: this.garden.blooms > 0 },
+      { title: 'Find five calm seeds', hint: 'They glow, and hide in out-of-the-way places', done: this.seeds.foundIds.length >= 5 },
+      { title: 'Skim a stone three times', hint: 'Press F at the edge of a lake', done: this.bestSkips >= 3 },
+      { title: 'Build a pebble tower', hint: 'Small stacks of stones wait on the shores', done: this.cairns.tallest >= this.cairns.max },
+      { title: 'Fly a kite', hint: 'Press K, then run', done: this.flags.has('kite') },
+      { title: 'Watch night fall', hint: 'Stay sitting and the day drifts by', done: this.flags.has('night') },
+      { title: 'Take a photo', hint: 'Press P, frame it, press Enter', done: this.flags.has('photo') },
+      { title: 'Visit every corner of the island', hint: 'Eight places to discover', done: this.discovered.size >= this.island.regions.length },
+    ]);
   }
   photosSaved = 0;
 
@@ -889,6 +981,11 @@ export class Game {
     const drift = this.playing && this.player?.sitting && !this.breathing.active && !this.practice ? 10 : 1;
     this.day.update(dt * drift, this.sun, this.hemi, this.scene.fog as THREE.FogExp2, this.weather.rain);
     this.garden.update(Date.now(), globalUniforms.uTime.value);
+    if (this.player) {
+      this.hand.copy(this.player.pos);
+      this.hand.y += 1.1;
+      this.kite.update(dt, globalUniforms.uTime.value, this.hand, this.player.yaw, this.player.speed);
+    }
     this.sky.update(dt, this.camera, this.day.night);
     globalUniforms.uPlayer.value.copy(p);
     this.camera.getWorldDirection(this.fwd);
@@ -945,6 +1042,9 @@ export class Game {
       seeds: this.seeds.foundIds,
       reveals: this.reveals,
       bestSkips: this.bestSkips,
+      viewpoints: [...this.rested],
+      cairns: this.cairns.serialize(),
+      flags: [...this.flags],
     });
   }
 
@@ -977,6 +1077,11 @@ export class Game {
       photo: this.photo,
       photosSaved: this.photosSaved,
       waterNear: this.waterNear,
+      rested: [...this.rested],
+      kite: this.kite.flying,
+      cairnTallest: this.cairns.tallest,
+      flags: [...this.flags],
+      prompt: document.getElementById('prompt')!.classList.contains('hidden') ? null : document.getElementById('prompt-text')!.textContent,
       skips: this.skimming.skips,
       stoneFlying: this.skimming.flying,
       birdCalls: this.ambience.calls,
