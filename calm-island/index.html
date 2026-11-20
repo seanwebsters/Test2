@@ -18,6 +18,8 @@
         <span><kbd>B</kbd> sit &amp; breathe</span>
         <span><kbd>E</kbd> say hello</span>
         <span><kbd>L</kbd> log</span>
+        <span><kbd>M</kbd> map</span>
+        <span><kbd>P</kbd> photo</span>
         <span><kbd>Esc</kbd> menu</span>
       </div>
       <div id="prompt" class="hidden"><kbd>E</kbd><span id="prompt-text"></span></div>
@@ -34,8 +36,10 @@
         <button id="btn-hello" class="hidden">Hello</button>
         <button id="btn-practise" class="hidden">Practise</button>
         <button id="btn-log" aria-label="Calmling log">Log</button>
+        <button id="btn-map" aria-label="Map">Map</button>
         <button id="btn-hop">Hop</button>
       </div>
+      <div id="seeds" class="hidden"></div>
       <div id="fps" class="hidden"></div>
     </div>
 
@@ -63,6 +67,8 @@
           <span class="desk"><kbd>E</kbd> say hello to a Calmling, or ask them along</span>
           <span class="desk"><kbd>Q</kbd> learn a friend's practice</span>
           <span class="desk"><kbd>L</kbd> Calmling log</span>
+          <span class="desk"><kbd>M</kbd> map</span>
+          <span class="desk"><kbd>P</kbd> photo mode</span>
           <span class="desk"><kbd>Esc</kbd> menu</span>
           <span class="touch">Left thumb stick to wander</span>
           <span class="touch">Drag the view to look around</span>
@@ -94,6 +100,7 @@
         <div class="buttons">
           <button id="resume" class="primary">Keep wandering</button>
           <button id="open-log">Calmling log</button>
+          <button id="open-map">Map</button>
           <button id="home">Return to the garden</button>
           <button id="reset" class="quiet">Start afresh</button>
         </div>
@@ -108,6 +115,22 @@
         </div>
         <div id="log-grid"></div>
       </div>
+    </div>
+
+    <div id="map" class="screen hidden">
+      <div class="card map-card">
+        <div class="log-head">
+          <div><h2>Calm Island</h2><p class="lead" id="map-count"></p></div>
+          <button id="map-close" class="primary">Back to the island</button>
+        </div>
+        <canvas id="map-canvas" width="720" height="720"></canvas>
+      </div>
+    </div>
+
+    <div id="photo-bar" class="hidden">
+      <span>Photo mode · drag to look · wheel to zoom</span>
+      <button id="photo-save" class="primary">Save photo</button>
+      <button id="photo-exit">Done</button>
     </div>
 
     <div id="error" class="screen hidden"><div class="card"><h2>The island couldn't wake up</h2><p id="error-text"></p></div></div>

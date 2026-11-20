@@ -17,6 +17,8 @@ export class Npc {
   following = false;
   /** on the way back home after being a companion */
   returning = false;
+  /** tucked away because it is the wrong time of day for them */
+  absent = false;
   private target = new THREE.Vector3();
   private wait = 1;
   private speed = 0;
@@ -52,7 +54,15 @@ export class Npc {
     return this.island.heightAt(x, z) > this.island.waterLevelAt(x, z) + 0.3;
   }
 
-  update(dt: number, time: number, player: Player, camera: THREE.Vector3): void {
+  update(dt: number, time: number, player: Player, camera: THREE.Vector3, hour: number): void {
+    const w = this.who.hours;
+    const out = !w || (w[0] <= w[1] ? hour >= w[0] && hour < w[1] : hour >= w[0] || hour < w[1]);
+    this.absent = !out && !this.following;
+    if (this.absent) {
+      this.pos.copy(this.home);
+      this.model.root.visible = false;
+      return;
+    }
     const toPlayer = Math.hypot(player.pos.x - this.pos.x, player.pos.z - this.pos.z);
     let want = 0;
     let faceX = 0;

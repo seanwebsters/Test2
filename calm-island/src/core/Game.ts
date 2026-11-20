@@ -7,6 +7,8 @@ import { UI, type LogEntry } from '../ui/UI';
 import { Ambient } from '../world/Ambient';
 import { DayCycle } from '../world/DayCycle';
 import { Garden } from '../world/Garden';
+import { Seeds } from '../world/Seeds';
+import { CELL, GRID, HALF, WORLD_SIZE } from '../world/islandMap';
 import { Weather } from '../world/Weather';
 import { Grass } from '../world/Grass';
 import { SPAWN, getIsland, type Island, type Region } from '../world/islandMap';
@@ -65,6 +67,11 @@ export class Game {
   private day = new DayCycle();
   private weather = new Weather();
   private garden!: Garden;
+  private seeds!: Seeds;
+  private reveals: number[][] = [[0, 0, 80]];
+  private mapBase: HTMLCanvasElement | null = null;
+  private groundTex!: THREE.DataTexture;
+  private photo = false;
   private gardenPlot = -1;
   private learned = new Set<string>();
   private practice: { npc: Npc; t: number; count: number; motes: THREE.Mesh[]; wasGrounded: boolean } | null = null;
@@ -106,6 +113,8 @@ export class Game {
     this.ui = new UI(this.settings, {
       onPlay: () => this.play(),
       onLog: () => this.openLog(),
+      onMap: () => this.openMap(),
+      onPhotoSave: () => this.savePhoto(),
       onLogClose: () => this.play(),
       onResume: () => this.play(),
       onHome: () => {
@@ -124,6 +133,9 @@ export class Game {
         this.bonds.clear();
         this.learned.clear();
         this.garden.clear();
+        this.seeds.reset();
+        this.reveals = [[0, 0, 80]];
+        this.ui.seeds(0, this.seeds.spots.length);
         this.endPractice();
         this.day.hour = 9;
         this.setCompanion(null);
@@ -146,6 +158,16 @@ export class Game {
       if (e.code !== 'Escape' || !this.ready) return;
       if (this.playing) this.pause();
       else if (this.ui.menuOpen || this.ui.logOpen) this.play();
+    });
+    window.addEventListener('keydown', (e) => {
+      if (!this.ready || e.repeat) return;
+      if (e.code === 'KeyM') {
+        if (this.playing) this.openMap();
+        else if (this.ui.logOpen && !this.photo) this.play();
+      } else if (e.code === 'KeyP') {
+        if (this.playing) this.enterPhoto();
+        else if (this.photo) this.play();
+      } else if (e.code === 'Enter' && this.photo) this.savePhoto();
     });
     window.addEventListener('keydown', (e) => {
       if (e.code !== 'KeyL' || !this.ready || e.repeat) return;
@@ -177,6 +199,7 @@ export class Game {
     await step(0.55, 'Painting meadows and beaches…');
     const groundTex = bakeGroundTexture(this.island, low ? 1024 : 2048, this.vegetation.shade);
     groundTex.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
+    this.groundTex = groundTex;
     const terrain = new Terrain(this.island, groundTex, low ? 2 : 1);
     this.scene.add(terrain.group);
 
@@ -194,6 +217,8 @@ export class Game {
     this.scene.add(this.grassFar.mesh, this.grassNear.mesh);
     this.ambient = new Ambient(this.island);
     this.garden = new Garden(this.island);
+    this.seeds = new Seeds(this.island);
+    this.scene.add(this.seeds.group);
     this.scene.add(this.garden.group, this.weather.mesh);
     this.scene.add(this.ambient.group);
 
@@ -230,6 +255,8 @@ export class Game {
       if (typeof save.hour === 'number') this.day.hour = save.hour;
       for (const id of save.practices ?? []) this.learned.add(id);
       this.garden.load(save.garden);
+      this.seeds.load(save.seeds);
+      if (save.reveals?.length) this.reveals = save.reveals;
       const friend = this.npcs.find((n) => n.who.id === save.companion);
       if (friend) {
         this.setCompanion(friend);
@@ -238,6 +265,7 @@ export class Game {
       for (const id of save.discovered) this.discovered.add(id);
     }
     this.rig.snap(this.player);
+    this.ui.seeds(this.seeds.foundIds.length, this.seeds.spots.length);
     this.applySettings();
     this.resize();
 
@@ -254,6 +282,8 @@ export class Game {
 
   play(): void {
     this.playing = true;
+    this.photo = false;
+    this.input.cameraOnly = false;
     this.input.enabled = true;
     if (!this.opts.test) void this.music.start();
     this.music.duck(false);
@@ -315,6 +345,7 @@ export class Game {
   private frame(): void {
     this.timer.update();
     const dt = Math.min(this.timer.getDelta(), 1 / 20);
+    if (this.photo) this.rig.update(dt, this.input, this.player, this.settings);
     if (this.playing) {
       this.updateBreathing(dt);
       this.player.update(dt, this.input, this.rig.yaw);
@@ -322,6 +353,13 @@ export class Game {
       this.updateMeetings();
       this.updateFriendship(dt);
       this.updatePractice(dt);
+      const seed = this.seeds.update(globalUniforms.uTime.value, this.player.pos);
+      if (seed >= 0) {
+        const n = this.seeds.foundIds.length;
+        this.ui.seeds(n, this.seeds.spots.length);
+        this.ui.toast('Calm seed', `${n} of ${this.seeds.spots.length}`, n === 1 ? 'There are more, hidden all over the island' : 'Well spotted');
+        this.save();
+      }
       this.playTime += dt;
       this.checkRegion();
       this.saveIn -= dt;
@@ -357,7 +395,7 @@ export class Game {
     let bestD = 3.4;
     for (const npc of this.npcs) {
       const d = Math.hypot(npc.pos.x - p.x, npc.pos.z - p.z);
-      if (d < bestD && Math.abs(npc.pos.y - p.y) < 2.5) {
+      if (!npc.absent && d < bestD && Math.abs(npc.pos.y - p.y) < 2.5) {
         bestD = d;
         best = npc;
       }
@@ -486,6 +524,140 @@ export class Game {
     return name;
   }
 
+  private reveal(x: number, z: number, r: number): void {
+    this.reveals.push([Math.round(x), Math.round(z), Math.round(r)]);
+    if (this.reveals.length > 80) this.reveals.splice(1, 1);
+  }
+
+  /** The island from above; mist covers what you have not yet explored. */
+  openMap(): void {
+    if (!this.ready) return;
+    this.playing = false;
+    this.input.enabled = false;
+    this.input.releaseLock();
+    this.stopBreathing();
+    this.endPractice();
+    this.ui.prompt(null);
+    this.ui.prompt2(null);
+    const canvas = this.ui.showMap(`${this.discovered.size} of ${this.island.regions.length} places · ${this.seeds.foundIds.length} of ${this.seeds.spots.length} calm seeds · ${this.day.label}. Sit and breathe to clear more mist.`);
+    const S = canvas.width;
+    const ctx = canvas.getContext('2d')!;
+    if (!this.mapBase) {
+      // paint the ground texture once, with the sea drawn in
+      const B = 360;
+      const base = document.createElement('canvas');
+      base.width = base.height = B;
+      const bctx = base.getContext('2d')!;
+      const img = bctx.createImageData(B, B);
+      const tex = this.groundTex.image as { data: Uint8Array; width: number };
+      for (let j = 0; j < B; j++) {
+        for (let i = 0; i < B; i++) {
+          const x = ((i + 0.5) / B) * WORLD_SIZE - HALF;
+          const z = ((j + 0.5) / B) * WORLD_SIZE - HALF;
+          const h = this.island.heightAt(x, z);
+          const o = (j * B + i) * 4;
+          if (h < 0.15 || this.island.waterLevelAt(x, z) > h + 0.3) {
+            const deep = Math.min(1, Math.max(0, -h / 14));
+            img.data.set([90 - deep * 50, 196 - deep * 70, 226 - deep * 20, 255], o);
+          } else {
+            const t = (Math.floor(((j + 0.5) / B) * tex.width) * tex.width + Math.floor(((i + 0.5) / B) * tex.width)) * 4;
+            const shade = 0.86 + Math.min(0.3, h / 320);
+            img.data.set([tex.data[t] * shade, tex.data[t + 1] * shade, tex.data[t + 2] * shade, 255], o);
+          }
+        }
+      }
+      bctx.putImageData(img, 0, 0);
+      this.mapBase = base;
+    }
+    const at = (x: number, z: number): [number, number] => [((x + HALF) / WORLD_SIZE) * S, ((z + HALF) / WORLD_SIZE) * S];
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(this.mapBase, 0, 0, S, S);
+    // mist, with soft holes wherever you have been
+    const mist = document.createElement('canvas');
+    mist.width = mist.height = S;
+    const m = mist.getContext('2d')!;
+    m.fillStyle = 'rgba(232,242,250,0.84)';
+    m.fillRect(0, 0, S, S);
+    m.globalCompositeOperation = 'destination-out';
+    for (const [x, z, r] of this.reveals) {
+      const [cx, cy] = at(x, z);
+      const rr = (r / WORLD_SIZE) * S;
+      const g = m.createRadialGradient(cx, cy, rr * 0.55, cx, cy, rr);
+      g.addColorStop(0, 'rgba(0,0,0,1)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      m.fillStyle = g;
+      m.beginPath();
+      m.arc(cx, cy, rr, 0, Math.PI * 2);
+      m.fill();
+    }
+    ctx.drawImage(mist, 0, 0);
+    const dot = (x: number, z: number, r: number, fill: string, ring = '#fff'): void => {
+      const [cx, cy] = at(x, z);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = ring;
+      ctx.stroke();
+    };
+    for (const s of this.seeds.spots) if (s.found) dot(s.x, s.z, 3.5, '#eaff8a', '#7a9a2a');
+    ctx.font = '700 13px ui-rounded, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    for (const npc of this.npcs) {
+      if (!this.met.has(npc.who.id)) continue;
+      const q = npc === this.companion ? npc.pos : npc.home;
+      dot(q.x, q.z, 7, `#${npc.who.look.fur.toString(16).padStart(6, '0')}`);
+      const [cx, cy] = at(q.x, q.z);
+      ctx.fillStyle = '#17406b';
+      ctx.strokeStyle = 'rgba(255,255,255,.9)';
+      ctx.lineWidth = 3;
+      ctx.strokeText(npc.who.name, cx, cy - 12);
+      ctx.fillText(npc.who.name, cx, cy - 12);
+    }
+    const p = this.player.pos;
+    const [px, py] = at(p.x, p.z);
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(-this.player.yaw + Math.PI);
+    ctx.beginPath();
+    ctx.moveTo(0, -15);
+    ctx.lineTo(8, 6);
+    ctx.lineTo(-8, 6);
+    ctx.closePath();
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    ctx.restore();
+    dot(p.x, p.z, 8, '#3d9fea');
+    void CELL;
+    void GRID;
+  }
+
+  /** Freeze the moment: the HUD hides and the camera is free to frame a picture. */
+  enterPhoto(): void {
+    this.playing = false;
+    this.photo = true;
+    this.input.releaseLock();
+    this.input.enabled = true;
+    this.input.cameraOnly = true;
+    this.stopBreathing();
+    this.endPractice();
+    this.ui.prompt(null);
+    this.ui.prompt2(null);
+    this.ui.showPhoto();
+  }
+
+  savePhoto(): void {
+    this.renderer.info.reset();
+    this.post.render(); // draw, then read the canvas before the browser clears it
+    const link = document.createElement('a');
+    link.download = `calm-island-${Date.now()}.png`;
+    link.href = this.canvas.toDataURL('image/png');
+    link.click();
+    this.photosSaved++;
+  }
+  photosSaved = 0;
+
   openLog(): void {
     if (!this.ready) return;
     this.playing = false;
@@ -502,7 +674,7 @@ export class Game {
         name: npc.who.name,
         meaning: npc.who.meaning,
         hello: npc.who.hello,
-        hint: `Someone lives near ${this.nearestRegionName(npc.home.x, npc.home.z)}.`,
+        hint: `Someone lives near ${this.nearestRegionName(npc.home.x, npc.home.z)}${npc.who.hours ? (npc.who.hours[0] > npc.who.hours[1] ? ', but only comes out after dark' : ', but only in the early morning') : ''}.`,
         met,
         companion: npc === this.companion,
         hearts: this.hearts(npc.who.id),
@@ -527,6 +699,7 @@ export class Game {
     this.player.breath = b.fill;
     if (finished) {
       this.breathsDone++;
+      this.reveal(this.player.pos.x, this.player.pos.z, 120); // breathing clears the mist from the map
       this.ui.breath(null);
       if (this.practice?.npc.who.practice.type === 'breathe') this.completePractice();
       else this.ui.toast('', 'Three deep breaths', 'Carry that calm with you');
@@ -652,7 +825,9 @@ export class Game {
     globalUniforms.uTime.value += dt;
     const p = this.player.pos;
     this.weather.update(dt, this.camera.position);
-    this.day.update(dt, this.sun, this.hemi, this.scene.fog as THREE.FogExp2, this.weather.rain);
+    // stay sitting after your breaths and the day drifts by ten times faster
+    const drift = this.playing && this.player?.sitting && !this.breathing.active && !this.practice ? 10 : 1;
+    this.day.update(dt * drift, this.sun, this.hemi, this.scene.fog as THREE.FogExp2, this.weather.rain);
     this.garden.update(Date.now(), globalUniforms.uTime.value);
     this.sky.update(dt, this.camera, this.day.night);
     globalUniforms.uPlayer.value.copy(p);
@@ -663,7 +838,7 @@ export class Game {
     this.grassFar.update(this.grassCenter.copy(p).addScaledVector(this.fwd, 36), p);
     this.vegetation.update(this.camera.position, QUALITY_PRESETS[this.settings.quality].distance);
     this.ambient.update(dt, globalUniforms.uTime.value, p, this.player.speed, this.player.grounded, this.day.night);
-    for (const npc of this.npcs) npc.update(dt, globalUniforms.uTime.value, this.player, this.camera.position);
+    for (const npc of this.npcs) npc.update(dt, globalUniforms.uTime.value, this.player, this.camera.position, this.day.hour);
     // keep the shadow box centred on the Calmling, snapped so edges don't shimmer
     const snap = 92 / this.sun.shadow.mapSize.x * 4;
     this.sun.target.position.set(Math.round(p.x / snap) * snap, Math.round(p.y / snap) * snap, Math.round(p.z / snap) * snap);
@@ -682,6 +857,7 @@ export class Game {
     if (found && found !== this.currentRegion) {
       const fresh = !this.discovered.has(found.id);
       this.discovered.add(found.id);
+      if (fresh) this.reveal(found.x, found.z, found.r + 55);
       this.ui.toast(fresh ? 'Discovered' : '', found.name, found.blurb);
     }
     if (found || !this.currentRegion || Math.hypot(p.x - this.currentRegion.x, p.z - this.currentRegion.z) > this.currentRegion.r + 12) {
@@ -706,6 +882,8 @@ export class Game {
       hour: this.day.hour,
       practices: [...this.learned],
       garden: this.garden.serialize(),
+      seeds: this.seeds.foundIds,
+      reveals: this.reveals,
     });
   }
 
@@ -732,6 +910,12 @@ export class Game {
       learned: [...this.learned],
       gardenPrompt: this.gardenPlot >= 0 ? this.garden.prompt(this.gardenPlot, Date.now()) : null,
       blooms: this.garden.blooms,
+      seedsFound: this.seeds.foundIds.length,
+      seedsTotal: this.seeds.spots.length,
+      reveals: this.reveals.length,
+      photo: this.photo,
+      photosSaved: this.photosSaved,
+      absent: this.npcs.filter((n) => n.absent).map((n) => n.who.id),
       hour: this.day.hour,
       vy: this.player.vel.y,
       speed: this.player.speed,
