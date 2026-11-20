@@ -1,5 +1,16 @@
 import type { CalmlingLook } from '../player/CalmlingModel';
 
+/** A small mindful exercise a Calmling can teach. */
+export interface Practice {
+  /** breathe: three guided breaths · still: sit quietly · gather: find five things · hop: five hops */
+  type: 'breathe' | 'still' | 'gather' | 'hop';
+  title: string;
+  /** gentle prompts shown one after another while sitting still */
+  lines: string[];
+  /** what you are looking for in a gather practice */
+  thing: string;
+}
+
 export interface Resident {
   id: string;
   name: string;
@@ -9,6 +20,7 @@ export interface Resident {
   hello: string;
   /** something they tell you once you are good friends */
   story: string;
+  practice: Practice;
   /** where they like to be, in island metres */
   home: [number, number];
   look: CalmlingLook;
@@ -24,6 +36,7 @@ export const RESIDENTS: Resident[] = [
     meaning: 'Latin: warmed by the sun',
     hello: 'Stand here a moment. Feel that? Lovely.',
     story: "I find the warmest patch of sand each morning and just… stay. That's the whole plan.",
+    practice: { type: 'still', title: "Sun on your face", lines: ["Close your eyes and turn toward the light.", "Feel where the warmth lands first.", "Let your shoulders drop into it."], thing: "" },
     look: { fur: 0xf47a1c, belly: 0xf8dfa6, tip: 0xffa23a, limbs: 0xf58a24, iris: 0x2f7fe6, style: 'spiky', extras: ['stripes'] },
   },
   {
@@ -31,6 +44,7 @@ export const RESIDENTS: Resident[] = [
     meaning: "Ngan'gikurunggurr: deep, quiet listening",
     hello: 'Shh… listen. The pond is telling a story.',
     story: "When I'm very quiet I can hear the lilies open. It took me years to notice.",
+    practice: { type: 'still', title: "Deep listening", lines: ["What is the nearest sound?", "Now the farthest one you can find.", "And the quiet underneath them both."], thing: "" },
     look: { fur: 0xf49ad2, belly: 0xfdeff6, limbs: 0xf7a6d8, iris: 0xa8309a, style: 'fluffy', extras: ['catEars', 'blush'] },
   },
   {
@@ -38,6 +52,7 @@ export const RESIDENTS: Resident[] = [
     meaning: "Chinese: putting yourself in another's place",
     hello: 'I packed a little extra, in case you needed some.',
     story: "I used to guess what others needed. Now I ask. It works much better.",
+    practice: { type: 'gather', title: "Five small kindnesses", lines: [], thing: "kindnesses" },
     look: { fur: 0xf5c2a4, belly: 0xfbe6d4, tip: 0xfad8c0, limbs: 0xf3b89a, iris: 0xa85068, style: 'shaggy', extras: ['pouch'] },
   },
   {
@@ -45,6 +60,7 @@ export const RESIDENTS: Resident[] = [
     meaning: 'Hawaiian: an elder, a keeper of wisdom',
     hello: 'These trees were saplings when I first sat here.',
     story: "I planted the great tree in the garden. It was shorter than you then.",
+    practice: { type: 'breathe', title: "The elder's breath", lines: [], thing: "" },
     look: { fur: 0x55555c, furLow: 0x7c7c84, belly: 0xbdbdc4, limbs: 0x56565e, iris: 0xdc8a1e, style: 'shaggy', extras: ['stick'] },
   },
   {
@@ -52,6 +68,7 @@ export const RESIDENTS: Resident[] = [
     meaning: 'Swedish: rising early to hear the first birdsong',
     hello: 'You should hear this meadow at dawn!',
     story: "The first bird of the day sings alone for a whole minute. I never miss it.",
+    practice: { type: 'still', title: "First birdsong", lines: ["Be still, and wait for a bird.", "Can you tell which way it came from?", "Let the song finish before you move."], thing: "" },
     look: { fur: 0xf58fb2, alt: 0x86bdea, belly: 0xfbd3e0, limbs: 0xf7a0bc, iris: 0x3a8ae6, style: 'spiky' },
   },
   {
@@ -59,6 +76,7 @@ export const RESIDENTS: Resident[] = [
     meaning: "Danish: fresh and rested after a good night's sleep",
     hello: 'What a morning! Shall we go somewhere?',
     story: "I sleep on the east shore so the sun reaches me first.",
+    practice: { type: 'breathe', title: "Morning breaths", lines: [], thing: "" },
     look: { fur: 0xf7b43a, furLow: 0xf0606c, lowAt: -0.15, limbs: 0xf2686e, iris: 0x2f7fe6, style: 'spiky', extras: ['openSmile', 'blush'] },
   },
   {
@@ -66,6 +84,7 @@ export const RESIDENTS: Resident[] = [
     meaning: 'Japanese: sunlight filtering through leaves',
     hello: 'Look up. See how the light falls through?',
     story: "I've counted the shapes the light makes on the forest floor. There's always one more.",
+    practice: { type: 'gather', title: "Five patches of light", lines: [], thing: "patches of light" },
     look: { fur: 0xf8e22c, furLow: 0x5c3f2c, lowAt: -0.3, lowSoft: 0.12, limbs: 0x5c3f2c, iris: 0x2f8ae6, style: 'spiky', extras: ['blush'] },
   },
   {
@@ -73,6 +92,7 @@ export const RESIDENTS: Resident[] = [
     meaning: 'German: one more special little wish',
     hello: 'Ah! Could we take the scenic path? And stop for a view?',
     story: "My wishes are small ones. A better view. A longer walk. One more minute here.",
+    practice: { type: 'gather', title: "Five little wishes", lines: [], thing: "wishes" },
     look: { fur: 0xe59a58, belly: 0xf3c491, tip: 0xf0b070, limbs: 0xe8a468, iris: 0x7a4a26, style: 'shaggy', extras: ['glasses', 'moustache'] },
   },
   {
@@ -80,6 +100,7 @@ export const RESIDENTS: Resident[] = [
     meaning: 'Japanese: a vision, a waking dream',
     hello: 'Did the mountain move just now, or did I?',
     story: "Sometimes I can't tell a cloud from the mountain. I've decided I like that.",
+    practice: { type: 'still', title: "Cloud watching", lines: ["Pick one cloud and follow it.", "What shape is it becoming?", "Let it drift out of sight."], thing: "" },
     look: { fur: 0x8d66dc, belly: 0xf0627c, limbs: 0x8a63d8, iris: 0x3a8ae6, style: 'fluffy', extras: ['hood', 'brows'] },
   },
   {
@@ -87,6 +108,7 @@ export const RESIDENTS: Resident[] = [
     meaning: 'Japanese: forest bathing',
     hello: 'Breathe it in. The forest does the rest.',
     story: "The antlers? They just grew, the longer I stayed among the trees.",
+    practice: { type: 'gather', title: "Five forest things", lines: [], thing: "forest things" },
     look: { fur: 0x6d9c48, tip: 0x8fbf5a, limbs: 0xdc7a30, iris: 0xe8b82a, style: 'fluffy', extras: ['antlers'] },
   },
   {
@@ -94,6 +116,7 @@ export const RESIDENTS: Resident[] = [
     meaning: 'Greek: the whisper of wind in the leaves',
     hello: 'The wind has news from the sea today.',
     story: "The wind told me your name before you arrived.",
+    practice: { type: 'still', title: "What the wind says", lines: ["Feel the wind on your fur.", "Notice which leaves move first.", "Breathe out as the gust passes."], thing: "" },
     look: { fur: 0xf2f7fd, furLow: 0xbcd9f4, tip: 0xffffff, limbs: 0xa9cdf0, iris: 0x2f8ae6, style: 'fluffy' },
   },
   {
@@ -101,6 +124,7 @@ export const RESIDENTS: Resident[] = [
     meaning: 'Japanese: washing the spirit clean in cold water',
     hello: 'Stand near the falls. Let the spray wake you.',
     story: "I stand under the falls until my thoughts run clear. Cold, but worth it.",
+    practice: { type: 'breathe', title: "Waterfall breaths", lines: [], thing: "" },
     look: { fur: 0x9fd0f6, furLow: 0x5c92dc, alt: 0xd9c6f8, tip: 0xe8fbff, limbs: 0x6aa6e6, iris: 0x2f6fd0, style: 'spiky', extras: ['sparkles'] },
   },
   {
@@ -108,6 +132,7 @@ export const RESIDENTS: Resident[] = [
     meaning: 'Portuguese: letting go and simply having fun',
     hello: "You came! Now it's a party.",
     story: "I wear the hat every day. Why wait for a reason?",
+    practice: { type: 'hop', title: "Five happy hops", lines: [], thing: "" },
     look: { fur: 0xf8f1f1, belly: 0xffffff, limbs: 0xf3e6e6, iris: 0x2f8ae6, style: 'fluffy', extras: ['partyHat', 'blush', 'openSmile'], scale: 0.88 },
   },
   {
@@ -115,6 +140,7 @@ export const RESIDENTS: Resident[] = [
     meaning: 'Japanese: mending what is broken with gold',
     hello: 'Every crack is where the gold goes.',
     story: "I was afraid of the cracks once. Then the gold came in.",
+    practice: { type: 'gather', title: "Mending with gold", lines: [], thing: "golden pieces" },
     look: { fur: 0x2a2c36, limbs: 0x2a2c36, paws: 0xf5c62a, iris: 0x7fa6d0, style: 'spiky', extras: ['cracks'] },
   },
   {
@@ -122,6 +148,7 @@ export const RESIDENTS: Resident[] = [
     meaning: 'Greek: things fitting together in balance',
     hello: 'The lake is so still. Everything in its place.',
     story: "When the lake is perfectly still I hum one note, and the whole shore hums back.",
+    practice: { type: 'breathe', title: "One long hum", lines: [], thing: "" },
     look: { fur: 0xf3f1f5, tip: 0xffffff, limbs: 0xe9e6ee, iris: 0x16161c, style: 'fluffy', extras: ['lashes', 'blush', 'sparkles'] },
   },
   {
@@ -129,6 +156,7 @@ export const RESIDENTS: Resident[] = [
     meaning: 'Greek: doing something with all your heart',
     hello: 'I planted every one of these flowers myself.',
     story: "Nobody asked me to plant the meadow. That's why I enjoyed it.",
+    practice: { type: 'gather', title: "Five flowers, chosen with care", lines: [], thing: "flowers" },
     look: { fur: 0xc4424f, limbs: 0xc4424f, paws: 0xfaf3f3, iris: 0xb05a9c, style: 'fluffy', extras: ['heart'] },
   },
   {
@@ -136,6 +164,7 @@ export const RESIDENTS: Resident[] = [
     meaning: 'Swedish: the road of moonlight across water',
     hello: 'Come back at night. The sea lays out a path.',
     story: "On clear nights I walk the moon's road as far as the tide lets me.",
+    practice: { type: 'still', title: "Watching the water", lines: ["Follow one wave all the way in.", "Notice the moment it turns back.", "Let the next one arrive by itself."], thing: "" },
     look: { fur: 0xeeedf2, limbs: 0xe2e0ea, iris: 0x6a4a9c, style: 'smooth', extras: ['antlersPale', 'smallEars'] },
   },
   {
@@ -143,6 +172,7 @@ export const RESIDENTS: Resident[] = [
     meaning: 'Japanese: the beauty of the worn and imperfect',
     hello: 'Bit scruffy, bit patched. Just right.',
     story: "This patch is from a storm. This one I don't remember. I'd keep them all.",
+    practice: { type: 'still', title: "Perfectly imperfect", lines: ["Find something worn or crooked nearby.", "Look at it a little longer.", "Notice what makes it lovely."], thing: "" },
     look: { fur: 0x6f9c48, furLow: 0xa67748, lowAt: 0.12, lowSoft: 0.18, limbs: 0xa67748, iris: 0xdc7a1e, style: 'shaggy', extras: ['patches'] },
   },
 ];

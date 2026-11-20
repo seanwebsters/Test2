@@ -13,6 +13,8 @@ export interface LogEntry {
   /** friendship, 0–3 hearts */
   hearts: number;
   story: string | null;
+  /** the practice they taught you, once completed */
+  practice: string | null;
 }
 
 export interface UIHandlers {
@@ -125,6 +127,15 @@ export class UI {
     $('btn-hello').textContent = text;
   }
 
+  /** Second hint under the first: "[Q] Practise: …". */
+  prompt2(text: string | null): void {
+    $('prompt2').classList.toggle('hidden', text === null);
+    $('btn-practise').classList.toggle('hidden', text === null);
+    if (text === null) return;
+    $('prompt2-text').textContent = text;
+    $('btn-practise').textContent = text;
+  }
+
   showLog(entries: LogEntry[]): void {
     $('menu').classList.add('hidden');
     const met = entries.filter((e) => e.met).length;
@@ -157,6 +168,12 @@ export class UI {
         const q = document.createElement('p');
         q.textContent = e.story ? `“${e.story}”` : `“${e.hello}” Walk together to hear more.`;
         item.append(hearts, q);
+        if (e.practice) {
+          const pr = document.createElement('p');
+          pr.textContent = `✓ Practice learned: ${e.practice}`;
+          pr.style.cssText = 'color:#2f8a5a;font-weight:700';
+          item.append(pr);
+        }
       }
       if (e.companion) {
         const pill = document.createElement('span');

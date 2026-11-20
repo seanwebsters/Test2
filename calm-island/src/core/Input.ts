@@ -133,6 +133,10 @@ export class Input {
     return this.enabled && (this.pressed.has('KeyE') || this.virtualHit.has('interact'));
   }
 
+  practisePressed(): boolean {
+    return this.enabled && (this.pressed.has('KeyQ') || this.virtualHit.has('practise'));
+  }
+
   breathePressed(): boolean {
     return this.enabled && (this.pressed.has('KeyB') || this.virtualHit.has('breathe'));
   }

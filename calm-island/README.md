@@ -27,6 +27,8 @@ Open http://localhost:5173 and press **Begin wandering**.
 | `Space` | Hop. Keep holding while falling to glide down under a leaf |
 | `B` | Sit down and take three guided deep breaths. Move to stand up |
 | `E` | Say hello to a Calmling. Once met, `E` invites them to walk with you (one at a time) or says goodbye |
+| `Q` | Near a Calmling you have met: learn the small practice they teach |
+| `E` at a garden plot | Plant a seed or water it. Plants grow in real time, even while the game is closed |
 | `L` | Calmling log: who you have met, with a photo and what their name means |
 | `Esc` | Menu: graphics, music volume, look speed, return to the garden |
 
