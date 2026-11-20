@@ -144,3 +144,5 @@ body.is-touch #seeds { left: 50%; transform: translateX(-50%); }
 #btn-map { left: max(86px, calc(env(safe-area-inset-left) + 70px)); top: max(14px, env(safe-area-inset-top)); width: 62px; height: 62px; font-size: 13px !important; }
 #photo-bar { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 20px; border-radius: 99px; font-weight: 700; font-size: 14px; color: var(--ink); background: rgba(255,255,255,.86); box-shadow: 0 8px 26px rgba(20,70,130,.3); z-index: 5; }
 #photo-bar button { padding: 9px 18px; font-size: 14px; }
+
+#btn-skim { right: max(214px, calc(env(safe-area-inset-right) + 190px)); bottom: max(26px, env(safe-area-inset-bottom)); width: 70px; height: 70px; }

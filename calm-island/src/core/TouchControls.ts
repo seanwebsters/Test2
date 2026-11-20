@@ -84,6 +84,7 @@ export class TouchControls {
     button('btn-breathe', 'breathe');
     button('btn-hello', 'interact');
     button('btn-practise', 'practise');
+    button('btn-skim', 'skim');
     document.getElementById('btn-menu')!.addEventListener('click', onMenu);
   }
 }

@@ -8,6 +8,7 @@ import { Ambient } from '../world/Ambient';
 import { DayCycle } from '../world/DayCycle';
 import { Garden } from '../world/Garden';
 import { Seeds } from '../world/Seeds';
+import { Skimming } from '../world/Skimming';
 import { CELL, GRID, HALF, WORLD_SIZE } from '../world/islandMap';
 import { Weather } from '../world/Weather';
 import { Grass } from '../world/Grass';
@@ -17,6 +18,7 @@ import { Terrain, bakeGroundTexture } from '../world/Terrain';
 import { Vegetation } from '../world/Vegetation';
 import { Water } from '../world/Water';
 import { SUN_DIR, globalUniforms, makeHeightTexture } from '../world/shared';
+import { Ambience } from './Ambience';
 import { BREATHS, Breathing } from './Breathing';
 import { Input } from './Input';
 import { Music } from './Music';
@@ -30,6 +32,8 @@ const nextFrame = (): Promise<void> => new Promise((r) => requestAnimationFrame(
 export interface GameOptions {
   /** automated runs: no pointer lock, no persistence */
   test: boolean;
+  /** allow ambient sound even in test mode */
+  sound?: boolean;
   quality?: Quality;
 }
 
@@ -68,6 +72,11 @@ export class Game {
   private weather = new Weather();
   private garden!: Garden;
   private seeds!: Seeds;
+  private ambience = new Ambience();
+  private skimming!: Skimming;
+  private bestSkips = 0;
+  private waterNear = 0;
+  private waterCheck = 0;
   private reveals: number[][] = [[0, 0, 80]];
   private mapBase: HTMLCanvasElement | null = null;
   private groundTex!: THREE.DataTexture;
@@ -218,6 +227,8 @@ export class Game {
     this.ambient = new Ambient(this.island);
     this.garden = new Garden(this.island);
     this.seeds = new Seeds(this.island);
+    this.skimming = new Skimming(this.island);
+    this.scene.add(this.skimming.group);
     this.scene.add(this.seeds.group);
     this.scene.add(this.garden.group, this.weather.mesh);
     this.scene.add(this.ambient.group);
@@ -257,6 +268,7 @@ export class Game {
       this.garden.load(save.garden);
       this.seeds.load(save.seeds);
       if (save.reveals?.length) this.reveals = save.reveals;
+      this.bestSkips = save.bestSkips ?? 0;
       const friend = this.npcs.find((n) => n.who.id === save.companion);
       if (friend) {
         this.setCompanion(friend);
@@ -286,7 +298,9 @@ export class Game {
     this.input.cameraOnly = false;
     this.input.enabled = true;
     if (!this.opts.test) void this.music.start();
+    if (!this.opts.test || this.opts.sound) this.ambience.start();
     this.music.duck(false);
+    this.ambience.duck(false);
     this.ui.showGame();
     this.input.requestLock();
     this.canvas.focus();
@@ -298,6 +312,7 @@ export class Game {
     this.input.enabled = false;
     this.input.releaseLock();
     this.music.duck(true);
+    this.ambience.duck(true);
     this.save();
     const mins = Math.max(1, Math.round(this.playTime / 60));
     this.stopBreathing();
@@ -323,6 +338,7 @@ export class Game {
       });
     }
     this.music.setVolume(s.musicVolume);
+    this.ambience.setVolume(s.soundVolume);
     if (this.post) this.post.enabled = s.quality !== 'low';
     this.grassNear?.setDensity(preset.grass * s.grassDensity);
     this.grassFar?.setDensity(preset.grass * s.grassDensity);
@@ -353,6 +369,7 @@ export class Game {
       this.updateMeetings();
       this.updateFriendship(dt);
       this.updatePractice(dt);
+      this.updateShore(dt);
       const seed = this.seeds.update(globalUniforms.uTime.value, this.player.pos);
       if (seed >= 0) {
         const n = this.seeds.foundIds.length;
@@ -522,6 +539,49 @@ export class Game {
       }
     }
     return name;
+  }
+
+  /** How close water is (for sound and skimming), and stones thrown across it. */
+  private updateShore(dt: number): void {
+    const p = this.player.pos;
+    const I = this.island;
+    this.waterCheck -= dt;
+    if (this.waterCheck <= 0) {
+      this.waterCheck = 0.25;
+      let near = 0;
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        const r = i % 2 ? 5 : 11;
+        const x = p.x + Math.cos(a) * r;
+        const z = p.z + Math.sin(a) * r;
+        if (I.waterLevelAt(x, z) > I.heightAt(x, z) + 0.15 && Math.abs(I.waterLevelAt(x, z) - p.y) < 4) near += i % 2 ? 2 : 1;
+      }
+      this.waterNear = Math.min(1, near / 7);
+      this.ui.skim(this.waterNear > 0.12 && this.player.grounded && !this.practice && !this.breathing.active);
+    }
+    if (this.input.skimPressed() && this.waterNear > 0.12 && this.player.grounded && !this.player.sitting) this.skimming.throw(p, this.player.yaw);
+    const event = this.skimming.update(dt);
+    if (event) this.ambience.plip(event === 'skip' ? 1 : 0.2);
+    if (event === 'done' && this.skimming.skips > 0) {
+      const n = this.skimming.skips;
+      const best = n > this.bestSkips;
+      if (best) this.bestSkips = n;
+      this.ui.toast(best && n > 1 ? 'A new best' : '', `${n} skip${n === 1 ? '' : 's'}`, n >= 5 ? 'Beautiful throw' : n >= 3 ? 'Nicely done' : 'Try a longer stretch of water');
+      if (best) this.save();
+    }
+    const fx = I.falls.base.x - p.x;
+    const fz = I.falls.base.z - p.z;
+    this.ambience.update(
+      {
+        water: this.waterNear,
+        falls: Math.max(0, 1 - Math.hypot(fx, fz) / 110),
+        height: Math.min(1, Math.max(0, p.y / 120)),
+        night: this.day.night,
+        rain: this.weather.rain,
+        trees: I.sample(I.forest, p.x, p.z),
+      },
+      globalUniforms.uTime.value,
+    );
   }
 
   private reveal(x: number, z: number, r: number): void {
@@ -884,6 +944,7 @@ export class Game {
       garden: this.garden.serialize(),
       seeds: this.seeds.foundIds,
       reveals: this.reveals,
+      bestSkips: this.bestSkips,
     });
   }
 
@@ -915,6 +976,10 @@ export class Game {
       reveals: this.reveals.length,
       photo: this.photo,
       photosSaved: this.photosSaved,
+      waterNear: this.waterNear,
+      skips: this.skimming.skips,
+      stoneFlying: this.skimming.flying,
+      birdCalls: this.ambience.calls,
       absent: this.npcs.filter((n) => n.absent).map((n) => n.who.id),
       hour: this.day.hour,
       vy: this.player.vel.y,
