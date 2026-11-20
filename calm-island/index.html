@@ -19,6 +19,8 @@
         <span><kbd>E</kbd> say hello</span>
         <span><kbd>L</kbd> log</span>
         <span><kbd>F</kbd> skim a stone</span>
+        <span><kbd>K</kbd> kite</span>
+        <span><kbd>J</kbd> journal</span>
         <span><kbd>M</kbd> map</span>
         <span><kbd>P</kbd> photo</span>
         <span><kbd>Esc</kbd> menu</span>
@@ -39,6 +41,9 @@
         <button id="btn-skim" class="hidden">Skim</button>
         <button id="btn-log" aria-label="Calmling log">Log</button>
         <button id="btn-map" aria-label="Map">Map</button>
+        <button id="btn-journal" aria-label="Journal">Tips</button>
+        <button id="btn-photo" aria-label="Photo mode">Photo</button>
+        <button id="btn-kite" aria-label="Kite">Kite</button>
         <button id="btn-hop">Hop</button>
       </div>
       <div id="seeds" class="hidden"></div>
@@ -70,6 +75,8 @@
           <span class="desk"><kbd>Q</kbd> learn a friend's practice</span>
           <span class="desk"><kbd>L</kbd> Calmling log</span>
           <span class="desk"><kbd>F</kbd> skim a stone across water</span>
+          <span class="desk"><kbd>K</kbd> fly a kite</span>
+          <span class="desk"><kbd>J</kbd> journal of little things to try</span>
           <span class="desk"><kbd>M</kbd> map</span>
           <span class="desk"><kbd>P</kbd> photo mode</span>
           <span class="desk"><kbd>Esc</kbd> menu</span>
@@ -105,6 +112,7 @@
           <button id="resume" class="primary">Keep wandering</button>
           <button id="open-log">Calmling log</button>
           <button id="open-map">Map</button>
+          <button id="open-journal">Journal</button>
           <button id="home">Return to the garden</button>
           <button id="reset" class="quiet">Start afresh</button>
         </div>
@@ -128,6 +136,16 @@
           <button id="map-close" class="primary">Back to the island</button>
         </div>
         <canvas id="map-canvas" width="720" height="720"></canvas>
+      </div>
+    </div>
+
+    <div id="journal" class="screen hidden">
+      <div class="card log-card" style="width: min(560px, 100%)">
+        <div class="log-head">
+          <div><h2>Little things to try</h2><p class="lead" id="journal-count"></p></div>
+          <button id="journal-close" class="primary">Back to the island</button>
+        </div>
+        <div id="journal-list"></div>
       </div>
     </div>
 
