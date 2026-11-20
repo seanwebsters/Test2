@@ -29,6 +29,7 @@ Open http://localhost:5173 and press **Begin wandering**.
 | `E` | Say hello to a Calmling. Once met, `E` invites them to walk with you (one at a time) or says goodbye |
 | `Q` | Near a Calmling you have met: learn the small practice they teach |
 | `E` at a garden plot | Plant a seed or water it. Plants grow in real time, even while the game is closed |
+| `F` | Beside water: skim a stone and count the skips |
 | `M` | Map. Mist covers what you have not explored; discovering places and breathing clears it |
 | `P` | Photo mode: frame a shot and save it |
 | `L` | Calmling log: who you have met, with a photo and what their name means |

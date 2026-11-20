@@ -64,6 +64,7 @@ export class UI {
       handlers.onSettings(this.settings);
     });
     bind('set-music', (el) => (this.settings.musicVolume = +el.value));
+    bind('set-sound', (el) => (this.settings.soundVolume = +el.value));
     bind('set-shadows', (el) => (this.settings.shadows = el.checked));
     bind('set-grass', (el) => (this.settings.grassDensity = +el.value));
     bind('set-scale', (el) => (this.settings.renderScale = +el.value));
@@ -77,6 +78,7 @@ export class UI {
     const s = this.settings;
     $<HTMLSelectElement>('set-quality').value = s.quality;
     $<HTMLInputElement>('set-music').value = String(s.musicVolume);
+    $<HTMLInputElement>('set-sound').value = String(s.soundVolume);
     $<HTMLInputElement>('set-shadows').checked = s.shadows;
     $<HTMLInputElement>('set-grass').value = String(s.grassDensity);
     $<HTMLInputElement>('set-scale').value = String(s.renderScale);
@@ -192,6 +194,11 @@ export class UI {
     }
     $('log').classList.remove('hidden');
     $('log-close').focus();
+  }
+
+  /** The Skim button only shows beside water. */
+  skim(show: boolean): void {
+    $('btn-skim').classList.toggle('hidden', !show);
   }
 
   seeds(found: number, total: number): void {

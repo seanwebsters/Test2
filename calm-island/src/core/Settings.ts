@@ -9,6 +9,8 @@ export interface Settings {
   invertY: boolean;
   showFps: boolean;
   musicVolume: number; // 0..1
+  /** wind, water, birds */
+  soundVolume: number;
   /** lower the graphics preset automatically if the frame rate is poor */
   autoQuality: boolean;
 }
@@ -30,6 +32,7 @@ const DEFAULTS: Settings = {
   invertY: false,
   showFps: false,
   musicVolume: 0.6,
+  soundVolume: 0.7,
   autoQuality: true,
 };
 

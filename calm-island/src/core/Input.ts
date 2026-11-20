@@ -140,6 +140,10 @@ export class Input {
   /** Photo mode keeps the camera controls but nothing else. */
   cameraOnly = false;
 
+  skimPressed(): boolean {
+    return this.enabled && (this.pressed.has('KeyF') || this.virtualHit.has('skim'));
+  }
+
   breathePressed(): boolean {
     return this.enabled && (this.pressed.has('KeyB') || this.virtualHit.has('breathe'));
   }

@@ -18,6 +18,7 @@ export interface SaveData {
   practices?: string[];
   garden?: { t: number; w: number }[];
   seeds?: number[];
+  bestSkips?: number;
   /** patches of the map cleared of mist: x, z, radius */
   reveals?: number[][];
 }

@@ -12,6 +12,7 @@ const params = new URLSearchParams(location.search);
 const quality = params.get('quality');
 const game = new Game(document.getElementById('game') as HTMLCanvasElement, {
   test: params.has('test'),
+  sound: params.has('sound'),
   quality: quality === 'low' || quality === 'medium' || quality === 'high' ? (quality as Quality) : undefined,
 });
 window.__calm = game;
