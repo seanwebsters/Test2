@@ -43,7 +43,7 @@ export class DayCycle {
   /** 0 by day, 1 in the middle of the night */
   night = 0;
 
-  update(dt: number, sun: THREE.DirectionalLight, hemi: THREE.HemisphereLight, fog: THREE.FogExp2): void {
+  update(dt: number, sun: THREE.DirectionalLight, hemi: THREE.HemisphereLight, fog: THREE.FogExp2, rain = 0): void {
     this.hour = (this.hour + dt * this.rate) % 24;
     const h = this.hour;
     let i = 0;
@@ -68,7 +68,17 @@ export class DayCycle {
     const u = day ? (h - 5.6) / 13.6 : ((h - 19.2 + 24) % 24) / 10.4;
     SUN_DIR.set(Math.cos(Math.PI * u) * 0.85, Math.sin(Math.PI * u) * 0.95, 0.42).normalize();
     // fade the light out near the horizon so the hand-over from sun to moon is invisible
-    sun.intensity = num(k0.sunI, k1.sunI) * smoothstep(0.0, 0.16, SUN_DIR.y);
+    sun.intensity = num(k0.sunI, k1.sunI) * smoothstep(0.0, 0.16, SUN_DIR.y) * (1 - 0.65 * rain);
+    // a shower greys the sky, thickens the haze and softens everything
+    if (rain > 0.001) {
+      const dim = 0.35 + 0.65 * globalUniforms.uDayLight.value;
+      SKY_TOP.lerp(a.set(0x7f93aa).multiplyScalar(dim), rain * 0.75);
+      SKY_HORIZON.lerp(a.set(0xc3ccd6).multiplyScalar(dim), rain * 0.75);
+      fog.color.copy(SKY_HORIZON);
+      hemi.intensity *= 1 - 0.12 * rain;
+      globalUniforms.uDayLight.value *= 1 - 0.22 * rain;
+    }
+    fog.density = 0.00105 + 0.0016 * rain;
   }
 
   get label(): string {

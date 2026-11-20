@@ -6,6 +6,8 @@ import { Player } from '../player/Player';
 import { UI, type LogEntry } from '../ui/UI';
 import { Ambient } from '../world/Ambient';
 import { DayCycle } from '../world/DayCycle';
+import { Garden } from '../world/Garden';
+import { Weather } from '../world/Weather';
 import { Grass } from '../world/Grass';
 import { SPAWN, getIsland, type Island, type Region } from '../world/islandMap';
 import { SKY_HORIZON, Sky } from '../world/Sky';
@@ -61,6 +63,13 @@ export class Game {
   private companion: Npc | null = null;
   private bonds = new Map<string, number>();
   private day = new DayCycle();
+  private weather = new Weather();
+  private garden!: Garden;
+  private gardenPlot = -1;
+  private learned = new Set<string>();
+  private practice: { npc: Npc; t: number; count: number; motes: THREE.Mesh[]; wasGrounded: boolean } | null = null;
+  private moteMat = new THREE.MeshBasicMaterial({ color: 0xfff2a8 });
+  private moteGeo = new THREE.SphereGeometry(0.16, 12, 10);
   private nearby: Npc | null = null;
   private portraits = new Map<string, string>();
   private portraitTarget = new THREE.WebGLRenderTarget(256, 256);
@@ -113,6 +122,9 @@ export class Game {
         this.breathsDone = 0;
         this.met.clear();
         this.bonds.clear();
+        this.learned.clear();
+        this.garden.clear();
+        this.endPractice();
         this.day.hour = 9;
         this.setCompanion(null);
         this.player.teleport(SPAWN.x, SPAWN.z, 0.5);
@@ -181,6 +193,8 @@ export class Game {
     this.grassFar = new Grass(heightTex, groundTex, { patch: 110, maxBlades: 110000, bladeHeight: 0.5, bladeWidth: 0.2, seed: 2, simple: true, inner: 15 });
     this.scene.add(this.grassFar.mesh, this.grassNear.mesh);
     this.ambient = new Ambient(this.island);
+    this.garden = new Garden(this.island);
+    this.scene.add(this.garden.group, this.weather.mesh);
     this.scene.add(this.ambient.group);
 
     this.sun.castShadow = true;
@@ -214,6 +228,8 @@ export class Game {
       for (const id of save.met ?? []) this.met.add(id);
       for (const [id, t] of Object.entries(save.bonds ?? {})) this.bonds.set(id, t);
       if (typeof save.hour === 'number') this.day.hour = save.hour;
+      for (const id of save.practices ?? []) this.learned.add(id);
+      this.garden.load(save.garden);
       const friend = this.npcs.find((n) => n.who.id === save.companion);
       if (friend) {
         this.setCompanion(friend);
@@ -256,6 +272,7 @@ export class Game {
     const mins = Math.max(1, Math.round(this.playTime / 60));
     this.stopBreathing();
     this.ui.prompt(null);
+    this.ui.prompt2(null);
     const calm = this.breathsDone ? ` · ${this.breathsDone * BREATHS} deep breaths` : '';
     this.ui.showMenu(`${this.discovered.size} of ${this.island.regions.length} places · ${this.met.size} of ${this.npcs.length} Calmlings met · ${mins} min of wandering${calm}`);
   }
@@ -304,6 +321,7 @@ export class Game {
       this.rig.update(dt, this.input, this.player, this.settings, this.breathing.active ? this.player.yaw : null);
       this.updateMeetings();
       this.updateFriendship(dt);
+      this.updatePractice(dt);
       this.playTime += dt;
       this.checkRegion();
       this.saveIn -= dt;
@@ -344,7 +362,27 @@ export class Game {
         best = npc;
       }
     }
-    if (this.breathing.active) best = null;
+    if (this.breathing.active || this.practice) best = null;
+    // garden plots share the E key when no Calmling is in reach
+    this.gardenPlot = best || this.practice ? -1 : this.garden.near(p);
+    if (this.gardenPlot >= 0) {
+      this.nearby = null;
+      this.ui.prompt(this.garden.prompt(this.gardenPlot, Date.now()));
+      this.ui.prompt2(null);
+      if (this.input.interactPressed()) {
+        const did = this.garden.tend(this.gardenPlot, Date.now());
+        if (did === 'planted') this.ui.toast('', 'Seed planted', 'It grows while you are away. Come back and see.');
+        if (did === 'watered') this.ui.toast('', 'Watered', 'That will help it along.');
+        if (did) this.save();
+      }
+      return;
+    }
+    const canLearn = best && this.met.has(best.who.id) && !this.practice;
+    this.ui.prompt2(canLearn ? `${this.learned.has(best!.who.id) ? 'Practise again' : 'Learn'}: ${best!.who.practice.title}` : null);
+    if (canLearn && this.input.practisePressed()) {
+      this.startPractice(best!);
+      return;
+    }
     if (best !== this.nearby || best) {
       this.nearby = best;
       const name = best?.who.name;
@@ -454,7 +492,9 @@ export class Game {
     this.input.enabled = false;
     this.input.releaseLock();
     this.stopBreathing();
+    this.endPractice();
     this.ui.prompt(null);
+    this.ui.prompt2(null);
     const entries: LogEntry[] = this.npcs.map((npc) => {
       const met = this.met.has(npc.who.id);
       if (met && !this.portraits.has(npc.who.id)) this.portraits.set(npc.who.id, this.snapPortrait(npc));
@@ -467,6 +507,7 @@ export class Game {
         companion: npc === this.companion,
         hearts: this.hearts(npc.who.id),
         story: this.hearts(npc.who.id) >= 2 ? npc.who.story : null,
+        practice: this.learned.has(npc.who.id) ? npc.who.practice.title : null,
         portrait: this.portraits.get(npc.who.id) ?? null,
       };
     });
@@ -476,7 +517,7 @@ export class Game {
   /** Sit down and take three slow breaths, guided by the ring on screen. */
   private updateBreathing(dt: number): void {
     const b = this.breathing;
-    if (this.input.breathePressed() && !b.active && this.player.sit()) b.start();
+    if (this.input.breathePressed() && !b.active && !this.practice && this.player.sit()) b.start();
     if (!b.active) return;
     if (!this.player.sitting) {
       this.stopBreathing(); // the player moved: stand up, no fuss
@@ -487,11 +528,104 @@ export class Game {
     if (finished) {
       this.breathsDone++;
       this.ui.breath(null);
-      this.ui.toast('', 'Three deep breaths', 'Carry that calm with you');
+      if (this.practice?.npc.who.practice.type === 'breathe') this.completePractice();
+      else this.ui.toast('', 'Three deep breaths', 'Carry that calm with you');
       return;
     }
     const label = b.phase === 'in' ? 'Breathe in' : b.phase === 'hold' ? 'Hold' : 'Breathe out';
     this.ui.breath(label, b.fill, b.breath + (b.phase === 'out' ? 1 : 0), BREATHS);
+  }
+
+  /** Begin the small exercise a Calmling teaches. */
+  private startPractice(npc: Npc): void {
+    const pr = npc.who.practice;
+    this.practice = { npc, t: 0, count: 0, motes: [], wasGrounded: true };
+    this.ui.prompt(null);
+    this.ui.prompt2(null);
+    this.ui.toast(`${npc.who.name} shows you`, pr.title, pr.type === 'gather' ? `Find five ${pr.thing} nearby` : pr.type === 'hop' ? 'Hop five times. Go on!' : 'Sit, and take your time');
+    if (pr.type === 'breathe') {
+      if (this.player.sit()) this.breathing.start();
+      else this.practice = null;
+    } else if (pr.type === 'still') {
+      if (!this.player.sit()) this.practice = null;
+    } else if (pr.type === 'gather') {
+      // five glowing things scattered within a short walk
+      for (let i = 0; i < 5; i++) {
+        let x = npc.pos.x;
+        let z = npc.pos.z;
+        for (let tries = 0; tries < 12; tries++) {
+          const a = (i / 5) * Math.PI * 2 + Math.random();
+          const r = 6 + Math.random() * 8;
+          x = npc.pos.x + Math.cos(a) * r;
+          z = npc.pos.z + Math.sin(a) * r;
+          if (this.island.heightAt(x, z) > this.island.waterLevelAt(x, z) + 0.3) break;
+        }
+        const m = new THREE.Mesh(this.moteGeo, this.moteMat);
+        m.position.set(x, this.island.heightAt(x, z) + 0.9, z);
+        this.scene.add(m);
+        this.practice.motes.push(m);
+      }
+    }
+  }
+
+  private updatePractice(dt: number): void {
+    const pr = this.practice;
+    if (!pr) return;
+    const def = pr.npc.who.practice;
+    const p = this.player.pos;
+    pr.t += dt;
+    if (def.type === 'breathe') {
+      if (!this.breathing.active) this.endPractice(); // stood up early
+      return;
+    }
+    if (def.type === 'still') {
+      if (!this.player.sitting) {
+        this.endPractice();
+        return;
+      }
+      const total = 30;
+      this.ui.breath(def.lines[Math.min(def.lines.length - 1, Math.floor((pr.t / total) * def.lines.length))], pr.t / total, 0, 0);
+      if (pr.t >= total) this.completePractice();
+      return;
+    }
+    if (def.type === 'gather') {
+      const time = globalUniforms.uTime.value;
+      pr.motes.forEach((m, i) => {
+        if (!m.visible) return;
+        m.position.y += Math.sin(time * 2 + i) * 0.004;
+        m.scale.setScalar(1 + Math.sin(time * 4 + i * 2) * 0.18);
+        if (Math.hypot(m.position.x - p.x, m.position.z - p.z) < 1.5) {
+          m.visible = false;
+          pr.count++;
+        }
+      });
+      this.ui.breath(`${def.thing[0].toUpperCase()}${def.thing.slice(1)}: ${pr.count} of 5`, pr.count / 5, pr.count, 5);
+    } else {
+      if (pr.wasGrounded && !this.player.grounded && this.player.vel.y > 2) pr.count++;
+      pr.wasGrounded = this.player.grounded;
+      this.ui.breath(`Hop! ${pr.count} of 5`, pr.count / 5, pr.count, 5);
+    }
+    if (pr.count >= 5) this.completePractice();
+    else if (Math.hypot(pr.npc.pos.x - p.x, pr.npc.pos.z - p.z) > 70) this.endPractice(); // wandered off
+  }
+
+  private completePractice(): void {
+    const pr = this.practice;
+    if (!pr) return;
+    const first = !this.learned.has(pr.npc.who.id);
+    this.learned.add(pr.npc.who.id);
+    this.bonds.set(pr.npc.who.id, (this.bonds.get(pr.npc.who.id) ?? 0) + 60); // practising together brings you closer
+    this.ui.toast(first ? `Practice learned · ${this.learned.size} of ${this.npcs.length}` : 'Practice complete', pr.npc.who.practice.title, `With ${pr.npc.who.name}`);
+    this.endPractice();
+    this.save();
+  }
+
+  private endPractice(): void {
+    const pr = this.practice;
+    if (!pr) return;
+    for (const m of pr.motes) this.scene.remove(m);
+    this.practice = null;
+    if (!this.breathing.active) this.ui.breath(null);
   }
 
   private stopBreathing(): void {
@@ -517,7 +651,9 @@ export class Game {
   private updateWorld(dt: number): void {
     globalUniforms.uTime.value += dt;
     const p = this.player.pos;
-    this.day.update(dt, this.sun, this.hemi, this.scene.fog as THREE.FogExp2);
+    this.weather.update(dt, this.camera.position);
+    this.day.update(dt, this.sun, this.hemi, this.scene.fog as THREE.FogExp2, this.weather.rain);
+    this.garden.update(Date.now(), globalUniforms.uTime.value);
     this.sky.update(dt, this.camera, this.day.night);
     globalUniforms.uPlayer.value.copy(p);
     this.camera.getWorldDirection(this.fwd);
@@ -568,6 +704,8 @@ export class Game {
       companion: this.companion?.who.id ?? null,
       bonds: Object.fromEntries(this.bonds),
       hour: this.day.hour,
+      practices: [...this.learned],
+      garden: this.garden.serialize(),
     });
   }
 
@@ -588,6 +726,12 @@ export class Game {
       companion: this.companion?.who.id ?? null,
       nearby: this.nearby?.who.id ?? null,
       gliding: this.player.gliding,
+      rain: this.weather.rain,
+      practice: this.practice ? this.practice.npc.who.practice.type : null,
+      practiceCount: this.practice?.count ?? 0,
+      learned: [...this.learned],
+      gardenPrompt: this.gardenPlot >= 0 ? this.garden.prompt(this.gardenPlot, Date.now()) : null,
+      blooms: this.garden.blooms,
       hour: this.day.hour,
       vy: this.player.vel.y,
       speed: this.player.speed,

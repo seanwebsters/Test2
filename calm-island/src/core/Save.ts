@@ -14,6 +14,9 @@ export interface SaveData {
   bonds?: Record<string, number>;
   /** time of day, 0–24 */
   hour?: number;
+  /** ids of Calmlings whose practice you have completed */
+  practices?: string[];
+  garden?: { t: number; w: number }[];
 }
 
 const KEY = 'calmlings.save.v1';
