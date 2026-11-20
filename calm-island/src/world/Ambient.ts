@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mulberry32 } from '../core/math';
+import type { Island } from './islandMap';
 import { globalUniforms } from './shared';
 
 /** Small signs of life: drifting pollen around the player and birds wheeling overhead. */
@@ -8,8 +9,24 @@ export class Ambient {
   private pollen: THREE.ShaderMaterial;
   private birds: { pivot: THREE.Group; wingL: THREE.Mesh; wingR: THREE.Mesh; r: number; speed: number; phase: number; y: number; cx: number; cz: number }[] = [];
 
-  constructor() {
+  private butterflies: { body: THREE.Group; wingL: THREE.Mesh; wingR: THREE.Mesh; hx: number; hz: number; ph: number; f: number; h: number }[] = [];
+
+  constructor(private island: Island) {
     const rnd = mulberry32(11);
+    // butterflies drifting between the flowers, always a few near the Calmling
+    const wingGeo = new THREE.CircleGeometry(0.11, 10).scale(1, 1.25, 1).translate(0.1, 0, 0).rotateX(-Math.PI / 2);
+    const tints = [0xffffff, 0xffe27a, 0xffa9d0, 0x9fd6ff, 0xffb46b, 0xd7b6ff];
+    for (let i = 0; i < 18; i++) {
+      const mat = new THREE.MeshBasicMaterial({ color: tints[i % tints.length], side: THREE.DoubleSide });
+      const body = new THREE.Group();
+      const wingR = new THREE.Mesh(wingGeo, mat);
+      const wingL = new THREE.Mesh(wingGeo, mat);
+      wingL.scale.x = -1;
+      body.add(wingL, wingR);
+      body.scale.setScalar(0.8 + rnd() * 0.6);
+      this.butterflies.push({ body, wingL, wingR, hx: rnd() * 60, hz: rnd() * 60, ph: rnd() * 6.3, f: 0.25 + rnd() * 0.3, h: 0.5 + rnd() * 1.1 });
+      this.group.add(body);
+    }
     const N = 260;
     const BOX = 46;
     const pos = new Float32Array(N * 3);
@@ -42,8 +59,8 @@ export class Ambient {
           p.y += uCenter.y - 1.0;
           vec4 mv = modelViewMatrix * vec4(p, 1.0);
           float edge = 1.0 - smoothstep(${(BOX * 0.36).toFixed(1)}, ${(BOX * 0.5).toFixed(1)}, distance(p.xz, uCenter.xz));
-          vAlpha = edge * (0.35 + 0.45 * sin(uTime * 1.3 + aSeed * 90.0)) * smoothstep(1.5, 4.0, -mv.z);
-          gl_PointSize = uScale * (0.035 + aSeed * 0.035) / -mv.z;
+          vAlpha = edge * (0.35 + 0.45 * sin(uTime * 1.3 + aSeed * 90.0)) * smoothstep(3.0, 7.0, -mv.z);
+          gl_PointSize = uScale * (0.02 + aSeed * 0.022) / -mv.z;
           gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: /* glsl */ `
@@ -81,6 +98,22 @@ export class Ambient {
 
   update(time: number, center: THREE.Vector3): void {
     (this.pollen.uniforms.uCenter.value as THREE.Vector3).copy(center);
+    for (const b of this.butterflies) {
+      const t = time * b.f + b.ph;
+      // a looping wander around a home spot that wraps to stay near the player
+      const hx = center.x + ((((b.hx - center.x) % 60) + 90) % 60) - 30;
+      const hz = center.z + ((((b.hz - center.z) % 60) + 90) % 60) - 30;
+      const x = hx + Math.sin(t) * 3.2 + Math.sin(t * 2.7 + 1) * 1.1;
+      const z = hz + Math.cos(t * 0.8) * 3.2 + Math.cos(t * 2.3) * 1.1;
+      const ground = Math.max(this.island.heightAt(x, z), this.island.waterLevelAt(x, z));
+      const vx = Math.cos(t) * 3.2 + Math.cos(t * 2.7 + 1) * 3;
+      const vz = -Math.sin(t * 0.8) * 2.6 - Math.sin(t * 2.3) * 2.5;
+      b.body.position.set(x, ground + b.h + Math.sin(time * 3 + b.ph) * 0.18, z);
+      b.body.rotation.y = Math.atan2(vx, vz) + Math.PI / 2;
+      const flap = 0.15 + Math.abs(Math.sin(time * 13 + b.ph * 5)) * 1.15;
+      b.wingR.rotation.z = flap;
+      b.wingL.rotation.z = -flap;
+    }
     for (const b of this.birds) {
       const a = time * b.speed + b.phase;
       b.pivot.position.set(b.cx + Math.cos(a) * b.r, b.y + Math.sin(a * 2.3) * 3, b.cz + Math.sin(a) * b.r);

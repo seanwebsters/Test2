@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Calmlings: Calm Island</title>
     <link rel="stylesheet" href="/src/ui/style.css" />
   </head>
@@ -12,11 +12,27 @@
     <div id="hud" class="hidden">
       <div id="toast"><div class="toast-kicker"></div><div class="toast-title"></div><div class="toast-blurb"></div></div>
       <div id="hints">
-        <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> wander</span>
-        <span><kbd>Shift</kbd> run</span>
+        <span><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> wander</span>
+        <span><kbd>Shift</kbd>+<kbd>arrows</kbd> camera</span>
         <span><kbd>Space</kbd> hop</span>
-        <span><kbd>Mouse</kbd> look</span>
+        <span><kbd>B</kbd> sit &amp; breathe</span>
+        <span><kbd>E</kbd> say hello</span>
+        <span><kbd>L</kbd> log</span>
         <span><kbd>Esc</kbd> menu</span>
+      </div>
+      <div id="prompt" class="hidden"><kbd>E</kbd><span id="prompt-text"></span></div>
+      <div id="breath" class="hidden">
+        <div class="breath-ring"><div id="breath-fill"></div></div>
+        <div id="breath-label">Breathe in</div>
+        <div id="breath-count"></div>
+      </div>
+      <div id="touch" class="hidden">
+        <div id="joy"><div id="joy-thumb"></div></div>
+        <button id="btn-menu" aria-label="Menu">Menu</button>
+        <button id="btn-breathe">Breathe</button>
+        <button id="btn-hello" class="hidden">Hello</button>
+        <button id="btn-log" aria-label="Calmling log">Log</button>
+        <button id="btn-hop">Hop</button>
       </div>
       <div id="fps" class="hidden"></div>
     </div>
@@ -37,12 +53,16 @@
         <p class="lead">No goals. No clock. Just an island to wander.</p>
         <button id="play" class="primary">Begin wandering</button>
         <div class="controls">
-          <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> wander</span>
-          <span><kbd>Shift</kbd> run</span>
-          <span><kbd>Space</kbd> hop</span>
-          <span><kbd>Mouse</kbd> look around</span>
-          <span><kbd>Wheel</kbd> zoom</span>
-          <span><kbd>Esc</kbd> menu</span>
+          <span class="desk"><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> wander</span>
+          <span class="desk"><kbd>Shift</kbd>+<kbd>arrows</kbd> or mouse: camera</span>
+          <span class="desk"><kbd>Space</kbd> hop</span>
+          <span class="desk"><kbd>B</kbd> sit and take three deep breaths</span>
+          <span class="desk"><kbd>E</kbd> say hello to a Calmling, or ask them along</span>
+          <span class="desk"><kbd>L</kbd> Calmling log</span>
+          <span class="desk"><kbd>Esc</kbd> menu</span>
+          <span class="touch">Left thumb stick to wander</span>
+          <span class="touch">Drag the view to look around</span>
+          <span class="touch">Buttons to hop, sit and breathe, and say hello</span>
         </div>
       </div>
     </div>
@@ -69,9 +89,20 @@
         </div>
         <div class="buttons">
           <button id="resume" class="primary">Keep wandering</button>
+          <button id="open-log">Calmling log</button>
           <button id="home">Return to the garden</button>
           <button id="reset" class="quiet">Start afresh</button>
         </div>
+      </div>
+    </div>
+
+    <div id="log" class="screen hidden">
+      <div class="card log-card">
+        <div class="log-head">
+          <div><h2>Calmling log</h2><p class="lead" id="log-count"></p></div>
+          <button id="log-close" class="primary">Back to the island</button>
+        </div>
+        <div id="log-grid"></div>
       </div>
     </div>
 

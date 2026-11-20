@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { angleDelta, clamp, damp } from '../core/math';
+import { angleDelta, clamp, damp, lerp, smoothstep } from '../core/math';
 import type { Input } from '../core/Input';
 import type { Colliders } from '../world/Colliders';
 import { SPAWN, type Island } from '../world/islandMap';
@@ -24,6 +24,12 @@ export class Player {
   yaw = 0.5;
   grounded = true;
   swimming = false;
+  /** resting on the ground; any movement stands back up */
+  sitting = false;
+  /** 0..1 lung fill while breathing, read by the model */
+  breath = 0;
+  private moveTime = 0;
+  private axis = { x: 0, y: 0 };
   private coyote = 0;
   private jumpBuffer = 0;
   private prevVel = new THREE.Vector3();
@@ -35,7 +41,7 @@ export class Player {
   constructor(private island: Island, private colliders: Colliders) {
     this.pose = {
       speed: 0, walkSpeed: WALK, runSpeed: RUN, grounded: true, swimming: false,
-      verticalSpeed: 0, turnRate: 0, accel: this.accel, yaw: 0,
+      verticalSpeed: 0, turnRate: 0, accel: this.accel, yaw: 0, sitting: false, breath: 0,
     };
     this.teleport(SPAWN.x, SPAWN.z);
   }
@@ -49,7 +55,15 @@ export class Player {
     this.yaw = yaw;
     this.grounded = true;
     this.swimming = false;
+    this.sitting = false;
     this.sync();
+  }
+
+  /** Sit down where we stand. Returns false in the air or in water. */
+  sit(): boolean {
+    if (!this.grounded || this.swimming) return false;
+    this.sitting = true;
+    return true;
   }
 
   get speed(): number {
@@ -58,18 +72,24 @@ export class Player {
 
   update(dt: number, input: Input, camYaw: number): void {
     const I = this.island;
-    const ix = (input.down('KeyD') ? 1 : 0) - (input.down('KeyA') ? 1 : 0);
-    const iz = (input.down('KeyW') ? 1 : 0) - (input.down('KeyS') ? 1 : 0);
+    let amount = input.moveAxis(this.axis);
+    let jump = input.jumpPressed();
+    if (this.sitting) {
+      if (amount > 0.25 || jump || !this.grounded) this.sitting = false; // stand up first
+      amount = 0;
+      jump = false;
+    }
     let wx = 0;
     let wz = 0;
-    if (ix || iz) {
-      wx = -Math.sin(camYaw) * iz + Math.cos(camYaw) * ix;
-      wz = -Math.cos(camYaw) * iz - Math.sin(camYaw) * ix;
-      const l = Math.hypot(wx, wz);
-      wx /= l;
-      wz /= l;
+    if (amount > 0.08) {
+      wx = -Math.sin(camYaw) * this.axis.y + Math.cos(camYaw) * this.axis.x;
+      wz = -Math.cos(camYaw) * this.axis.y - Math.sin(camYaw) * this.axis.x;
     }
-    const top = this.swimming ? SWIM : input.down('ShiftLeft', 'ShiftRight') ? RUN : WALK;
+    // sets off at a stroll and settles into a run if you keep going;
+    // a gentle push on the thumb stick stays a walk
+    this.moveTime = amount > 0.08 ? this.moveTime + dt : 0;
+    const run = smoothstep(0.8, 1.7, this.moveTime) * smoothstep(0.6, 0.95, amount);
+    const top = this.swimming ? SWIM : lerp(WALK, RUN, run);
     const hasInput = wx !== 0 || wz !== 0;
     // quick to start, a touch longer to settle: weighty but never sluggish
     const rate = this.swimming ? 4 : this.grounded ? (hasInput ? 11 : 9) : 2.5;
@@ -77,7 +97,7 @@ export class Player {
     this.vel.z = damp(this.vel.z, wz * top, rate, dt);
 
     // jumping, with a little forgiveness either side of the edge
-    this.jumpBuffer = input.enabled && input.hit('Space') ? 0.14 : this.jumpBuffer - dt;
+    this.jumpBuffer = jump ? 0.14 : this.jumpBuffer - dt;
     this.coyote = this.grounded ? 0.12 : this.coyote - dt;
     if (this.jumpBuffer > 0 && this.coyote > 0 && !this.swimming) {
       this.vel.y = JUMP;
@@ -86,7 +106,7 @@ export class Player {
       this.coyote = 0;
       this.jumpBuffer = 0;
     }
-    if (!this.grounded && !this.swimming && this.vel.y > 3 && !input.down('Space')) this.vel.y = damp(this.vel.y, 3, 14, dt);
+    if (!this.grounded && !this.swimming && this.vel.y > 3 && !input.jumpHeld()) this.vel.y = damp(this.vel.y, 3, 14, dt);
 
     // steep ground: no climbing, and a gentle slide back down
     const steep = I.gradientAt(this.pos.x, this.pos.z, this.grad);
@@ -191,6 +211,8 @@ export class Player {
     this.pose.verticalSpeed = this.vel.y;
     this.pose.turnRate = this.turnRate;
     this.pose.yaw = this.yaw;
+    this.pose.sitting = this.sitting;
+    this.pose.breath = this.breath;
     this.model.update(dt, this.pose);
     this.sync();
   }

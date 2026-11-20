@@ -72,7 +72,28 @@ interface BlobDef {
 
 /** A cloud of blobs shaded as one soft mass: deep underneath, sunlit on top. */
 function canopy(blobs: BlobDef[], detail: number, pal: Palette, seed: number): THREE.BufferGeometry {
-  const parts = blobs.map((b, i) => blob(b.r, i === 0 ? detail : Math.max(1, detail - 1), seed + i * 1.7).translate(b.x, b.y, b.z));
+  const core = Math.max(1, detail - 1);
+  const parts = blobs.map((b, i) => blob(b.r, i === 0 ? core : Math.max(1, core - 1), seed + i * 1.7).translate(b.x, b.y, b.z));
+  if (detail >= 4) {
+    // little puffs over the top and sides break up the outline into leafy tufts
+    const rnd = mulberry32(Math.floor(seed * 1000) + 5);
+    blobs.forEach((b, i) => {
+      const n = b.r > 2 ? 9 : 5;
+      for (let k = 0; k < n; k++) {
+        const a = rnd() * Math.PI * 2;
+        const y = -0.25 + rnd() * 1.2;
+        const rr = Math.sqrt(Math.max(0, 1 - Math.min(1, y) ** 2));
+        const pr = b.r * (0.26 + rnd() * 0.16);
+        parts.push(
+          blob(pr, 1, seed + i * 3.1 + k, 0.9, 0.1).translate(
+            b.x + Math.cos(a) * rr * b.r * 0.86,
+            b.y + Math.min(1, y) * b.r * 0.84 * 0.86,
+            b.z + Math.sin(a) * rr * b.r * 0.86,
+          ),
+        );
+      }
+    });
+  }
   const g = merge(parts);
   g.computeBoundingBox();
   const bb = g.boundingBox!;

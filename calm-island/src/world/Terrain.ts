@@ -33,7 +33,29 @@ const SNOW = hex(0xf6f9ff);
  * grass grows there). The terrain mesh and the grass blades both read it, so
  * the blades always melt into the ground they stand on.
  */
-export function bakeGroundTexture(island: Island, res: number): THREE.DataTexture {
+export function bakeGroundTexture(island: Island, res: number, shadeSpots: number[] = []): THREE.DataTexture {
+  // Soft pools of shade under every tree and boulder, so distant ones sit on
+  // the ground instead of floating (real shadows only reach near the player).
+  const SR = 1024;
+  const shadeGrid = new Float32Array(SR * SR);
+  for (let k = 0; k < shadeSpots.length; k += 3) {
+    const cx = ((shadeSpots[k] + HALF) / WORLD_SIZE) * SR;
+    const cz = ((shadeSpots[k + 1] + HALF) / WORLD_SIZE) * SR;
+    const rad = (shadeSpots[k + 2] / WORLD_SIZE) * SR;
+    const i0 = Math.max(0, Math.floor(cx - rad));
+    const i1 = Math.min(SR - 1, Math.ceil(cx + rad));
+    const j0 = Math.max(0, Math.floor(cz - rad));
+    const j1 = Math.min(SR - 1, Math.ceil(cz + rad));
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
+        const t = 1 - Math.hypot(i - cx, j - cz) / rad;
+        if (t <= 0) continue;
+        const v = t * t * (3 - 2 * t);
+        const idx = j * SR + i;
+        if (v > shadeGrid[idx]) shadeGrid[idx] = v;
+      }
+    }
+  }
   const data = new Uint8Array(res * res * 4);
   const n1 = new Noise2D(77);
   const n2 = new Noise2D(303);
@@ -140,6 +162,22 @@ export function bakeGroundTexture(island: Island, res: number): THREE.DataTextur
       if (snow > 0) mix3(c, SNOW, snow, c);
 
       if (h < 0.35) grass = 0;
+      const sx = Math.min(SR - 1.001, ((i + 0.5) / res) * SR);
+      const sz = Math.min(SR - 1.001, ((j + 0.5) / res) * SR);
+      const si = Math.floor(sx);
+      const sj = Math.floor(sz);
+      const ia = Math.min(si + 1, SR - 1);
+      const ja = Math.min(sj + 1, SR - 1);
+      const ax = sx - si;
+      const az = sz - sj;
+      const sh =
+        (shadeGrid[sj * SR + si] * (1 - ax) + shadeGrid[sj * SR + ia] * ax) * (1 - az) +
+        (shadeGrid[ja * SR + si] * (1 - ax) + shadeGrid[ja * SR + ia] * ax) * az;
+      if (sh > 0) {
+        c[0] *= 1 - sh * 0.36;
+        c[1] *= 1 - sh * 0.26;
+        c[2] *= 1 - sh * 0.2;
+      }
       data[o] = clamp(c[0]) * 255;
       data[o + 1] = clamp(c[1]) * 255;
       data[o + 2] = clamp(c[2]) * 255;
@@ -215,7 +253,14 @@ export class Terrain {
             float blotch = texture2D(uDetail, vec2((vWPos.x + vWPos.z) * 0.012, vWPos.y * 0.012)).r;
             float strata = texture2D(uDetail, vec2((vWPos.x - vWPos.z) * 0.0016, vWPos.y * 0.021 + warp * 0.12)).r;
             float grain = texture2D(uDetail, vec2((vWPos.x - vWPos.z) * 0.06, vWPos.y * 0.19)).r;
-            vec3 rockCol = mix(vec3(0.34, 0.30, 0.27), vec3(0.50, 0.45, 0.38), smoothstep(0.35, 0.65, strata));
+            // ledges: stacked beds of stone with broken edges, used for both tone and relief
+            float beds = vWPos.y * 0.16 + warp * 1.6 + blotch * 0.5;
+            float bed = fract(beds);
+            float ledge = smoothstep(0.0, 0.12, bed) * smoothstep(1.0, 0.8, bed);
+            float cracks = smoothstep(0.42, 0.5, abs(texture2D(uDetail, vec2((vWPos.x - vWPos.z) * 0.021 + floor(beds) * 0.37, vWPos.y * 0.01)).r - 0.5) * 2.0 + 0.3);
+            vec3 rockCol = mix(vec3(0.36, 0.32, 0.29), vec3(0.56, 0.50, 0.43), smoothstep(0.35, 0.65, strata));
+            rockCol *= mix(0.7, 1.0, ledge) * mix(0.86, 1.0, cracks);
+            rockCol *= mix(0.92, 1.1, smoothstep(0.1, 0.9, bed)); // each bed lighter toward its top edge
             rockCol = mix(rockCol, vec3(0.60, 0.54, 0.45), smoothstep(0.45, 0.8, blotch) * 0.6);
             rockCol *= 0.9 + 0.2 * grain;
             // moss creeps over the gentler ledges

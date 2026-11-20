@@ -5,6 +5,11 @@ export interface SaveData {
   cam: { yaw: number; pitch: number; dist: number };
   discovered: string[];
   playTime: number;
+  /** completed three-breath exercises */
+  breaths?: number;
+  /** ids of the Calmlings you have met, and who is walking with you */
+  met?: string[];
+  companion?: string | null;
 }
 
 const KEY = 'calmlings.save.v1';
