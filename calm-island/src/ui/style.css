@@ -158,3 +158,58 @@ body.is-touch #seeds { left: 50%; transform: translateX(-50%); }
 #btn-journal { left: max(156px, calc(env(safe-area-inset-left) + 140px)); }
 #btn-photo { left: max(226px, calc(env(safe-area-inset-left) + 210px)); }
 #btn-kite { left: max(296px, calc(env(safe-area-inset-left) + 280px)); }
+
+/* ---- phones and tablets: layout that fits a small screen, portrait or landscape ---- */
+.screen { overflow-y: auto; place-items: safe center; }
+.card { max-width: 100%; }
+#menu .card, #start .card { max-height: none; }
+body.is-touch { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
+/* top row: five small round buttons on the left, Menu alone on the right */
+body.is-touch #btn-log, body.is-touch #btn-map, body.is-touch #btn-journal, body.is-touch #btn-photo, body.is-touch #btn-kite, body.is-touch #btn-menu {
+  top: max(10px, env(safe-area-inset-top)); width: 48px; height: 48px; font-size: 11.5px !important;
+}
+body.is-touch #btn-log { left: max(10px, env(safe-area-inset-left)); }
+body.is-touch #btn-map { left: calc(max(10px, env(safe-area-inset-left)) + 54px); }
+body.is-touch #btn-journal { left: calc(max(10px, env(safe-area-inset-left)) + 108px); }
+body.is-touch #btn-photo { left: calc(max(10px, env(safe-area-inset-left)) + 162px); }
+body.is-touch #btn-kite { left: calc(max(10px, env(safe-area-inset-left)) + 216px); }
+body.is-touch #btn-menu { right: max(10px, env(safe-area-inset-right)); left: auto; }
+body.is-touch #seeds { left: max(10px, env(safe-area-inset-left)); top: calc(max(10px, env(safe-area-inset-top)) + 56px); transform: none; font-size: 12px; }
+/* bottom right: Hop in the corner, Breathe beside it, Skim tucked above between them */
+body.is-touch #btn-hop { right: max(18px, env(safe-area-inset-right)); bottom: max(26px, env(safe-area-inset-bottom)); width: 84px; height: 84px; }
+body.is-touch #btn-breathe { right: calc(max(18px, env(safe-area-inset-right)) + 94px); bottom: max(22px, env(safe-area-inset-bottom)); width: 66px; height: 66px; font-size: 13px; }
+body.is-touch #btn-skim { right: calc(max(18px, env(safe-area-inset-right)) + 88px); bottom: calc(max(22px, env(safe-area-inset-bottom)) + 76px); width: 56px; height: 56px; font-size: 13px; }
+/* greetings sit in the middle, clear of both thumbs */
+body.is-touch #btn-hello, body.is-touch #btn-practise { right: auto; left: 50%; transform: translateX(-50%); height: 48px; max-width: 88vw; overflow: hidden; text-overflow: ellipsis; }
+body.is-touch #btn-hello { bottom: calc(max(26px, env(safe-area-inset-bottom)) + 150px); }
+body.is-touch #btn-practise { bottom: calc(max(26px, env(safe-area-inset-bottom)) + 206px); }
+body.is-touch #btn-hello:hover, body.is-touch #btn-practise:hover, body.is-touch #btn-hello:active, body.is-touch #btn-practise:active { transform: translateX(-50%); }
+body.is-touch #joy { left: max(18px, env(safe-area-inset-left)); bottom: max(22px, env(safe-area-inset-bottom)); }
+@media (max-width: 520px), (max-height: 520px) {
+  .screen { padding: 12px; }
+  .card { padding: 22px 20px 20px; border-radius: 24px; }
+  h1 { font-size: 34px; margin-bottom: 8px; }
+  h2 { font-size: 23px; }
+  .lead { margin-bottom: 14px; font-size: 15px; }
+  .logo-mark { height: 44px; }
+  .controls { margin-top: 16px; gap: 6px 12px; font-size: 13px; }
+  .toast-title { font-size: 28px; }
+  .toast-blurb { font-size: 14.5px; }
+  .toast-kicker { font-size: 11px; }
+  #toast { top: 15%; width: 92vw; }
+  .rows label { padding: 7px 0; font-size: 15px; }
+  input[type='range'] { width: 150px; }
+  .log-card, .map-card { padding: 18px; }
+  #log-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .breath-ring { width: 104px; height: 104px; }
+  #breath-fill { width: 97px; height: 97px; }
+  #breath-label { font-size: 21px; }
+  #photo-bar span { display: none; }
+}
+/* short landscape screens: keep the breathing ring and greetings out of the controls' way */
+@media (max-height: 520px) {
+  body.is-touch #breath { top: 12%; }
+  body.is-touch #btn-hello { bottom: calc(max(26px, env(safe-area-inset-bottom)) + 8px); }
+  body.is-touch #btn-practise { bottom: calc(max(26px, env(safe-area-inset-bottom)) + 62px); }
+  #toast { top: 20%; }
+}
