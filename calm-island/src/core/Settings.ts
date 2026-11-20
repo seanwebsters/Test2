@@ -33,6 +33,14 @@ const DEFAULTS: Settings = {
   autoQuality: true,
 };
 
+export function hasStoredSettings(): boolean {
+  try {
+    return localStorage.getItem(KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
 export function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem(KEY);

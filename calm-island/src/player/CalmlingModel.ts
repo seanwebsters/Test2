@@ -15,7 +15,36 @@ export interface CalmlingPose {
   /** world-space acceleration, used to make the fur lag behind */
   accel: THREE.Vector3;
   yaw: number;
+  sitting: boolean;
+  /** 0..1 lung fill during a breathing exercise */
+  breath: number;
 }
+
+/** Everything that makes one Calmling look different from another. */
+export interface CalmlingLook {
+  /** main fur colour (the top of the body when there is a gradient) */
+  fur: number;
+  /** fur colour toward the bottom of the body */
+  furLow?: number;
+  /** where the two fur colours meet (-1 bottom … 1 top) and how sharply */
+  lowAt?: number;
+  lowSoft?: number;
+  /** pale beard / belly patch down the front */
+  belly?: number;
+  /** colour the tufts fade to at their tips */
+  tip?: number;
+  /** every other tuft takes this colour (stripes, rainbow fur) */
+  alt?: number;
+  limbs?: number;
+  /** hands and feet, when different from the limbs */
+  paws?: number;
+  iris?: number;
+  style?: 'spiky' | 'shaggy' | 'fluffy' | 'smooth';
+  extras?: string[];
+  scale?: number;
+}
+
+export const BLUE_LOOK: CalmlingLook = { fur: 0x5cb4ec, style: 'spiky' };
 
 const BODY_Y = 0.78;
 const RX = 0.5;
@@ -53,9 +82,25 @@ export class CalmlingModel {
   private furOffset = new THREE.Vector3();
   private furVel = new THREE.Vector3();
   private lookX = 0;
+  private sit = 0;
+  private breath = 0;
+  private eyesShut = 0;
 
-  constructor(color = 0x5cb4ec) {
-    const base = new THREE.Color(color);
+  constructor(readonly look: CalmlingLook = BLUE_LOOK, hero = true) {
+    const base = new THREE.Color(0xffffff);
+    const cTop = new THREE.Color(look.fur);
+    const cLow = new THREE.Color(look.furLow ?? look.fur);
+    const cBelly = look.belly !== undefined ? new THREE.Color(look.belly) : null;
+    const lowAt = look.lowAt ?? 0;
+    const lowSoft = look.lowSoft ?? 0.6;
+    /** fur colour for a point on the body, by its direction from the centre */
+    const colorAt = (d: THREE.Vector3, out: THREE.Color): THREE.Color => {
+      out.copy(cLow).lerp(cTop, smoothstep(lowAt - lowSoft, lowAt + lowSoft, d.y));
+      if (cBelly) out.lerp(cBelly, smoothstep(0.15, 0.6, d.z) * smoothstep(0.12, -0.22, d.y) * 0.95);
+      return out;
+    };
+    const limbColor = new THREE.Color(look.limbs ?? look.furLow ?? look.fur).multiplyScalar(0.88);
+    const has = (x: string): boolean => !!look.extras?.includes(x);
     const furMat = new THREE.MeshStandardMaterial({ color: base, roughness: 0.95, metalness: 0, vertexColors: true });
     furMat.onBeforeCompile = (shader) => {
       shader.uniforms.uTime = globalUniforms.uTime;
@@ -118,10 +163,11 @@ export class CalmlingModel {
           #include <opaque_fragment>`,
         );
     };
-    const limbMat = new THREE.MeshStandardMaterial({ color: base.clone().multiplyScalar(0.86), roughness: 0.85 });
+    const limbMat = new THREE.MeshStandardMaterial({ color: limbColor, roughness: 0.85 });
+    const pawMat = look.paws !== undefined ? new THREE.MeshStandardMaterial({ color: look.paws, roughness: 0.85 }) : limbMat;
 
     // ---- body + fur ------------------------------------------------------
-    const fur = new THREE.Mesh(buildFur(), furMat);
+    const fur = new THREE.Mesh(buildFur(hero ? 18 : 9, hero, colorAt), furMat);
     fur.receiveShadow = true;
     this.body.add(fur);
     const tuftMat = new THREE.MeshStandardMaterial({ color: base, roughness: 0.95, vertexColors: true });
@@ -156,7 +202,7 @@ export class CalmlingModel {
           #include <opaque_fragment>`,
         );
     };
-    const tufts = new THREE.Mesh(buildTufts(), tuftMat);
+    const tufts = new THREE.Mesh(buildTufts(look.style ?? 'spiky', colorAt, look.tip, look.alt), tuftMat);
     tufts.castShadow = true;
     this.body.add(tufts);
     // an invisible stand-in casts the fur's shadow
@@ -169,7 +215,7 @@ export class CalmlingModel {
 
     // ---- face ------------------------------------------------------------
     const white = new THREE.MeshStandardMaterial({ color: 0xf2f4ff, roughness: 0.3, emissive: 0x8c92a8 });
-    const iris = new THREE.MeshStandardMaterial({ color: 0x4a9cf0, roughness: 0.3, emissive: 0x1c58b4 });
+    const iris = new THREE.MeshStandardMaterial({ color: look.iris ?? 0x4a9cf0, roughness: 0.3, emissive: new THREE.Color(look.iris ?? 0x4a9cf0).multiplyScalar(0.35) });
     const pupil = new THREE.MeshStandardMaterial({ color: 0x0a1638, roughness: 0.2 });
     const shine = new THREE.MeshBasicMaterial({ color: 0xffffff });
     for (const side of [-1, 1]) {
@@ -227,11 +273,21 @@ export class CalmlingModel {
     for (const [leg, side] of [[this.legL, -1], [this.legR, 1]] as const) {
       leg.position.set(side * 0.2, 0.37, 0);
       const mesh = new THREE.Mesh(legGeo, limbMat);
-      const foot = new THREE.Mesh(footGeo, limbMat);
+      const foot = new THREE.Mesh(footGeo, pawMat);
       mesh.castShadow = foot.castShadow = true;
       leg.add(mesh, foot);
       this.tilt.add(leg);
     }
+
+    if (look.paws !== undefined) {
+      for (const arm of [this.armL, this.armR]) {
+        const hand = new THREE.Mesh(new THREE.SphereGeometry(0.112, 14, 10), pawMat);
+        hand.position.y = -0.3;
+        arm.add(hand);
+      }
+    }
+    addExtras(look, has, this.body, this.armL, this.armR, this.legL, this.legR, smile);
+    this.root.scale.setScalar(look.scale ?? 1);
 
     this.body.position.y = BODY_Y;
     this.tilt.add(this.body);
@@ -252,6 +308,9 @@ export class CalmlingModel {
     this.run = damp(this.run, running, 8, dt);
     this.air = damp(this.air, pose.grounded || pose.swimming ? 0 : 1, 14, dt);
     this.swim = damp(this.swim, pose.swimming ? 1 : 0, 6, dt);
+    this.sit = damp(this.sit, pose.sitting ? 1 : 0, 5, dt);
+    this.breath = damp(this.breath, pose.sitting ? pose.breath : 0, 10, dt);
+    this.eyesShut = damp(this.eyesShut, pose.sitting && pose.breath > 0.001 ? 1 : 0, 3, dt);
 
     // steps keep pace with the ground so feet never skate
     this.phase += dt * (pose.swimming ? 5 : pose.speed * lerp(2.9, 1.75, this.run));
@@ -264,27 +323,37 @@ export class CalmlingModel {
     const breathe = Math.sin(t * 1.9) * 0.014 * (1 - this.move);
     const sy = 1 + this.squash + breathe + this.air * 0.04 * clamp(pose.verticalSpeed / 8, -1, 1);
     const sxz = 1 / Math.sqrt(Math.max(0.5, sy));
-    this.body.scale.set(sxz, sy, sxz);
+    // a deep breath fills the whole body
+    const swell = 1 + this.breath * 0.075;
+    this.body.scale.set(sxz * swell, sy * swell, sxz * swell);
 
     const stride = lerp(0.62, 1.0, this.run) * this.move;
     const bounce = Math.abs(c) * lerp(0.035, 0.085, this.run) * this.move;
-    this.body.position.y = BODY_Y + bounce + (sy - 1) * 0.3 + Math.sin(t * 2.2) * 0.03 * this.swim;
+    this.body.position.y = BODY_Y + bounce + (sy - 1) * 0.3 + Math.sin(t * 2.2) * 0.03 * this.swim - this.sit * 0.27 + this.breath * 0.04;
     this.tilt.rotation.z = s * lerp(0.075, 0.04, this.run) * this.move - clamp(pose.turnRate * 0.035, -0.22, 0.22) * this.move;
-    this.tilt.rotation.x = 0.07 * this.move + 0.15 * this.run + this.air * clamp(-pose.verticalSpeed * 0.02, -0.15, 0.2) + this.swim * 0.25;
+    this.tilt.rotation.x = -0.06 * this.sit - 0.03 * this.breath + 0.07 * this.move + 0.15 * this.run + this.air * clamp(-pose.verticalSpeed * 0.02, -0.15, 0.2) + this.swim * 0.25;
 
     const tuck = this.air * 0.55;
     this.legL.rotation.x = s * stride * (1 - this.air) - tuck + Math.sin(t * 5) * 0.5 * this.swim;
     this.legR.rotation.x = -s * stride * (1 - this.air) - tuck * 0.5 - Math.sin(t * 5) * 0.5 * this.swim;
-    this.legL.position.y = 0.37 + Math.max(0, c) * 0.05 * this.move + bounce * 0.4;
-    this.legR.position.y = 0.37 + Math.max(0, -c) * 0.05 * this.move + bounce * 0.4;
+    // sitting: legs swing out in front, feet up, arms resting
+    this.legL.rotation.x = lerp(this.legL.rotation.x, -1.38, this.sit);
+    this.legR.rotation.x = lerp(this.legR.rotation.x, -1.38, this.sit);
+    this.legL.rotation.z = -0.22 * this.sit;
+    this.legR.rotation.z = 0.22 * this.sit;
+    this.legL.position.z = this.legR.position.z = 0.14 * this.sit;
+    this.legL.position.y = 0.37 + Math.max(0, c) * 0.05 * this.move + bounce * 0.4 - this.sit * 0.2;
+    this.legR.position.y = 0.37 + Math.max(0, -c) * 0.05 * this.move + bounce * 0.4 - this.sit * 0.2;
 
     const armSwing = lerp(0.55, 1.05, this.run) * this.move;
     const lift = this.air * 1.15 + this.run * 0.18 + this.swim * 0.9;
     const idleSway = Math.sin(t * 1.9) * 0.04 * (1 - this.move);
     this.armL.rotation.x = -s * armSwing + Math.sin(t * 4) * 0.5 * this.swim;
     this.armR.rotation.x = s * armSwing - Math.sin(t * 4) * 0.5 * this.swim;
-    this.armL.rotation.z = -(0.14 + lift + idleSway);
-    this.armR.rotation.z = 0.14 + lift + idleSway;
+    this.armL.rotation.x -= 0.35 * this.sit;
+    this.armR.rotation.x -= 0.35 * this.sit;
+    this.armL.rotation.z = -(0.14 + lift + idleSway + this.breath * 0.12);
+    this.armR.rotation.z = 0.14 + lift + idleSway + this.breath * 0.12;
 
     // blinking and a glance into turns
     this.blinkIn -= dt;
@@ -294,7 +363,7 @@ export class CalmlingModel {
       if (Math.random() < 0.2) this.blinkIn = 0.3;
     }
     this.blink = Math.max(0, this.blink - dt);
-    const lid = this.blink > 0 ? 1 - Math.sin((this.blink / 0.15) * Math.PI) * 0.92 : 1;
+    const lid = Math.min(this.blink > 0 ? 1 - Math.sin((this.blink / 0.15) * Math.PI) * 0.92 : 1, 1 - this.eyesShut * 0.9);
     this.eyes.scale.y = lid;
     this.eyes.position.y = (1 - lid) * 0.1;
     const glance = this.move > 0.1 ? 0 : Math.sin(t * 0.43) * Math.sin(t * 0.17 + 1) * 0.6;
@@ -322,10 +391,47 @@ export class CalmlingModel {
  * a couple of hundred pointed tufts — long and upswept on the crown, hanging
  * down the sides, clipped short across the face so the eyes and smile stay clear.
  */
-function buildFur(): THREE.BufferGeometry {
+type ColorAt = (d: THREE.Vector3, out: THREE.Color) => THREE.Color;
+
+interface FurBase {
+  attrs: Record<string, THREE.BufferAttribute>;
+  index: THREE.BufferAttribute;
+  dirs: Float32Array;
+  tone: Float32Array;
+  count: number;
+  shells: number;
+}
+const furBases = new Map<string, FurBase>();
+
+/** Fur shells share their shape between Calmlings; only the colours differ. */
+function buildFur(shells: number, hero: boolean, colorAt: ColorAt): THREE.BufferGeometry {
+  const key = `${shells}${hero}`;
+  let fb = furBases.get(key);
+  if (!fb) furBases.set(key, (fb = furBase(shells, hero)));
+  const col = new Float32Array(fb.count * fb.shells * 3);
+  const d = new THREE.Vector3();
+  const c = new THREE.Color();
+  for (let i = 0; i < fb.count; i++) {
+    colorAt(d.fromArray(fb.dirs, i * 3), c);
+    const t = fb.tone[i];
+    for (let s = 0; s < fb.shells; s++) {
+      const o = (s * fb.count + i) * 3;
+      col[o] = c.r * t;
+      col[o + 1] = c.g * t;
+      col[o + 2] = c.b * t;
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  for (const [name, attr] of Object.entries(fb.attrs)) g.setAttribute(name, attr);
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.setIndex(fb.index);
+  g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1.1);
+  return g;
+}
+
+function furBase(SHELLS: number, hero: boolean): FurBase {
   const rnd = mulberry32(7);
-  const SHELLS = 18;
-  const base = new THREE.SphereGeometry(1, 80, 54);
+  const base = hero ? new THREE.SphereGeometry(1, 80, 54) : new THREE.SphereGeometry(1, 46, 30);
   const bp = base.attributes.position;
   const count = bp.count;
 
@@ -404,7 +510,6 @@ function buildFur(): THREE.BufferGeometry {
   const dir = new Float32Array(total * 3);
   const lean = new Float32Array(total * 3);
   const fur = new Float32Array(total * 2);
-  const col = new Float32Array(total * 3);
   const baseIndex = base.index!.array;
   const index = new Uint32Array(baseIndex.length * SHELLS);
   for (let s = 0; s < SHELLS; s++) {
@@ -417,22 +522,23 @@ function buildFur(): THREE.BufferGeometry {
     for (let i = 0; i < count; i++) {
       fur[(o + i) * 2] = t;
       fur[(o + i) * 2 + 1] = len[i];
-      col[(o + i) * 3] = tone[i] * 0.97;
-      col[(o + i) * 3 + 1] = tone[i];
-      col[(o + i) * 3 + 2] = tone[i] * 1.02;
     }
     for (let k = 0; k < baseIndex.length; k++) index[s * baseIndex.length + k] = baseIndex[k] + o;
   }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
-  g.setAttribute('aDir', new THREE.BufferAttribute(dir, 3));
-  g.setAttribute('aLean', new THREE.BufferAttribute(lean, 3));
-  g.setAttribute('aFur', new THREE.BufferAttribute(fur, 2));
-  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  g.setIndex(new THREE.BufferAttribute(index, 1));
-  g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1.1);
-  return g;
+  return {
+    attrs: {
+      position: new THREE.BufferAttribute(pos, 3),
+      normal: new THREE.BufferAttribute(nor, 3),
+      aDir: new THREE.BufferAttribute(dir, 3),
+      aLean: new THREE.BufferAttribute(lean, 3),
+      aFur: new THREE.BufferAttribute(fur, 2),
+    },
+    index: new THREE.BufferAttribute(index, 1),
+    dirs: D,
+    tone,
+    count,
+    shells: SHELLS,
+  };
 }
 
 /**
@@ -440,14 +546,57 @@ function buildFur(): THREE.BufferGeometry {
  * flames lying over one another like feathers. They sweep up on the crown,
  * out and slightly down on the sides, and leave the face clear.
  */
-function buildTufts(): THREE.BufferGeometry {
+const TUFT_STYLES = {
+  spiky: { count: 190, len: [0.24, 0.38], width: [0.12, 0.17], side: -0.42, crown: 0.45 },
+  shaggy: { count: 210, len: [0.3, 0.46], width: [0.11, 0.15], side: -0.85, crown: 0.05 },
+  fluffy: { count: 270, len: [0.14, 0.22], width: [0.15, 0.2], side: -0.2, crown: 0.3 },
+  smooth: { count: 140, len: [0.09, 0.14], width: [0.15, 0.19], side: -0.3, crown: 0.2 },
+};
+interface TuftBase {
+  attrs: Record<string, THREE.BufferAttribute>;
+  index: number[];
+  /** per vertex: root direction xyz, distance along the tuft, tuft number, tone */
+  meta: Float32Array;
+}
+const tuftBases = new Map<string, TuftBase>();
+
+function buildTufts(style: keyof typeof TUFT_STYLES, colorAt: ColorAt, tip?: number, alt?: number): THREE.BufferGeometry {
+  let tb = tuftBases.get(style);
+  if (!tb) tuftBases.set(style, (tb = tuftBase(style)));
+  const n = tb.meta.length / 6;
+  const col = new Float32Array(n * 3);
+  const d = new THREE.Vector3();
+  const c = new THREE.Color();
+  const tipC = tip !== undefined ? new THREE.Color(tip) : null;
+  const altC = alt !== undefined ? new THREE.Color(alt) : null;
+  for (let i = 0; i < n; i++) {
+    const m = i * 6;
+    const t = tb.meta[m + 3];
+    if (altC && tb.meta[m + 4] % 2 === 1) c.copy(altC);
+    else colorAt(d.fromArray(tb.meta, m), c);
+    c.multiplyScalar(tb.meta[m + 5] * lerp(0.93, 1.13, t));
+    if (tipC) c.lerp(tipC, smoothstep(0.3, 1, t) * 0.85);
+    col[i * 3] = c.r;
+    col[i * 3 + 1] = c.g;
+    col[i * 3 + 2] = c.b;
+  }
+  const g = new THREE.BufferGeometry();
+  for (const [name, attr] of Object.entries(tb.attrs)) g.setAttribute(name, attr);
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.setIndex(tb.index);
+  g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1.2);
+  return g;
+}
+
+function tuftBase(style: keyof typeof TUFT_STYLES): TuftBase {
+  const S = TUFT_STYLES[style];
   const rnd = mulberry32(21);
-  const COUNT = 190;
+  const COUNT = S.count;
+  const meta: number[] = [];
   const RINGS = 6;
   const SIDES = 8;
   const pos: number[] = [];
   const nor: number[] = [];
-  const col: number[] = [];
   const tuft: number[] = [];
   const idx: number[] = [];
   const golden = Math.PI * (3 - Math.sqrt(5));
@@ -468,13 +617,13 @@ function buildTufts(): THREE.BufferGeometry {
     if (face > 0.55) continue;
     const crown = smoothstep(0.35, 0.9, n.y);
     const skirt = smoothstep(-0.3, -0.8, n.y);
-    const length = lerp(0.24, 0.38, rnd()) * (1 + crown * 0.2) * (1 - skirt * 0.35) * (1 - face * 0.5);
-    const width = lerp(0.12, 0.17, rnd()) * (1 - face * 0.3);
+    const length = lerp(S.len[0], S.len[1], rnd()) * (1 + crown * 0.2) * (1 - skirt * 0.35) * (1 - face * 0.5);
+    const width = lerp(S.width[0], S.width[1], rnd()) * (1 - face * 0.3);
     const pear = 1 - 0.07 * n.y;
     root.set(n.x * RX * pear, n.y * RY, n.z * RZ * pear).multiplyScalar(0.9);
     // sweep: up and out on the crown, out and a little down on the sides
     dir.copy(n).multiplyScalar(0.8);
-    dir.y += lerp(-0.42, 0.45, crown) - skirt * 0.2;
+    dir.y += lerp(S.side, S.crown, crown) - skirt * 0.2;
     dir.x += (rnd() - 0.5) * 0.3;
     dir.z += (rnd() - 0.5) * 0.3 - face * 0.5;
     dir.normalize();
@@ -498,8 +647,7 @@ function buildTufts(): THREE.BufferGeometry {
         pos.push(p.x, p.y, p.z);
         vn.copy(side).multiplyScalar(cx * 0.5).addScaledVector(up, cy).multiplyScalar(0.3).addScaledVector(n, 0.9).normalize();
         nor.push(vn.x, vn.y, vn.z);
-        const shade = tone * lerp(0.93, 1.13, t);
-        col.push(shade * 0.97, shade, Math.min(1.3, shade * 1.02));
+        meta.push(n.x, n.y, n.z, t, i, tone);
         tuft.push(t, ang + i);
       }
     }
@@ -511,12 +659,244 @@ function buildTufts(): THREE.BufferGeometry {
       }
     }
   }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  g.setAttribute('aTuft', new THREE.Float32BufferAttribute(tuft, 2));
-  g.setIndex(idx);
-  g.computeBoundingSphere();
+  return {
+    attrs: {
+      position: new THREE.Float32BufferAttribute(pos, 3),
+      normal: new THREE.Float32BufferAttribute(nor, 3),
+      aTuft: new THREE.Float32BufferAttribute(tuft, 2),
+    },
+    index: idx,
+    meta: Float32Array.from(meta),
+  };
+}
+
+// ------------------------------------------------------------------ extras
+
+const mat = (color: number, extra: THREE.MeshStandardMaterialParameters = {}): THREE.MeshStandardMaterial =>
+  new THREE.MeshStandardMaterial({ color, roughness: 0.8, ...extra });
+
+/** A point on the body surface (pushed out by `lift`) for a direction. */
+function onBody(x: number, y: number, z: number, lift = 1): THREE.Vector3 {
+  const d = new THREE.Vector3(x, y, z).normalize();
+  const pear = 1 - 0.07 * d.y;
+  return new THREE.Vector3(d.x * RX * pear, d.y * RY, d.z * RZ * pear).multiplyScalar(lift);
+}
+
+function antler(color: number, side: number): THREE.Group {
+  const g = new THREE.Group();
+  const m = mat(color);
+  const seg = (from: [number, number, number], to: [number, number, number], r: number): void => {
+    const a = new THREE.Vector3(...from);
+    const b = new THREE.Vector3(...to);
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.6, r, a.distanceTo(b), 7).translate(0, a.distanceTo(b) / 2, 0), m);
+    mesh.position.copy(a);
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+    mesh.castShadow = true;
+    g.add(mesh);
+  };
+  seg([0, 0, 0], [0.1 * side, 0.26, 0], 0.035);
+  seg([0.1 * side, 0.26, 0], [0.24 * side, 0.46, 0.02], 0.028);
+  seg([0.06 * side, 0.15, 0], [-0.07 * side, 0.34, 0.03], 0.024);
+  seg([0.16 * side, 0.34, 0], [0.34 * side, 0.36, 0], 0.022);
+  seg([0.2 * side, 0.4, 0.01], [0.16 * side, 0.58, 0], 0.02);
   return g;
+}
+
+/** Hats, ears, antlers, glasses and the other things individual Calmlings wear. */
+function addExtras(
+  look: CalmlingLook,
+  has: (x: string) => boolean,
+  body: THREE.Group,
+  armL: THREE.Group,
+  armR: THREE.Group,
+  legL: THREE.Group,
+  legR: THREE.Group,
+  smile: THREE.Mesh,
+): void {
+  const add = (mesh: THREE.Object3D, parent: THREE.Object3D = body): void => {
+    mesh.traverse((o) => ((o as THREE.Mesh).castShadow = true));
+    parent.add(mesh);
+  };
+  const face = (mesh: THREE.Mesh, x: number, y: number, z: number, lift: number): void => {
+    mesh.position.copy(onBody(x, y, z, lift));
+    mesh.lookAt(mesh.position.clone().multiplyScalar(3));
+    add(mesh);
+  };
+
+  if (has('blush')) {
+    for (const s of [-1, 1]) {
+      const m = new THREE.Mesh(new THREE.CircleGeometry(0.075, 16), new THREE.MeshBasicMaterial({ color: 0xff8fa8, transparent: true, opacity: 0.55, depthWrite: false }));
+      face(m, s * 0.62, -0.02, 0.78, 1.13);
+    }
+  }
+  if (has('openSmile')) {
+    smile.visible = false;
+    const m = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2).scale(0.085, 0.075, 0.03), mat(0x8a2338));
+    m.position.copy(onBody(0, -0.2, 1, 1.12));
+    add(m);
+  }
+  if (has('lashes')) {
+    for (const s of [-1, 1]) {
+      for (let i = 0; i < 3; i++) {
+        const m = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.1, 5).translate(0, 0.05, 0), mat(0x1a1a22));
+        m.position.set(s * (0.25 + i * 0.045), 0.36 - i * 0.03, 0.4 - i * 0.03);
+        m.rotation.z = -s * (0.5 + i * 0.35);
+        add(m);
+      }
+    }
+  }
+  if (has('brows')) {
+    for (const s of [-1, 1]) {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8).scale(0.13, 0.045, 0.06), mat(0xe9e9ee));
+      m.position.set(s * 0.19, 0.4, 0.42);
+      m.rotation.z = -s * 0.25;
+      add(m);
+    }
+  }
+  if (has('catEars')) {
+    for (const s of [-1, 1]) {
+      const ear = new THREE.Group();
+      ear.add(new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.34, 14).scale(1, 1, 0.55), mat(0x8a5fc8)));
+      const inner = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.22, 12).scale(1, 1, 0.4), mat(0xf7a8d8));
+      inner.position.set(0, -0.03, 0.05);
+      ear.add(inner);
+      ear.position.set(s * 0.33, 0.56, 0.02);
+      ear.rotation.z = -s * 0.42;
+      add(ear);
+    }
+  }
+  if (has('smallEars')) {
+    for (const s of [-1, 1]) {
+      const m = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.24, 10).scale(1, 1, 0.5), mat(look.fur));
+      m.position.set(s * 0.5, 0.36, 0);
+      m.rotation.z = -s * 1.15;
+      add(m);
+    }
+  }
+  if (has('antlers') || has('antlersPale')) {
+    for (const s of [-1, 1]) {
+      const a = antler(has('antlers') ? 0x8a5a36 : 0xf0e2b0, s);
+      a.position.set(s * 0.2, 0.5, 0);
+      add(a);
+    }
+  }
+  if (has('partyHat')) {
+    const hat = new THREE.Group();
+    hat.add(new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.44, 20).translate(0, 0.22, 0), mat(0x8a55d8, { emissive: 0x2a1060 })));
+    const pom = new THREE.Mesh(new THREE.SphereGeometry(0.065, 12, 10), mat(0xf0483a));
+    pom.position.y = 0.46;
+    hat.add(pom);
+    for (let i = 0; i < 7; i++) {
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.02, 6, 5), mat([0xffd23c, 0x6fe0ff, 0xff8fd0][i % 3]));
+      const a = i * 2.4;
+      const h = 0.06 + (i % 4) * 0.08;
+      dot.position.set(Math.cos(a) * 0.17 * (1 - h / 0.44), h, Math.sin(a) * 0.17 * (1 - h / 0.44));
+      hat.add(dot);
+    }
+    hat.position.set(0.06, 0.52, 0.02);
+    hat.rotation.z = -0.16;
+    add(hat);
+  }
+  if (has('hood')) {
+    const navy = mat(0x2f2f8f, { side: THREE.DoubleSide });
+    const open = 1.75;
+    const hood = new THREE.Mesh(new THREE.SphereGeometry(1, 30, 18, Math.PI / 2 + open / 2, Math.PI * 2 - open, 0, Math.PI * 0.6).scale(RX * 1.34, RY * 1.36, RZ * 1.36), navy);
+    hood.position.y = 0.03;
+    add(hood);
+    const cape = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.74, 0.66, 26, 1, true, open / 2, Math.PI * 2 - open), navy);
+    cape.position.y = -0.42;
+    add(cape);
+  }
+  if (has('glasses')) {
+    const gold = mat(0xd9a441, { metalness: 0.6, roughness: 0.35 });
+    for (const s of [-1, 1]) {
+      const m = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.014, 8, 26), gold);
+      m.position.set(s * 0.17, 0.2, 0.52);
+      m.rotation.y = s * 0.28;
+      add(m);
+    }
+  }
+  if (has('moustache')) {
+    for (const s of [-1, 1]) {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10).scale(0.15, 0.055, 0.06), mat(0xb5622a));
+      m.position.set(s * 0.12, -0.02, 0.5);
+      m.rotation.z = s * 0.35;
+      add(m);
+    }
+  }
+  if (has('heart')) {
+    const sh = new THREE.Shape();
+    sh.moveTo(0, -0.1);
+    sh.bezierCurveTo(-0.16, 0.0, -0.13, 0.13, 0, 0.05);
+    sh.bezierCurveTo(0.13, 0.13, 0.16, 0.0, 0, -0.1);
+    const m = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.02, bevelEnabled: false }), mat(0xf79ab0, { emissive: 0x5a1a2a }));
+    m.position.copy(onBody(0, -0.42, 1, 1.13));
+    m.rotation.x = 0.35;
+    add(m);
+  }
+  if (has('cracks')) {
+    const gold = mat(0xffc92e, { emissive: 0xffa800, emissiveIntensity: 1.6 });
+    const rnd = mulberry32(55);
+    for (let k = 0; k < 9; k++) {
+      let az = rnd() * Math.PI * 2;
+      let el = (rnd() - 0.4) * 1.6;
+      const pts: THREE.Vector3[] = [];
+      for (let i = 0; i < 7; i++) {
+        pts.push(onBody(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el), 1.2));
+        az += (rnd() - 0.5) * 0.5;
+        el += (rnd() - 0.5) * 0.5 - 0.12;
+      }
+      add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 18, 0.011, 5), gold));
+    }
+  }
+  if (has('patches')) {
+    const rnd = mulberry32(91);
+    for (let k = 0; k < 5; k++) {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.18), mat([0x8a5a36, 0xc49a62, 0x6f4a2c][k % 3], { side: THREE.DoubleSide }));
+      const az = rnd() * Math.PI * 2;
+      face(m, Math.sin(az), -0.25 - rnd() * 0.5, Math.cos(az), 1.16);
+      m.rotateZ(rnd() * 2);
+    }
+  }
+  if (has('sparkles')) {
+    const rnd = mulberry32(13);
+    const sm = mat(0xffffff, { emissive: 0xcfe8ff, emissiveIntensity: 2.2 });
+    for (let k = 0; k < 26; k++) {
+      const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.012 + rnd() * 0.016), sm);
+      const az = rnd() * Math.PI * 2;
+      m.position.copy(onBody(Math.sin(az), rnd() * 1.3 - 0.9, Math.cos(az), 1.2 + rnd() * 0.1));
+      add(m);
+    }
+  }
+  if (has('stick')) {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.038, 1.15, 8), mat(0x8a5a36));
+    m.position.set(0.02, -0.02, 0.1);
+    m.rotation.x = 0.1;
+    add(m, armR);
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), mat(0x7a4d2c));
+    knob.position.set(0.02, 0.56, 0.16);
+    add(knob, armR);
+  }
+  if (has('pouch')) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 10).scale(1, 1.1, 0.9), mat(0x7fb89a));
+    m.position.set(0, -0.44, 0.03);
+    add(m, armL);
+  }
+  if (has('stripes')) {
+    const dark = mat(0x5a2a10);
+    for (const limb of [armL, armR]) {
+      for (const y of [-0.1, -0.2, -0.3]) {
+        const m = new THREE.Mesh(new THREE.TorusGeometry(0.104, 0.016, 6, 18), dark);
+        m.rotation.x = Math.PI / 2;
+        m.position.y = y;
+        add(m, limb);
+      }
+    }
+    for (const limb of [legL, legR]) {
+      const m = new THREE.Mesh(new THREE.TorusGeometry(0.163, 0.018, 6, 20), dark);
+      m.rotation.x = Math.PI / 2;
+      m.position.y = -0.14;
+      add(m, limb);
+    }
+  }
 }

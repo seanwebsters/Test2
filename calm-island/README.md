@@ -21,13 +21,18 @@ Open http://localhost:5173 and press **Begin wandering**.
 
 | Key | Action |
 | --- | --- |
-| `W` `A` `S` `D` | Wander |
-| `Shift` | Run |
+| Arrow keys (or `W` `A` `S` `D`) | Wander. Keep going and the Calmling breaks into a run |
+| `Shift` + arrow keys | Turn and tilt the camera |
+| Mouse | Look around (click the view to capture the mouse); wheel zooms |
 | `Space` | Hop (hold for a higher hop) |
-| Mouse | Look around (click the view to capture the mouse) |
-| Mouse wheel | Zoom |
-| Arrow keys / `Q` `E` | Turn the camera without a mouse |
+| `B` | Sit down and take three guided deep breaths. Move to stand up |
+| `E` | Say hello to a Calmling. Once met, `E` invites them to walk with you (one at a time) or says goodbye |
+| `L` | Calmling log: who you have met, with a photo and what their name means |
 | `Esc` | Menu: graphics, music volume, look speed, return to the garden |
+
+On a phone or tablet the game shows on-screen controls instead: a thumb stick
+to wander (push gently to walk, fully to run), drag anywhere to look around,
+and buttons for Hop, Breathe and Menu.
 
 Walk into deep water and the Calmling floats and swims. Your position, camera
 and the places you have discovered are saved in the browser automatically.
@@ -40,7 +45,7 @@ preset down by itself. Choosing a preset in the menu turns that off.
 Phase 1 of four is done: the island, the playable Calmling, the camera and
 movement, plus saving, a settings menu and background music.
 
-Not built yet (later phases): other Calmlings, collectibles, benches, plants
+Not built yet (later phases): collectibles, benches, plants
 to water, caves, ambient sound effects (wind, water, birds) and a day/night
 cycle.
 
@@ -66,7 +71,8 @@ npm run build
 flat, the river runs downhill, lakes hold water, paths stay on land).
 
 `npm run smoke` plays the built game in headless Chromium: it walks, runs,
-hops, bumps into a tree, tries to climb a cliff, swims, and opens the menu,
+hops, turns the camera, sits to breathe, bumps into a tree, tries to climb a
+cliff, swims, and opens the menu,
 and fails on any console error. It needs the preview server and Playwright:
 
 ```bash
@@ -95,6 +101,9 @@ src/
     Game.ts            loading, main loop, settings, saving, region discovery
     Input.ts           keyboard + mouse (pointer lock with a drag fallback)
     Music.ts           seamless looping music via Web Audio
+    Breathing.ts       timing of the three-breath exercise
+    TouchControls.ts   on-screen thumb stick and buttons for phones
+    PostFX.ts          glow, tone mapping and colour grade
     Settings.ts        graphics presets and stored preferences
     Save.ts            local save data
   world/
@@ -108,6 +117,9 @@ src/
     plantGeometry.ts   the procedural plant and rock meshes
     Colliders.ts       solid tree trunks and boulders
     Ambient.ts         pollen and birds
+  npc/
+    roster.ts          the 18 resident Calmlings: looks, homes, name meanings
+    Npc.ts             wandering, greeting and following behaviour
   player/
     CalmlingModel.ts   the character mesh, fur and procedural animation
     Player.ts          movement, jumping, swimming, collisions

@@ -59,8 +59,8 @@ export class Ambient {
           p.y += uCenter.y - 1.0;
           vec4 mv = modelViewMatrix * vec4(p, 1.0);
           float edge = 1.0 - smoothstep(${(BOX * 0.36).toFixed(1)}, ${(BOX * 0.5).toFixed(1)}, distance(p.xz, uCenter.xz));
-          vAlpha = edge * (0.35 + 0.45 * sin(uTime * 1.3 + aSeed * 90.0)) * smoothstep(1.5, 4.0, -mv.z);
-          gl_PointSize = uScale * (0.035 + aSeed * 0.035) / -mv.z;
+          vAlpha = edge * (0.35 + 0.45 * sin(uTime * 1.3 + aSeed * 90.0)) * smoothstep(3.0, 7.0, -mv.z);
+          gl_PointSize = uScale * (0.02 + aSeed * 0.022) / -mv.z;
           gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: /* glsl */ `

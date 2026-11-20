@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { clamp, damp } from '../core/math';
+import { angleDelta, clamp, damp } from '../core/math';
 import type { Input } from '../core/Input';
 import type { Settings } from '../core/Settings';
 import type { Island } from '../world/islandMap';
@@ -16,6 +16,7 @@ export class CameraRig {
   private probe = new THREE.Vector3();
   private look = new THREE.Vector3();
   private fov = 50;
+  private keys = { x: 0, y: 0 };
 
   constructor(readonly camera: THREE.PerspectiveCamera, private island: Island) {}
 
@@ -25,14 +26,18 @@ export class CameraRig {
     this.place(player);
   }
 
-  update(dt: number, input: Input, player: Player, settings: Settings): void {
+  /** `faceYaw`: when set, the camera drifts round to look at the Calmling's face. */
+  update(dt: number, input: Input, player: Player, settings: Settings, faceYaw: number | null = null): void {
     const sens = 0.0024 * settings.sensitivity;
     this.yaw -= input.dx * sens;
     this.pitch += input.dy * sens * (settings.invertY ? -1 : 1);
-    const keyTurn = (input.down('ArrowLeft', 'KeyQ') ? 1 : 0) - (input.down('ArrowRight', 'KeyE') ? 1 : 0);
-    const keyTilt = (input.down('ArrowUp') ? 1 : 0) - (input.down('ArrowDown') ? 1 : 0);
-    this.yaw += keyTurn * 1.9 * dt;
-    this.pitch += keyTilt * 1.1 * dt;
+    input.cameraAxis(this.keys);
+    this.yaw += this.keys.x * 1.9 * dt;
+    this.pitch += this.keys.y * 1.1 * dt;
+    if (faceYaw !== null && input.dx === 0 && this.keys.x === 0) {
+      this.yaw += angleDelta(this.yaw, faceYaw) * (1 - Math.exp(-1.2 * dt));
+      this.pitch = damp(this.pitch, 0.14, 1.2, dt);
+    }
     this.pitch = clamp(this.pitch, -0.4, 1.35);
     this.dist = clamp(this.dist * Math.exp(input.wheel * 0.0012), 2.8, 18);
 

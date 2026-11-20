@@ -1,7 +1,9 @@
 import * as THREE from 'three';
+import { Npc } from '../npc/Npc';
+import { RESIDENTS } from '../npc/roster';
 import { CameraRig } from '../player/CameraRig';
 import { Player } from '../player/Player';
-import { UI } from '../ui/UI';
+import { UI, type LogEntry } from '../ui/UI';
 import { Ambient } from '../world/Ambient';
 import { Grass } from '../world/Grass';
 import { SPAWN, getIsland, type Island, type Region } from '../world/islandMap';
@@ -10,11 +12,13 @@ import { Terrain, bakeGroundTexture } from '../world/Terrain';
 import { Vegetation } from '../world/Vegetation';
 import { Water } from '../world/Water';
 import { SUN_DIR, globalUniforms, makeHeightTexture } from '../world/shared';
+import { BREATHS, Breathing } from './Breathing';
 import { Input } from './Input';
 import { Music } from './Music';
 import { PostFX } from './PostFX';
 import { clearSave, loadSave, writeSave } from './Save';
-import { QUALITY_PRESETS, loadSettings, saveSettings, type Quality, type Settings } from './Settings';
+import { QUALITY_PRESETS, hasStoredSettings, loadSettings, saveSettings, type Quality, type Settings } from './Settings';
+import { TouchControls, isTouchDevice } from './TouchControls';
 
 const nextFrame = (): Promise<void> => new Promise((r) => requestAnimationFrame(() => r()));
 
@@ -49,6 +53,15 @@ export class Game {
   private discovered = new Set<string>();
   private currentRegion: Region | null = null;
   private playTime = 0;
+  private breathing = new Breathing();
+  private breathsDone = 0;
+  private npcs: Npc[] = [];
+  private met = new Set<string>();
+  private companion: Npc | null = null;
+  private nearby: Npc | null = null;
+  private portraits = new Map<string, string>();
+  private portraitTarget = new THREE.WebGLRenderTarget(256, 256);
+  private portraitCam = new THREE.PerspectiveCamera(32, 1, 0.2, 3000);
   private saveIn = 5;
   private grassCenter = new THREE.Vector3();
   private fwd = new THREE.Vector3();
@@ -60,7 +73,10 @@ export class Game {
   ready = false;
 
   constructor(private canvas: HTMLCanvasElement, private opts: GameOptions) {
+    const touch = isTouchDevice();
+    const fresh = !hasStoredSettings();
     this.settings = loadSettings();
+    if (touch && fresh) this.settings.quality = 'medium'; // phones start lighter
     if (opts.quality) this.settings.quality = opts.quality;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -71,12 +87,14 @@ export class Game {
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
     this.input = new Input(canvas);
-    this.input.allowPointerLock = !opts.test;
+    this.input.allowPointerLock = !opts.test && !touch;
     this.input.onLockChange = (locked) => {
       if (!locked && this.playing) this.pause();
     };
     this.ui = new UI(this.settings, {
       onPlay: () => this.play(),
+      onLog: () => this.openLog(),
+      onLogClose: () => this.play(),
       onResume: () => this.play(),
       onHome: () => {
         this.player.teleport(SPAWN.x, SPAWN.z, 0.5);
@@ -89,6 +107,9 @@ export class Game {
         this.discovered.clear();
         this.currentRegion = null;
         this.playTime = 0;
+        this.breathsDone = 0;
+        this.met.clear();
+        this.setCompanion(null);
         this.player.teleport(SPAWN.x, SPAWN.z, 0.5);
         this.rig.yaw = 0;
         this.rig.snap(this.player);
@@ -99,11 +120,19 @@ export class Game {
         this.applySettings();
       },
     });
+    this.ui.touch = touch;
+    document.body.classList.toggle('is-touch', touch);
+    new TouchControls(this.input, canvas, () => this.pause());
     window.addEventListener('resize', () => this.resize());
     window.addEventListener('keydown', (e) => {
       if (e.code !== 'Escape' || !this.ready) return;
       if (this.playing) this.pause();
-      else if (this.ui.menuOpen) this.play();
+      else if (this.ui.menuOpen || this.ui.logOpen) this.play();
+    });
+    window.addEventListener('keydown', (e) => {
+      if (e.code !== 'KeyL' || !this.ready || e.repeat) return;
+      if (this.playing) this.openLog();
+      else if (this.ui.logOpen) this.play();
     });
     window.addEventListener('beforeunload', () => this.save());
     document.addEventListener('visibilitychange', () => {
@@ -162,6 +191,11 @@ export class Game {
     this.player = new Player(this.island, this.vegetation.colliders);
     this.scene.add(this.player.model.root);
     this.rig = new CameraRig(this.camera, this.island);
+    RESIDENTS.forEach((who, i) => {
+      const npc = new Npc(who, this.island, i);
+      this.npcs.push(npc);
+      this.scene.add(npc.model.root);
+    });
 
     const save = this.opts.test ? null : loadSave();
     if (save) {
@@ -170,6 +204,13 @@ export class Game {
       this.rig.pitch = save.cam.pitch;
       this.rig.dist = save.cam.dist;
       this.playTime = save.playTime;
+      this.breathsDone = save.breaths ?? 0;
+      for (const id of save.met ?? []) this.met.add(id);
+      const friend = this.npcs.find((n) => n.who.id === save.companion);
+      if (friend) {
+        this.setCompanion(friend);
+        friend.pos.set(save.pos[0] + 1.2, 0, save.pos[2] + 1.2);
+      }
       for (const id of save.discovered) this.discovered.add(id);
     }
     this.rig.snap(this.player);
@@ -205,7 +246,10 @@ export class Game {
     this.music.duck(true);
     this.save();
     const mins = Math.max(1, Math.round(this.playTime / 60));
-    this.ui.showMenu(`${this.discovered.size} of ${this.island.regions.length} places discovered · ${mins} min of wandering`);
+    this.stopBreathing();
+    this.ui.prompt(null);
+    const calm = this.breathsDone ? ` · ${this.breathsDone * BREATHS} deep breaths` : '';
+    this.ui.showMenu(`${this.discovered.size} of ${this.island.regions.length} places · ${this.met.size} of ${this.npcs.length} Calmlings met · ${mins} min of wandering${calm}`);
   }
 
   private applySettings(): void {
@@ -247,8 +291,10 @@ export class Game {
     this.timer.update();
     const dt = Math.min(this.timer.getDelta(), 1 / 20);
     if (this.playing) {
+      this.updateBreathing(dt);
       this.player.update(dt, this.input, this.rig.yaw);
-      this.rig.update(dt, this.input, this.player, this.settings);
+      this.rig.update(dt, this.input, this.player, this.settings, this.breathing.active ? this.player.yaw : null);
+      this.updateMeetings();
       this.playTime += dt;
       this.checkRegion();
       this.saveIn -= dt;
@@ -277,6 +323,152 @@ export class Game {
     }
   }
 
+  /** Who is close enough to greet, and what E does about it. */
+  private updateMeetings(): void {
+    const p = this.player.pos;
+    let best: Npc | null = null;
+    let bestD = 3.4;
+    for (const npc of this.npcs) {
+      const d = Math.hypot(npc.pos.x - p.x, npc.pos.z - p.z);
+      if (d < bestD && Math.abs(npc.pos.y - p.y) < 2.5) {
+        bestD = d;
+        best = npc;
+      }
+    }
+    if (this.breathing.active) best = null;
+    if (best !== this.nearby || best) {
+      this.nearby = best;
+      const name = best?.who.name;
+      this.ui.prompt(!best ? null : !this.met.has(best.who.id) ? 'Say hello' : best === this.companion ? `Say goodbye to ${name}` : `Invite ${name} along`);
+    }
+    if (!best || !this.input.interactPressed()) return;
+    if (!this.met.has(best.who.id)) {
+      this.met.add(best.who.id);
+      this.ui.toast(`You met · ${this.met.size} of ${this.npcs.length}`, best.who.name, best.who.meaning);
+      this.portraits.set(best.who.id, this.snapPortrait(best));
+    } else if (best === this.companion) {
+      this.setCompanion(null);
+      this.ui.toast('', `Goodbye, ${best.who.name}`, 'They are heading home');
+    } else {
+      this.setCompanion(best);
+      this.ui.toast('Walking with you', best.who.name, `“${best.who.hello}”`);
+    }
+    this.save();
+  }
+
+  /** Only one friend walks with you; the previous one wanders home. */
+  private setCompanion(npc: Npc | null): void {
+    if (this.companion && this.companion !== npc) {
+      this.companion.following = false;
+      this.companion.returning = true;
+    }
+    this.companion = npc;
+    if (npc) {
+      npc.following = true;
+      npc.returning = false;
+    }
+  }
+
+  /** A little photo of a Calmling where they stand, for the log. */
+  private snapPortrait(npc: Npc): string {
+    const size = this.portraitTarget.width;
+    const cam = this.portraitCam;
+    const s = npc.who.look.scale ?? 1;
+    const fx = Math.sin(npc.yaw);
+    const fz = Math.cos(npc.yaw);
+    cam.position.set(npc.pos.x + fx * 4.2 * s + fz * 0.9, npc.pos.y + 1.15 * s, npc.pos.z + fz * 4.2 * s - fx * 0.9);
+    cam.lookAt(npc.pos.x, npc.pos.y + 0.95 * s, npc.pos.z);
+    const wasVisible = npc.model.root.visible;
+    npc.model.root.visible = true;
+    npc.sync();
+    const fog = this.scene.fog;
+    this.renderer.setRenderTarget(this.portraitTarget);
+    this.renderer.render(this.scene, cam);
+    const px = new Uint8Array(size * size * 4);
+    this.renderer.readRenderTargetPixels(this.portraitTarget, 0, 0, size, size, px);
+    this.renderer.setRenderTarget(null);
+    this.scene.fog = fog;
+    npc.model.root.visible = wasVisible;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+    const img = ctx.createImageData(size, size);
+    // the target holds linear light, upside down: brighten to display values and flip
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const i = ((size - 1 - y) * size + x) * 4;
+        const o = (y * size + x) * 4;
+        for (let c = 0; c < 3; c++) img.data[o + c] = Math.min(255, Math.pow(px[i + c] / 255, 1 / 2.2) * 255 * 1.04);
+        img.data[o + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    return canvas.toDataURL('image/jpeg', 0.86);
+  }
+
+  private nearestRegionName(x: number, z: number): string {
+    let name = 'the island';
+    let best = Infinity;
+    for (const r of this.island.regions) {
+      const d = Math.hypot(r.x - x, r.z - z) - r.r;
+      if (d < best) {
+        best = d;
+        name = r.name;
+      }
+    }
+    return name;
+  }
+
+  openLog(): void {
+    if (!this.ready) return;
+    this.playing = false;
+    this.input.enabled = false;
+    this.input.releaseLock();
+    this.stopBreathing();
+    this.ui.prompt(null);
+    const entries: LogEntry[] = this.npcs.map((npc) => {
+      const met = this.met.has(npc.who.id);
+      if (met && !this.portraits.has(npc.who.id)) this.portraits.set(npc.who.id, this.snapPortrait(npc));
+      return {
+        name: npc.who.name,
+        meaning: npc.who.meaning,
+        hello: npc.who.hello,
+        hint: `Someone lives near ${this.nearestRegionName(npc.home.x, npc.home.z)}.`,
+        met,
+        companion: npc === this.companion,
+        portrait: this.portraits.get(npc.who.id) ?? null,
+      };
+    });
+    this.ui.showLog(entries);
+  }
+
+  /** Sit down and take three slow breaths, guided by the ring on screen. */
+  private updateBreathing(dt: number): void {
+    const b = this.breathing;
+    if (this.input.breathePressed() && !b.active && this.player.sit()) b.start();
+    if (!b.active) return;
+    if (!this.player.sitting) {
+      this.stopBreathing(); // the player moved: stand up, no fuss
+      return;
+    }
+    const finished = b.update(dt);
+    this.player.breath = b.fill;
+    if (finished) {
+      this.breathsDone++;
+      this.ui.breath(null);
+      this.ui.toast('', 'Three deep breaths', 'Carry that calm with you');
+      return;
+    }
+    const label = b.phase === 'in' ? 'Breathe in' : b.phase === 'hold' ? 'Hold' : 'Breathe out';
+    this.ui.breath(label, b.fill, b.breath + (b.phase === 'out' ? 1 : 0), BREATHS);
+  }
+
+  private stopBreathing(): void {
+    this.breathing.cancel();
+    this.player.breath = 0;
+    this.ui.breath(null);
+  }
+
   /** Step the graphics down once if the machine is clearly struggling. */
   private autoQuality(): void {
     if (!this.settings.autoQuality || !this.playing || this.opts.test || document.hidden) return;
@@ -302,6 +494,7 @@ export class Game {
     this.grassFar.update(this.grassCenter.copy(p).addScaledVector(this.fwd, 36), p);
     this.vegetation.update(this.camera.position, QUALITY_PRESETS[this.settings.quality].distance);
     this.ambient.update(globalUniforms.uTime.value, p);
+    for (const npc of this.npcs) npc.update(dt, globalUniforms.uTime.value, this.player, this.camera.position);
     // keep the shadow box centred on the Calmling, snapped so edges don't shimmer
     const snap = 92 / this.sun.shadow.mapSize.x * 4;
     this.sun.target.position.set(Math.round(p.x / snap) * snap, Math.round(p.y / snap) * snap, Math.round(p.z / snap) * snap);
@@ -337,6 +530,9 @@ export class Game {
       cam: { yaw: this.rig.yaw, pitch: this.rig.pitch, dist: this.rig.dist },
       discovered: [...this.discovered],
       playTime: this.playTime,
+      breaths: this.breathsDone,
+      met: [...this.met],
+      companion: this.companion?.who.id ?? null,
     });
   }
 
@@ -349,6 +545,13 @@ export class Game {
       ground: this.island.heightAt(p.x, p.z),
       grounded: this.player.grounded,
       swimming: this.player.swimming,
+      sitting: this.player.sitting,
+      breathing: this.breathing.active,
+      breathPhase: this.breathing.phase,
+      breathsDone: this.breathsDone,
+      met: [...this.met],
+      companion: this.companion?.who.id ?? null,
+      nearby: this.nearby?.who.id ?? null,
       speed: this.player.speed,
       playing: this.playing,
       fps: this.fps,
