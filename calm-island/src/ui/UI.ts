@@ -24,6 +24,8 @@ export interface JournalItem {
 }
 
 export interface UIHandlers {
+  onSeason(): void;
+  onWake(): void;
   onJournal(): void;
   onPhoto(): void;
   onMap(): void;
@@ -54,6 +56,7 @@ export class UI {
     $('photo-exit').addEventListener('click', () => handlers.onLogClose());
     $('photo-save').addEventListener('click', () => handlers.onPhotoSave());
     $('open-map').addEventListener('click', () => handlers.onMap());
+    $('sleep').addEventListener('pointerdown', () => handlers.onWake());
     $('open-journal').addEventListener('click', () => handlers.onJournal());
     $('btn-journal').addEventListener('click', () => handlers.onJournal());
     $('journal-close').addEventListener('click', () => handlers.onLogClose());
@@ -70,6 +73,13 @@ export class UI {
         handlers.onSettings(this.settings);
       });
     };
+    const season = $<HTMLSelectElement>('set-season');
+    season.value = this.settings.season;
+    season.addEventListener('change', () => {
+      this.settings.season = season.value as Settings['season'];
+      handlers.onSettings(this.settings);
+      handlers.onSeason();
+    });
     q.addEventListener('change', () => {
       this.settings.quality = q.value as Quality;
       this.settings.autoQuality = false; // an explicit choice is respected
@@ -208,9 +218,19 @@ export class UI {
     $('log-close').focus();
   }
 
-  /** The Skim button only shows beside water. */
-  skim(show: boolean): void {
+  /** Skim and Fish only show beside water; `fishLabel` changes while a line is out. */
+  skim(show: boolean, fishLabel = 'Fish'): void {
     $('btn-skim').classList.toggle('hidden', !show);
+    $('btn-fish').classList.toggle('hidden', !show && fishLabel === 'Fish');
+    $('btn-fish').textContent = fishLabel;
+  }
+
+  sleepButton(show: boolean): void {
+    $('btn-sleep').classList.toggle('hidden', !show);
+  }
+
+  sleeping(on: boolean): void {
+    $('sleep').classList.toggle('hidden', !on);
   }
 
   showJournal(items: JournalItem[]): void {

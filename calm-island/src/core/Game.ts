@@ -9,6 +9,9 @@ import { DayCycle } from '../world/DayCycle';
 import { Garden } from '../world/Garden';
 import { Seeds } from '../world/Seeds';
 import { Skimming } from '../world/Skimming';
+import { Fishing } from '../world/Fishing';
+import { Home, KEEPSAKES } from '../world/Home';
+import { SEASON, currentSeason, setSeason } from '../world/season';
 import { Cairns, Kite, Viewpoints } from '../world/Places';
 import { CELL, GRID, HALF, WORLD_SIZE } from '../world/islandMap';
 import { Weather } from '../world/Weather';
@@ -36,6 +39,8 @@ export interface GameOptions {
   /** allow ambient sound even in test mode */
   sound?: boolean;
   quality?: Quality;
+  /** force a season instead of following the calendar */
+  season?: string | null;
 }
 
 export class Game {
@@ -70,7 +75,15 @@ export class Game {
   private companion: Npc | null = null;
   private bonds = new Map<string, number>();
   private day = new DayCycle();
-  private weather = new Weather();
+  private weather!: Weather;
+  private fishing!: Fishing;
+  private home!: Home;
+  private keepsakes = new Set<string>();
+  private sleeping = false;
+  private sleptFor = 0;
+  private daily!: { npc: Npc; kind: 'thought' | 'breathe'; text: string; key: string };
+  private dailyDone = '';
+  private dailyAnnounced = false;
   private garden!: Garden;
   private seeds!: Seeds;
   private ambience = new Ambience();
@@ -130,6 +143,11 @@ export class Game {
       onPlay: () => this.play(),
       onLog: () => this.openLog(),
       onMap: () => this.openMap(),
+      onSeason: () => {
+        this.save();
+        location.reload(); // the island is repainted for the new season
+      },
+      onWake: () => this.wake(false),
       onJournal: () => this.openJournal(),
       onPhoto: () => this.enterPhoto(),
       onPhotoSave: () => this.savePhoto(),
@@ -153,6 +171,9 @@ export class Game {
         this.garden.clear();
         this.seeds.reset();
         this.rested.clear();
+        this.keepsakes.clear();
+        this.home.show(this.keepsakes);
+        this.dailyDone = '';
         this.flags.clear();
         this.cairns.load([]);
         this.kite.flying = false;
@@ -214,6 +235,8 @@ export class Game {
     };
     const low = this.settings.quality === 'low';
 
+    setSeason(currentSeason(this.opts.season ?? (this.settings.season === 'auto' ? null : this.settings.season)));
+    this.weather = new Weather(SEASON === 'winter');
     await step(0.08, 'Raising hills from the sea…');
     this.island = getIsland();
     const heightTex = makeHeightTexture(this.island);
@@ -245,6 +268,9 @@ export class Game {
     this.garden = new Garden(this.island);
     this.seeds = new Seeds(this.island);
     this.skimming = new Skimming(this.island);
+    this.fishing = new Fishing(this.island);
+    this.home = new Home(this.island);
+    this.scene.add(this.fishing.group, this.home.group);
     this.viewpoints = new Viewpoints(this.island);
     this.cairns = new Cairns(this.island);
     this.scene.add(this.viewpoints.group, this.cairns.group, this.kite.group);
@@ -272,6 +298,7 @@ export class Game {
       this.npcs.push(npc);
       this.scene.add(npc.model.root);
     });
+    this.pickDaily();
 
     const save = this.opts.test ? null : loadSave();
     if (save) {
@@ -289,6 +316,8 @@ export class Game {
       this.seeds.load(save.seeds);
       if (save.reveals?.length) this.reveals = save.reveals;
       this.bestSkips = save.bestSkips ?? 0;
+      this.dailyDone = save.dailyDone ?? '';
+      for (const k of save.keepsakes ?? []) this.keepsakes.add(k);
       for (const id of save.viewpoints ?? []) this.rested.add(id);
       for (const f of save.flags ?? []) this.flags.add(f);
       this.cairns.load(save.cairns);
@@ -301,6 +330,7 @@ export class Game {
     }
     this.rig.snap(this.player);
     this.ui.seeds(this.seeds.foundIds.length, this.seeds.spots.length);
+    this.updateKeepsakes();
     this.applySettings();
     this.resize();
 
@@ -325,6 +355,11 @@ export class Game {
     this.music.duck(false);
     this.ambience.duck(false);
     this.ui.showGame();
+    if (!this.dailyAnnounced && this.dailyDone !== this.daily.key) {
+      this.dailyAnnounced = true;
+      const d = this.daily.npc;
+      window.setTimeout(() => this.playing && this.ui.toast('Today', `${d.who.name} has something for you`, `Near ${this.nearestRegionName(d.home.x, d.home.z)}`), 6000);
+    }
     this.input.requestLock();
     this.canvas.focus();
   }
@@ -393,6 +428,8 @@ export class Game {
       this.updateFriendship(dt);
       this.updatePractice(dt);
       this.updateShore(dt);
+      this.updateFishing(dt);
+      this.updateSleep(dt);
       if (this.input.kitePressed()) {
         this.kite.flying = !this.kite.flying;
         if (this.kite.flying) this.flags.add('kite');
@@ -462,6 +499,16 @@ export class Game {
       }
       return;
     }
+    if (!best && !this.practice && this.home.near(p)) {
+      this.nearby = null;
+      this.ui.prompt2(null);
+      this.ui.prompt(this.player.sitting ? null : 'Rest at home');
+      if (this.input.interactPressed() && this.player.sit()) {
+        const n = this.keepsakes.size;
+        this.ui.toast('Your nook', 'Home', n ? `${n} of ${KEEPSAKES.length} keepsakes gathered` : 'Bare for now. It fills with the things you do');
+      }
+      return;
+    }
     // resting logs and pebble towers, when nothing else is in reach
     const view = best || this.practice ? null : this.viewpoints.near(p);
     const cairn = best || this.practice || view ? -1 : this.cairns.near(p);
@@ -501,6 +548,11 @@ export class Game {
       this.nearby = best;
       const name = best?.who.name;
       this.ui.prompt(!best ? null : !this.met.has(best.who.id) ? 'Say hello' : best === this.companion ? `Say goodbye to ${name}` : `Invite ${name} along`);
+    }
+    if (best && best === this.daily.npc && this.dailyDone !== this.daily.key) {
+      this.ui.prompt(`Today’s moment with ${best.who.name}`);
+      if (this.input.interactPressed()) this.giveDaily();
+      return;
     }
     if (!best || !this.input.interactPressed()) return;
     if (!this.met.has(best.who.id)) {
@@ -600,6 +652,140 @@ export class Game {
     return name;
   }
 
+  /** Today's Calmling, chosen by the date so it is the same all day and new tomorrow. */
+  private pickDaily(): void {
+    const d = new Date();
+    const key = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    let hash = 0;
+    for (const ch of key) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+    const pool = this.npcs.filter((n) => !n.who.hours);
+    const thoughts = [
+      'You don’t have to earn a rest. It is already yours.',
+      'Nothing on this island is in a hurry. You needn’t be either.',
+      'Whatever today was, the tide has already taken some of it.',
+      'Notice one small good thing. That is enough for now.',
+      'You can put it down for a while. It will keep.',
+      'Slow is still moving.',
+      'Somebody is glad you are here. I am, for one.',
+      'A breath is the shortest holiday there is.',
+      'Not every day needs to be remembered. Some just need to be gentle.',
+      'Look how far the light travels to land on you.',
+      'It’s all right to simply watch the water today.',
+      'You were kind to someone recently. Be that kind to yourself.',
+      'The mountain doesn’t rush, and it still gets to see everything.',
+      'Start small. A sip of water. A stretch. A walk to the garden.',
+    ];
+    this.daily = { npc: pool[hash % pool.length], kind: hash % 3 === 0 ? 'breathe' : 'thought', text: thoughts[(hash >>> 5) % thoughts.length], key };
+  }
+
+  private giveDaily(): void {
+    const { npc, kind, text, key } = this.daily;
+    if (!this.met.has(npc.who.id)) {
+      this.met.add(npc.who.id);
+      this.portraits.set(npc.who.id, this.snapPortrait(npc));
+    }
+    this.dailyDone = key;
+    this.bonds.set(npc.who.id, (this.bonds.get(npc.who.id) ?? 0) + 45);
+    this.save(); // first, so a new keepsake never talks over the moment itself
+    if (kind === 'breathe' && this.player.sit()) {
+      this.breathing.start();
+      this.ui.toast(`Today’s moment · ${npc.who.name}`, 'Breathe with me', 'Three slow breaths, together');
+    } else {
+      this.ui.toast(`Today’s moment · ${npc.who.name}`, 'A thought for today', text);
+    }
+  }
+
+  /** Cast, wait, watch the float. Whatever bites is greeted and let go. */
+  private updateFishing(dt: number): void {
+    const f = this.fishing;
+    this.hand.copy(this.player.pos);
+    this.hand.y += 0.95;
+    if (this.input.fishPressed()) {
+      if (f.active) {
+        const fish = f.reel();
+        this.ui.breath(null);
+        if (fish) {
+          this.flags.add('fish');
+          this.save();
+          this.ui.toast('', fish, 'You say hello, and let it swim away');
+          this.ambience.plip(0.6);
+        }
+      } else if (this.waterNear > 0.12 && this.player.grounded && !this.practice && !this.breathing.active && !this.sleeping) {
+        if (f.cast(this.player.pos, this.player.yaw) && this.player.sit()) this.ui.toast('', 'Line cast', 'Now there is nothing to do but wait');
+        else {
+          f.stop();
+          this.ui.toast('', 'No water there', 'Face the water and try again');
+        }
+      }
+    }
+    if (!f.active) return;
+    if (!this.player.sitting) {
+      f.stop();
+      this.ui.breath(null);
+      return;
+    }
+    const time = globalUniforms.uTime.value;
+    const event = f.update(dt, time, this.hand);
+    if (event === 'bite') this.ambience.plip(1);
+    if (f.state === 'bite') this.ui.breath('A nibble! Reel in', 1, 0, 0);
+    else this.ui.breath('Waiting…', 0.22 + Math.sin(time * 1.2) * 0.08, 0, 0);
+  }
+
+  /** At night, or at home, lie down and let the hours pass until morning. */
+  private updateSleep(dt: number): void {
+    const can = !this.sleeping && this.player.grounded && !this.practice && !this.breathing.active && !this.fishing.active && (this.day.night > 0.5 || this.home.near(this.player.pos));
+    this.ui.sleepButton(can);
+    if (!this.sleeping) {
+      if (!this.input.sleepPressed()) return;
+      if (!can) {
+        this.ui.toast('', 'Not sleepy yet', 'Sleep comes after dark, or any time at your nook');
+        return;
+      }
+      if (!this.player.sit()) return;
+      this.sleeping = true;
+      this.sleptFor = 0;
+      this.player.sleeping = true;
+      this.ui.prompt(null);
+      this.ui.prompt2(null);
+      this.ui.sleeping(true);
+      this.music.duck(true);
+      return;
+    }
+    this.sleptFor += dt;
+    this.rig.yaw += dt * 0.04;
+    const morning = this.sleptFor > 2.5 && this.day.hour >= 6.9 && this.day.hour < 9.5;
+    if (morning || !this.player.sitting || (this.sleptFor > 1 && this.input.anyPressed())) this.wake(morning);
+  }
+
+  private wake(morning: boolean): void {
+    if (!this.sleeping) return;
+    this.sleeping = false;
+    this.player.sleeping = false;
+    this.ui.sleeping(false);
+    this.music.duck(false);
+    if (morning) {
+      this.flags.add('sleep');
+      this.ui.toast('', 'Good morning', 'A whole night, slept through');
+      this.save();
+    }
+  }
+
+  /** Things you have done turn up as keepsakes in your nook. */
+  private updateKeepsakes(): void {
+    const best = Math.max(0, ...[...this.bonds.keys()].map((id) => this.hearts(id)));
+    const earned: [string, boolean][] = [
+      ['lantern', this.seeds.foundIds.length >= 5], ['bloom', this.garden.blooms > 0], ['stones', this.cairns.tallest >= this.cairns.max],
+      ['kite', this.flags.has('kite')], ['skimmer', this.bestSkips >= 3], ['shell', this.discovered.has('bay')],
+      ['feather', this.rested.has('summit')], ['garland', best >= 2], ['bowl', this.flags.has('fish')], ['picture', this.flags.has('photo')],
+    ];
+    for (const [id, ok] of earned) {
+      if (!ok || this.keepsakes.has(id)) continue;
+      this.keepsakes.add(id);
+      if (this.playing) this.ui.toast('Something new for your nook', KEEPSAKES.find((k) => k.id === id)!.name, 'It is waiting at home, near the garden');
+    }
+    this.home.show(this.keepsakes);
+  }
+
   /** How close water is (for sound and skimming), and stones thrown across it. */
   private updateShore(dt: number): void {
     const p = this.player.pos;
@@ -616,7 +802,7 @@ export class Game {
         if (I.waterLevelAt(x, z) > I.heightAt(x, z) + 0.15 && Math.abs(I.waterLevelAt(x, z) - p.y) < 4) near += i % 2 ? 2 : 1;
       }
       this.waterNear = Math.min(1, near / 7);
-      this.ui.skim(this.waterNear > 0.12 && this.player.grounded && !this.practice && !this.breathing.active);
+      this.ui.skim(this.waterNear > 0.12 && this.player.grounded && !this.practice && !this.breathing.active && !this.fishing.active, this.fishing.state === 'bite' ? 'Reel!' : this.fishing.active ? 'Reel in' : 'Fish');
     }
     if (this.input.skimPressed() && this.waterNear > 0.12 && this.player.grounded && !this.player.sitting) this.skimming.throw(p, this.player.yaw);
     const event = this.skimming.update(dt);
@@ -734,6 +920,15 @@ export class Game {
       ctx.strokeText(npc.who.name, cx, cy - 12);
       ctx.fillText(npc.who.name, cx, cy - 12);
     }
+    dot(this.home.x, this.home.z, 6, '#fff', '#8a5a36');
+    if (this.dailyDone !== this.daily.key) {
+      const [dx, dy] = at(this.daily.npc.home.x, this.daily.npc.home.z);
+      ctx.beginPath();
+      ctx.arc(dx, dy, 15, 0, Math.PI * 2);
+      ctx.strokeStyle = '#ffb03a';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+    }
     const p = this.player.pos;
     const [px, py] = at(p.x, p.z);
     ctx.save();
@@ -790,6 +985,7 @@ export class Game {
     this.ui.prompt2(null);
     const best = Math.max(0, ...[...this.bonds.keys()].map((id) => this.hearts(id)));
     this.ui.showJournal([
+      { title: `Today’s moment: find ${this.daily.npc.who.name}`, hint: `Near ${this.nearestRegionName(this.daily.npc.home.x, this.daily.npc.home.z)}. A new one each day`, done: this.dailyDone === this.daily.key },
       { title: 'Take three deep breaths', hint: 'Press B anywhere', done: this.breathsDone > 0 },
       { title: 'Say hello to a Calmling', hint: 'Walk up to one and press E', done: this.met.size > 0 },
       { title: 'Go for a walk with a friend', hint: 'Press E again to invite them', done: best >= 1 },
@@ -803,6 +999,9 @@ export class Game {
       { title: 'Skim a stone three times', hint: 'Press F at the edge of a lake', done: this.bestSkips >= 3 },
       { title: 'Build a pebble tower', hint: 'Small stacks of stones wait on the shores', done: this.cairns.tallest >= this.cairns.max },
       { title: 'Fly a kite', hint: 'Press K, then run', done: this.flags.has('kite') },
+      { title: 'Catch a fish, and let it go', hint: 'Press R beside water, then wait', done: this.flags.has('fish') },
+      { title: 'Sleep through a night', hint: 'Press Z after dark', done: this.flags.has('sleep') },
+      { title: 'Fill your nook', hint: `${this.keepsakes.size} of ${KEEPSAKES.length} keepsakes. Home is just south-east of the garden`, done: this.keepsakes.size >= KEEPSAKES.length },
       { title: 'Watch night fall', hint: 'Stay sitting and the day drifts by', done: this.flags.has('night') },
       { title: 'Take a photo', hint: 'Press P, frame it, press Enter', done: this.flags.has('photo') },
       { title: 'Visit every corner of the island', hint: 'Eight places to discover', done: this.discovered.size >= this.island.regions.length },
@@ -978,7 +1177,7 @@ export class Game {
     const p = this.player.pos;
     this.weather.update(dt, this.camera.position);
     // stay sitting after your breaths and the day drifts by ten times faster
-    const drift = this.playing && this.player?.sitting && !this.breathing.active && !this.practice ? 10 : 1;
+    const drift = this.sleeping ? 40 : this.playing && this.player?.sitting && !this.breathing.active && !this.practice && !this.fishing.active ? 10 : 1;
     this.day.update(dt * drift, this.sun, this.hemi, this.scene.fog as THREE.FogExp2, this.weather.rain);
     this.garden.update(Date.now(), globalUniforms.uTime.value);
     if (this.player) {
@@ -1023,6 +1222,7 @@ export class Game {
   }
 
   private save(): void {
+    if (this.ready) this.updateKeepsakes();
     if (this.opts.test || !this.ready) return;
     const p = this.player.pos;
     writeSave({
@@ -1045,6 +1245,8 @@ export class Game {
       viewpoints: [...this.rested],
       cairns: this.cairns.serialize(),
       flags: [...this.flags],
+      dailyDone: this.dailyDone,
+      keepsakes: [...this.keepsakes],
     });
   }
 
@@ -1077,6 +1279,11 @@ export class Game {
       photo: this.photo,
       photosSaved: this.photosSaved,
       waterNear: this.waterNear,
+      season: SEASON,
+      fishing: this.fishing.state,
+      sleeping: this.sleeping,
+      keepsakes: [...this.keepsakes],
+      daily: { who: this.daily.npc.who.id, kind: this.daily.kind, done: this.dailyDone === this.daily.key },
       rested: [...this.rested],
       kite: this.kite.flying,
       cairnTallest: this.cairns.tallest,

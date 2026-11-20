@@ -8,9 +8,11 @@ export class Weather {
   readonly mesh: THREE.LineSegments;
   private raining = false;
   private timer = 240 + Math.random() * 200;
-  private uniforms = { uRain: { value: 0 }, uCam: { value: new THREE.Vector3() }, uTime: globalUniforms.uTime };
+  private uniforms = { uSnow: { value: 0 }, uRain: { value: 0 }, uCam: { value: new THREE.Vector3() }, uTime: globalUniforms.uTime };
 
-  constructor() {
+  /** In winter the showers fall as snow. */
+  constructor(snow = false) {
+    this.uniforms.uSnow.value = snow ? 1 : 0;
     const N = 1100;
     const pos = new Float32Array(N * 6);
     const end = new Float32Array(N * 2);
@@ -33,18 +35,21 @@ export class Weather {
         vertexShader: /* glsl */ `
           uniform float uTime;
           uniform vec3 uCam;
+          uniform float uSnow;
           attribute float aEnd;
           void main() {
             vec3 p = position;
-            p.y = mod(p.y - uTime * (15.0 + fract(position.x * 7.3) * 6.0), 26.0);
+            p.y = mod(p.y - uTime * mix(15.0 + fract(position.x * 7.3) * 6.0, 1.6 + fract(position.x * 7.3) * 1.2, uSnow), 26.0);
+            p.x += sin(uTime * 0.9 + position.z * 3.0) * 0.5 * uSnow;
             p.xz = mod(p.xz - uCam.xz + 20.0, 40.0) - 20.0 + uCam.xz;
-            p.y += uCam.y - 9.0 + aEnd * 0.75;
+            p.y += uCam.y - 9.0 + aEnd * mix(0.75, 0.14, uSnow);
             p.x += aEnd * 0.09;
             gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
           }`,
         fragmentShader: /* glsl */ `
           uniform float uRain;
-          void main() { gl_FragColor = vec4(0.82, 0.9, 1.0, 0.34 * uRain); }`,
+          uniform float uSnow;
+          void main() { gl_FragColor = vec4(mix(vec3(0.82, 0.9, 1.0), vec3(1.0), uSnow), mix(0.34, 0.95, uSnow) * uRain); }`,
       }),
     );
     this.mesh.frustumCulled = false;

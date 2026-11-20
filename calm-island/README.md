@@ -31,6 +31,9 @@ Open http://localhost:5173 and press **Begin wandering**.
 | `E` at a garden plot | Plant a seed or water it. Plants grow in real time, even while the game is closed |
 | `F` | Beside water: skim a stone and count the skips |
 | `K` | Fly a kite |
+| `R` | Beside water: cast a line, wait for a nibble, press again to reel in |
+| `Z` | Sleep until morning (after dark, or any time at your nook) |
+| `E` at your nook | Rest at home. Keepsakes appear there as you do things on the island |
 | `J` | Journal: a gentle list of things to try, ticked off as you do them |
 | `E` at a mossy log or a pebble stack | Rest at a viewpoint, or balance another pebble |
 | `M` | Map. Mist covers what you have not explored; discovering places and breathing clears it |

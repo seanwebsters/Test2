@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { clamp, lerp, smoothstep } from '../core/math';
 import { CELL, GRID, HALF, WORLD_SIZE, type Island } from './islandMap';
 import { Noise2D } from './noise';
+import { SEASON } from './season';
 
 type RGB = [number, number, number];
 const hex = (h: number): RGB => [((h >> 16) & 255) / 255, ((h >> 8) & 255) / 255, (h & 255) / 255];
@@ -27,6 +28,7 @@ const ROCK_A = hex(0x9c9284);
 const ROCK_B = hex(0x7b7468);
 const ROCK_WARM = hex(0xb39c7c);
 const SNOW = hex(0xf6f9ff);
+const AUTUMN_GRASS = hex(0xc9a83a);
 
 /**
  * Paints the island into one colour texture (rgb = ground colour, a = how much
@@ -118,6 +120,12 @@ export function bakeGroundTexture(island: Island, res: number, shadeSpots: numbe
       c[2] *= shade;
 
       let grass = 1 - smoothstep(64, 96, h);
+      // the meadows follow the calendar: straw-gold in autumn, under snow in winter
+      if (SEASON === 'autumn') mix3(c, AUTUMN_GRASS, 0.34 + 0.12 * mid, c);
+      else if (SEASON === 'winter') {
+        mix3(c, SNOW, 0.8 + 0.1 * mid, c);
+        grass *= 0.3;
+      } else if (SEASON === 'summer') mix3(c, GRASS_B, 0.18, c);
 
       // path
       const pathEdge = smoothstep(0.02, 0.5, pt);

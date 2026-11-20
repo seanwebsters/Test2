@@ -19,6 +19,7 @@ export interface CalmlingPose {
   /** 0..1 lung fill during a breathing exercise */
   breath: number;
   gliding: boolean;
+  sleeping?: boolean;
 }
 
 /** Everything that makes one Calmling look different from another. */
@@ -87,6 +88,7 @@ export class CalmlingModel {
   private breath = 0;
   private eyesShut = 0;
   private glide = 0;
+  private sleep = 0;
   private leaf: THREE.Group | null = null;
 
   constructor(readonly look: CalmlingLook = BLUE_LOOK, hero = true) {
@@ -313,7 +315,8 @@ export class CalmlingModel {
     this.swim = damp(this.swim, pose.swimming ? 1 : 0, 6, dt);
     this.sit = damp(this.sit, pose.sitting ? 1 : 0, 5, dt);
     this.breath = damp(this.breath, pose.sitting ? pose.breath : 0, 10, dt);
-    this.eyesShut = damp(this.eyesShut, pose.sitting && pose.breath > 0.001 ? 1 : 0, 3, dt);
+    this.sleep = damp(this.sleep, pose.sleeping ? 1 : 0, 1.5, dt);
+    this.eyesShut = damp(this.eyesShut, pose.sleeping || (pose.sitting && pose.breath > 0.001) ? 1 : 0, 3, dt);
 
     // steps keep pace with the ground so feet never skate
     this.phase += dt * (pose.swimming ? 5 : pose.speed * lerp(2.9, 1.75, this.run));
@@ -334,7 +337,7 @@ export class CalmlingModel {
     const bounce = Math.abs(c) * lerp(0.035, 0.085, this.run) * this.move;
     this.body.position.y = BODY_Y + bounce + (sy - 1) * 0.3 + Math.sin(t * 2.2) * 0.03 * this.swim - this.sit * 0.27 + this.breath * 0.04;
     this.tilt.rotation.z = s * lerp(0.075, 0.04, this.run) * this.move - clamp(pose.turnRate * 0.035, -0.22, 0.22) * this.move;
-    this.tilt.rotation.x = -0.06 * this.sit - 0.03 * this.breath + 0.07 * this.move + 0.15 * this.run + this.air * clamp(-pose.verticalSpeed * 0.02, -0.15, 0.2) + this.swim * 0.25;
+    this.tilt.rotation.x = -1.15 * this.sleep - 0.06 * this.sit - 0.03 * this.breath + 0.07 * this.move + 0.15 * this.run + this.air * clamp(-pose.verticalSpeed * 0.02, -0.15, 0.2) + this.swim * 0.25;
 
     const tuck = this.air * 0.55;
     this.legL.rotation.x = s * stride * (1 - this.air) - tuck + Math.sin(t * 5) * 0.5 * this.swim;
