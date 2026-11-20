@@ -12,6 +12,7 @@ import { Water } from '../world/Water';
 import { SUN_DIR, globalUniforms, makeHeightTexture } from '../world/shared';
 import { Input } from './Input';
 import { Music } from './Music';
+import { PostFX } from './PostFX';
 import { clearSave, loadSave, writeSave } from './Save';
 import { QUALITY_PRESETS, loadSettings, saveSettings, type Quality, type Settings } from './Settings';
 
@@ -33,14 +34,15 @@ export class Game {
   island!: Island;
   player!: Player;
   rig!: CameraRig;
+  private post!: PostFX;
   private sky!: Sky;
   private water!: Water;
   private grassNear!: Grass;
   private grassFar!: Grass;
   private vegetation!: Vegetation;
   private ambient!: Ambient;
-  private sun = new THREE.DirectionalLight(0xfff1d6, 2.8);
-  private hemi = new THREE.HemisphereLight(0xd6ebff, 0x9cc76a, 1.7);
+  private sun = new THREE.DirectionalLight(0xffecc8, 3.0);
+  private hemi = new THREE.HemisphereLight(0xcfe6ff, 0x9cc76a, 1.55);
   private timer = new THREE.Timer();
   private music = new Music(`${import.meta.env.BASE_URL}audio/woodland-walk.wav`);
   private playing = false;
@@ -64,6 +66,7 @@ export class Game {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NeutralToneMapping;
     this.renderer.toneMappingExposure = 1.0;
+    this.renderer.info.autoReset = false; // counted across all passes of a frame
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
@@ -120,22 +123,23 @@ export class Game {
     this.island = getIsland();
     const heightTex = makeHeightTexture(this.island);
 
-    await step(0.3, 'Painting meadows and beaches…');
-    const groundTex = bakeGroundTexture(this.island, low ? 1024 : 2048);
+    await step(0.25, 'Planting trees and wildflowers…');
+    this.vegetation = new Vegetation(this.island);
+    this.scene.add(this.vegetation.group);
+
+    await step(0.55, 'Painting meadows and beaches…');
+    const groundTex = bakeGroundTexture(this.island, low ? 1024 : 2048, this.vegetation.shade);
     groundTex.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
     const terrain = new Terrain(this.island, groundTex, low ? 2 : 1);
     this.scene.add(terrain.group);
 
-    await step(0.5, 'Filling the lakes…');
+    await step(0.78, 'Filling the lakes…');
     this.scene.fog = new THREE.FogExp2(SKY_HORIZON, 0.00105);
     this.sky = new Sky();
     this.scene.add(this.sky.group);
     this.water = new Water(this.island, heightTex, SKY_HORIZON);
     this.scene.add(this.water.group);
-
-    await step(0.62, 'Planting trees and wildflowers…');
-    this.vegetation = new Vegetation(this.island);
-    this.scene.add(this.vegetation.group);
+    this.post = new PostFX(this.renderer, this.scene, this.camera);
 
     await step(0.86, 'Combing the grass…');
     this.grassNear = new Grass(heightTex, groundTex, { patch: 44, maxBlades: 120000, bladeHeight: 0.42, bladeWidth: 0.09, seed: 1 });
@@ -175,7 +179,7 @@ export class Game {
     // compile shaders and draw one frame behind the loading card
     this.updateWorld(0);
     this.renderer.compile(this.scene, this.camera);
-    this.renderer.render(this.scene, this.camera);
+    this.post.render();
     await step(1, 'Ready');
 
     this.ready = true;
@@ -220,6 +224,7 @@ export class Game {
       });
     }
     this.music.setVolume(s.musicVolume);
+    if (this.post) this.post.enabled = s.quality !== 'low';
     this.grassNear?.setDensity(preset.grass * s.grassDensity);
     this.grassFar?.setDensity(preset.grass * s.grassDensity);
     this.ui.syncSettings();
@@ -230,6 +235,7 @@ export class Game {
     const w = window.innerWidth;
     const h = window.innerHeight;
     this.renderer.setSize(w, h, false);
+    this.post?.setSize(w, h, this.renderer.getPixelRatio());
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     const px = h * this.renderer.getPixelRatio();
@@ -253,7 +259,8 @@ export class Game {
     }
     this.input.endFrame();
     this.updateWorld(dt);
-    this.renderer.render(this.scene, this.camera);
+    this.renderer.info.reset();
+    this.post.render();
 
     this.frames++;
     this.fpsFrames++;

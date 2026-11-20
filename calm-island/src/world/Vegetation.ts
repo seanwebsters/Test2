@@ -32,7 +32,7 @@ const SECTOR = 128;
 const SECTORS = (HALF * 2) / SECTOR;
 
 /** Lambert material with vertex colours and a gentle wind sway above `base`. */
-function foliageMaterial(sway: number, base: number, doubleSide = false): THREE.MeshLambertMaterial {
+function foliageMaterial(sway: number, base: number, doubleSide = false, leafy = false): THREE.MeshLambertMaterial {
   const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: doubleSide ? THREE.DoubleSide : THREE.FrontSide });
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = globalUniforms.uTime;
@@ -48,8 +48,45 @@ function foliageMaterial(sway: number, base: number, doubleSide = false): THREE.
         #endif
         float swayAmt = ${sway.toFixed(4)} * max(position.y - ${base.toFixed(2)}, 0.0);
         transformed.x += (sin(uTime * 1.3 + swayPhase) + 0.5 * sin(uTime * 2.9 + swayPhase * 1.7 + position.y)) * swayAmt;
-        transformed.z += cos(uTime * 1.1 + swayPhase * 1.3) * swayAmt * 0.7;`,
+        transformed.z += cos(uTime * 1.1 + swayPhase * 1.3) * swayAmt * 0.7;
+        ${leafy ? `
+        #ifdef USE_INSTANCING
+          vLeafPos = (instanceMatrix * vec4(position, 1.0)).xyz;
+        #else
+          vLeafPos = position;
+        #endif` : ''}`,
       );
+    if (leafy) {
+      // Dappled clumps of lighter and darker leaves, so crowns read as foliage
+      // rather than smooth balloons.
+      shader.vertexShader = shader.vertexShader.replace('uniform float uTime;', 'uniform float uTime;\nvarying vec3 vLeafPos;');
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          '#include <common>',
+          /* glsl */ `#include <common>
+          varying vec3 vLeafPos;
+          float leafHash(vec3 p) {
+            p = fract(p * vec3(0.1031, 0.1030, 0.0973));
+            p += dot(p, p.yxz + 33.33);
+            return fract((p.x + p.y) * p.z);
+          }
+          float leafNoise(vec3 p) {
+            vec3 i = floor(p);
+            vec3 f = fract(p);
+            f = f * f * (3.0 - 2.0 * f);
+            return mix(
+              mix(mix(leafHash(i), leafHash(i + vec3(1, 0, 0)), f.x), mix(leafHash(i + vec3(0, 1, 0)), leafHash(i + vec3(1, 1, 0)), f.x), f.y),
+              mix(mix(leafHash(i + vec3(0, 0, 1)), leafHash(i + vec3(1, 0, 1)), f.x), mix(leafHash(i + vec3(0, 1, 1)), leafHash(i + vec3(1, 1, 1)), f.x), f.y),
+              f.z);
+          }`,
+        )
+        .replace(
+          '#include <color_fragment>',
+          /* glsl */ `#include <color_fragment>
+          float clump = leafNoise(vLeafPos * 1.9) * 0.6 + leafNoise(vLeafPos * 5.3 + 7.0) * 0.4;
+          diffuseColor.rgb *= mix(0.8, 1.14, smoothstep(0.32, 0.7, clump));`,
+        );
+    }
   };
   return mat;
 }
@@ -58,6 +95,8 @@ function foliageMaterial(sway: number, base: number, doubleSide = false): THREE.
 export class Vegetation {
   readonly group = new THREE.Group();
   readonly colliders = new Colliders();
+  /** x, z, radius triples: where the ground should be gently shaded */
+  readonly shade: number[] = [];
   private batches: Batch[] = [];
   private pending = new Map<Kind, { m: number[][]; c: number[][] }>();
   private occupied = new Map<number, number[]>();
@@ -66,8 +105,8 @@ export class Vegetation {
   constructor(private island: Island) {
     const rnd = mulberry32(2024);
     const nz = new Noise2D(606);
-    const tree = foliageMaterial(0.012, 2.2);
-    const small = foliageMaterial(0.05, 0.1);
+    const tree = foliageMaterial(0.012, 2.2, false, true);
+    const small = foliageMaterial(0.05, 0.1, false, true);
     const leafy = foliageMaterial(0.035, 0.2, true);
     const palmMat = foliageMaterial(0.014, 3, true);
     const flowerMat = foliageMaterial(0.16, 0.05, true);
@@ -104,6 +143,7 @@ export class Vegetation {
       if (spacing > 0 && !this.claim(x, z, spacing)) return false;
       this.put(kind, x, I.heightAt(x, z) - 0.15 * scale, z, rnd() * Math.PI * 2, scale, scale * (0.9 + rnd() * 0.25));
       if (colliderR > 0) this.colliders.add(x, z, colliderR * scale);
+      this.shade.push(x, z, 3.6 * scale);
       return true;
     };
 
@@ -230,6 +270,7 @@ export class Vegetation {
       else if (p < 0.14 + f * 0.3 + edge * 0.25) {
         const s = 0.8 + rnd() * 0.9;
         this.put(pick(bush), x, h - 0.1, z, rnd() * 6.3, s);
+        this.shade.push(x, z, 1.3 * s);
       } else if (p > 0.985 - f * 0.02) this.put(tropical, x, h, z, rnd() * 6.3, 0.9 + rnd() * 0.8);
     }
 
@@ -250,6 +291,7 @@ export class Vegetation {
       const s = 0.35 + Math.pow(rnd(), 2.2) * 2.6;
       this.put(pick(rock), x, h - 0.12 * s, z, rnd() * 6.3, s, s * (0.7 + rnd() * 0.5));
       if (s > 0.7) this.colliders.add(x, z, s * 0.78);
+      if (s > 0.6) this.shade.push(x, z, 1.5 * s);
     }
 
     // ---- wildflower drifts ------------------------------------------------
