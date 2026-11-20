@@ -8,6 +8,8 @@ export interface Settings {
   sensitivity: number;
   invertY: boolean;
   showFps: boolean;
+  /** 'auto' follows the real calendar */
+  season: 'auto' | 'spring' | 'summer' | 'autumn' | 'winter';
   musicVolume: number; // 0..1
   /** wind, water, birds */
   soundVolume: number;
@@ -31,6 +33,7 @@ const DEFAULTS: Settings = {
   sensitivity: 1,
   invertY: false,
   showFps: false,
+  season: 'auto',
   musicVolume: 0.6,
   soundVolume: 0.7,
   autoQuality: true,

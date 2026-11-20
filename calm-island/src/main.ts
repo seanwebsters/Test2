@@ -13,6 +13,7 @@ const quality = params.get('quality');
 const game = new Game(document.getElementById('game') as HTMLCanvasElement, {
   test: params.has('test'),
   sound: params.has('sound'),
+  season: params.get('season'),
   quality: quality === 'low' || quality === 'medium' || quality === 'high' ? (quality as Quality) : undefined,
 });
 window.__calm = game;

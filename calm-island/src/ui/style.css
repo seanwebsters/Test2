@@ -213,3 +213,13 @@ body.is-touch #joy { left: max(18px, env(safe-area-inset-left)); bottom: max(22p
   body.is-touch #btn-practise { bottom: calc(max(26px, env(safe-area-inset-bottom)) + 62px); }
   #toast { top: 20%; }
 }
+
+/* ---- fishing, sleep ---- */
+#btn-fish { right: max(122px, calc(env(safe-area-inset-right) + 98px)); bottom: max(114px, calc(env(safe-area-inset-bottom) + 90px)); width: 70px; height: 70px; }
+body.is-touch #btn-fish { right: calc(max(18px, env(safe-area-inset-right)) + 14px); bottom: calc(max(26px, env(safe-area-inset-bottom)) + 94px); width: 56px; height: 56px; font-size: 13px; }
+#btn-sleep { left: max(22px, env(safe-area-inset-left)); bottom: max(170px, calc(env(safe-area-inset-bottom) + 166px)); width: auto !important; height: 48px; padding: 0 20px !important; border-radius: 99px !important; }
+#sleep { position: fixed; inset: 0; z-index: 8; display: grid; place-content: center; justify-items: center; gap: 6px; color: #cfdcff; text-align: center; background: radial-gradient(120% 90% at 50% 40%, rgba(8,16,52,.62), rgba(3,6,24,.9)); animation: fade 3s ease both; }
+#sleep p { margin: 18px 0 0; font-size: 24px; font-weight: 700; letter-spacing: .04em; }
+#sleep small { opacity: .65; font-size: 14px; }
+.sleep-moon { width: 84px; height: 84px; border-radius: 50%; background: radial-gradient(circle at 38% 36%, #fff, #c9d8ff 70%); box-shadow: 0 0 60px rgba(170,200,255,.55); animation: moon 7s ease-in-out infinite; }
+@keyframes moon { 0%, 100% { transform: scale(.9); opacity: .75; } 45% { transform: scale(1.08); opacity: 1; } }

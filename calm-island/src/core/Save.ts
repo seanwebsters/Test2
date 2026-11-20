@@ -23,6 +23,10 @@ export interface SaveData {
   cairns?: number[];
   /** one-off things done, for the journal */
   flags?: string[];
+  /** the date (YYYY-M-D) on which today's moment was last received */
+  dailyDone?: string;
+  /** keepsakes already shown in the nook */
+  keepsakes?: string[];
   /** patches of the map cleared of mist: x, z, radius */
   reveals?: number[][];
 }

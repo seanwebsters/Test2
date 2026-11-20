@@ -144,6 +144,19 @@ export class Input {
     return this.enabled && (this.pressed.has('KeyF') || this.virtualHit.has('skim'));
   }
 
+  fishPressed(): boolean {
+    return this.enabled && (this.pressed.has('KeyR') || this.virtualHit.has('fish'));
+  }
+
+  sleepPressed(): boolean {
+    return this.enabled && (this.pressed.has('KeyZ') || this.virtualHit.has('sleep'));
+  }
+
+  /** True if anything at all was pressed this frame (used to wake from sleep). */
+  anyPressed(): boolean {
+    return this.pressed.size > 0 || this.virtualHit.size > 0 || this.joyX !== 0 || this.joyY !== 0;
+  }
+
   kitePressed(): boolean {
     return this.enabled && (this.pressed.has('KeyK') || this.virtualHit.has('kite'));
   }

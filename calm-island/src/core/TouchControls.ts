@@ -86,6 +86,8 @@ export class TouchControls {
     button('btn-practise', 'practise');
     button('btn-skim', 'skim');
     button('btn-kite', 'kite');
+    button('btn-fish', 'fish');
+    button('btn-sleep', 'sleep');
     document.getElementById('btn-menu')!.addEventListener('click', onMenu);
     // a long press should never pop up the browser's own menu over the game
     window.addEventListener('contextmenu', (e) => {

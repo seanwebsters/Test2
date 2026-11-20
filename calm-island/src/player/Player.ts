@@ -28,6 +28,7 @@ export class Player {
   sitting = false;
   /** floating down under a leaf: hold jump while falling */
   gliding = false;
+  sleeping = false;
   /** 0..1 lung fill while breathing, read by the model */
   breath = 0;
   private moveTime = 0;
@@ -218,6 +219,8 @@ export class Player {
     this.pose.yaw = this.yaw;
     if (this.grounded || this.swimming) this.gliding = false;
     this.pose.gliding = this.gliding;
+    if (!this.sitting) this.sleeping = false;
+    this.pose.sleeping = this.sleeping;
     this.pose.sitting = this.sitting;
     this.pose.breath = this.breath;
     this.model.update(dt, this.pose);

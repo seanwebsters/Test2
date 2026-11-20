@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { lerp, mulberry32, smoothstep } from '../core/math';
 import { Noise2D } from './noise';
+import { SEASON } from './season';
 
 const nz = new Noise2D(808);
 const v = new THREE.Vector3();
@@ -167,7 +168,7 @@ export function broadleafTree(variant: number, detail: number): THREE.BufferGeom
     blobs.push({ x: bend + Math.cos(a) * d, y: h + 0.9 + rnd() * 1.5, z: Math.sin(a) * d, r: 1.5 + rnd() * 0.6 });
   }
   blobs.push({ x: bend + 0.3, y: h + 4.0, z: 0.2, r: 1.7 });
-  return merge([trunk(h + 1.6, 0.36, 0.2, bend), canopy(blobs, detail, LEAF[variant % LEAF.length], variant * 3.1)]);
+  return merge([trunk(h + 1.6, 0.36, 0.2, bend), canopy(blobs, detail, leafPal(variant), variant * 3.1)]);
 }
 
 export function cherryTree(variant: number, detail: number): THREE.BufferGeometry {
@@ -185,13 +186,39 @@ export function cherryTree(variant: number, detail: number): THREE.BufferGeometr
     blobs.push(b);
     if (i % 2 === 0) parts.push(branch(top.clone().setY(h - 0.4), new THREE.Vector3(b.x, b.y - 0.2, b.z), 0.11));
   }
-  parts.push(canopy(blobs, detail, BLOSSOM[variant % BLOSSOM.length], 40 + variant * 2.3));
+  parts.push(canopy(blobs, detail, blossomPal(variant), 40 + variant * 2.3));
   return merge(parts);
 }
 
 const PINE_DARK = C(0x1f6b45);
 const PINE_MID = C(0x318f52);
 const PINE_LIGHT = C(0x63b963);
+const SNOWY = C(0xf4f8ff);
+const AUTUMN_LEAF: Palette[] = [
+  { dark: C(0xb5521e), mid: C(0xe8922a), light: C(0xffd24a) },
+  { dark: C(0x9a3a1e), mid: C(0xd9602a), light: C(0xf7a03a) },
+  { dark: C(0xa8761e), mid: C(0xe0b030), light: C(0xf7e06a) },
+];
+const AUTUMN_BLOSSOM: Palette[] = [
+  { dark: C(0x9a2a2a), mid: C(0xd9483a), light: C(0xf78a5a) },
+  { dark: C(0xb5521e), mid: C(0xf08a3a), light: C(0xffc86a) },
+];
+const WINTER: Palette = { dark: C(0x8fa6b2), mid: C(0xd4e2ea), light: C(0xffffff) };
+const SUMMER_BLOSSOM: Palette = { dark: C(0x2f8a3c), mid: C(0x5cbc48), light: C(0xa6e25c) };
+
+/** Leaves turn with the seasons: gold in autumn, snow-laden in winter. */
+function leafPal(i: number): Palette {
+  if (SEASON === 'autumn') return AUTUMN_LEAF[i % AUTUMN_LEAF.length];
+  if (SEASON === 'winter') return WINTER;
+  return LEAF[i % LEAF.length];
+}
+/** Blossom trees are pink in spring, green in summer, red in autumn, white in winter. */
+function blossomPal(i: number): Palette {
+  if (SEASON === 'summer') return SUMMER_BLOSSOM;
+  if (SEASON === 'autumn') return AUTUMN_BLOSSOM[i % AUTUMN_BLOSSOM.length];
+  if (SEASON === 'winter') return WINTER;
+  return BLOSSOM[i % BLOSSOM.length];
+}
 
 export function pineTree(variant: number, detail: number): THREE.BufferGeometry {
   const rnd = mulberry32(900 + variant * 13);
@@ -220,7 +247,7 @@ export function pineTree(variant: number, detail: number): THREE.BufferGeometry 
     parts.push(
       paint(g, (p, _n, c) => {
         const low = 1 - (p.y - y0) / hgt;
-        c.copy(PINE_DARK).lerp(PINE_MID, smoothstep(0.1, 0.7, low)).lerp(PINE_LIGHT, smoothstep(0.75, 1.05, low) * 0.8);
+        c.copy(PINE_DARK).lerp(PINE_MID, smoothstep(0.1, 0.7, low)).lerp(SEASON === 'winter' ? SNOWY : PINE_LIGHT, smoothstep(SEASON === 'winter' ? 0.45 : 0.75, 1.05, low) * 0.8);
       }),
     );
     y += hgt * 0.56;
@@ -312,7 +339,7 @@ export function bush(variant: number): THREE.BufferGeometry {
     const a = (i / 4) * Math.PI * 2 + rnd();
     blobs.push({ x: Math.cos(a) * 0.7, y: 0.35 + rnd() * 0.3, z: Math.sin(a) * 0.7, r: 0.5 + rnd() * 0.25 });
   }
-  return canopy(blobs, 4, LEAF[(variant + 1) % LEAF.length], 60 + variant);
+  return canopy(blobs, 4, leafPal(variant + 1), 60 + variant);
 }
 
 const ROCK_DARK = C(0x6f6a64);

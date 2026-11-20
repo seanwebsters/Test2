@@ -39,6 +39,8 @@
         <button id="btn-hello" class="hidden">Hello</button>
         <button id="btn-practise" class="hidden">Practise</button>
         <button id="btn-skim" class="hidden">Skim</button>
+        <button id="btn-fish" class="hidden">Fish</button>
+        <button id="btn-sleep" class="hidden">Sleep</button>
         <button id="btn-log" aria-label="Calmling log">Log</button>
         <button id="btn-map" aria-label="Map">Map</button>
         <button id="btn-journal" aria-label="Journal">Tips</button>
@@ -75,6 +77,8 @@
           <span class="desk"><kbd>Q</kbd> learn a friend's practice</span>
           <span class="desk"><kbd>L</kbd> Calmling log</span>
           <span class="desk"><kbd>F</kbd> skim a stone across water</span>
+          <span class="desk"><kbd>R</kbd> fish, beside water</span>
+          <span class="desk"><kbd>Z</kbd> sleep, at night or at home</span>
           <span class="desk"><kbd>K</kbd> fly a kite</span>
           <span class="desk"><kbd>J</kbd> journal of little things to try</span>
           <span class="desk"><kbd>M</kbd> map</span>
@@ -97,6 +101,15 @@
               <option value="low">Gentle (fastest)</option>
               <option value="medium">Balanced</option>
               <option value="high">Lush (best looking)</option>
+            </select>
+          </label>
+          <label>Season
+            <select id="set-season">
+              <option value="auto">Follow the calendar</option>
+              <option value="spring">Spring</option>
+              <option value="summer">Summer</option>
+              <option value="autumn">Autumn</option>
+              <option value="winter">Winter</option>
             </select>
           </label>
           <label>Music <input type="range" id="set-music" min="0" max="1" step="0.05" /></label>
@@ -148,6 +161,8 @@
         <div id="journal-list"></div>
       </div>
     </div>
+
+    <div id="sleep" class="hidden"><div class="sleep-moon"></div><p>Sleeping…</p><small>Tap or press any key to wake</small></div>
 
     <div id="photo-bar" class="hidden">
       <span>Photo mode · drag to look · wheel to zoom</span>

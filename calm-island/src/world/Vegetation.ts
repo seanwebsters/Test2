@@ -3,6 +3,7 @@ import { mulberry32 } from '../core/math';
 import { Colliders } from './Colliders';
 import { GARDEN_HEIGHT, HALF, polylineAt, type Island } from './islandMap';
 import { Noise2D } from './noise';
+import { SEASON } from './season';
 import * as plants from './plantGeometry';
 import { globalUniforms } from './shared';
 
@@ -302,7 +303,7 @@ export class Vegetation {
     }
 
     // ---- wildflower drifts ------------------------------------------------
-    for (let i = 0; i < 90000; i++) {
+    for (let i = 0; i < (SEASON === 'winter' ? 0 : SEASON === 'autumn' ? 30000 : 90000); i++) {
       const x = (rnd() - 0.5) * 880;
       const z = (rnd() - 0.5) * 880;
       const a = nz.simplex(x * 0.017, z * 0.017);

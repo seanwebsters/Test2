@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mulberry32 } from '../core/math';
 import type { Island } from './islandMap';
+import { SEASON } from './season';
 import { globalUniforms } from './shared';
 
 /** Small signs of life: drifting pollen around the player and birds wheeling overhead. */
@@ -48,7 +49,7 @@ export class Ambient {
     this.pollen = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
-      uniforms: { uTime: globalUniforms.uTime, uCenter: { value: new THREE.Vector3() }, uScale: { value: 600 } },
+      uniforms: { uTime: globalUniforms.uTime, uCenter: { value: new THREE.Vector3() }, uScale: { value: 600 }, uTint: { value: new THREE.Color({ spring: 0xffd6e6, summer: 0xfffacc, autumn: 0xffa040, winter: 0xffffff }[SEASON]) } },
       vertexShader: /* glsl */ `
         uniform float uTime;
         uniform vec3 uCenter;
@@ -69,10 +70,11 @@ export class Ambient {
           gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: /* glsl */ `
+        uniform vec3 uTint;
         varying float vAlpha;
         void main() {
           float d = length(gl_PointCoord - 0.5);
-          gl_FragColor = vec4(1.0, 0.98, 0.8, smoothstep(0.5, 0.1, d) * vAlpha);
+          gl_FragColor = vec4(uTint, smoothstep(0.5, 0.1, d) * vAlpha);
         }`,
     });
     const points = new THREE.Points(geo, this.pollen);
