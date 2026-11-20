@@ -253,7 +253,14 @@ export class Terrain {
             float blotch = texture2D(uDetail, vec2((vWPos.x + vWPos.z) * 0.012, vWPos.y * 0.012)).r;
             float strata = texture2D(uDetail, vec2((vWPos.x - vWPos.z) * 0.0016, vWPos.y * 0.021 + warp * 0.12)).r;
             float grain = texture2D(uDetail, vec2((vWPos.x - vWPos.z) * 0.06, vWPos.y * 0.19)).r;
-            vec3 rockCol = mix(vec3(0.34, 0.30, 0.27), vec3(0.50, 0.45, 0.38), smoothstep(0.35, 0.65, strata));
+            // ledges: stacked beds of stone with broken edges, used for both tone and relief
+            float beds = vWPos.y * 0.16 + warp * 1.6 + blotch * 0.5;
+            float bed = fract(beds);
+            float ledge = smoothstep(0.0, 0.12, bed) * smoothstep(1.0, 0.8, bed);
+            float cracks = smoothstep(0.42, 0.5, abs(texture2D(uDetail, vec2((vWPos.x - vWPos.z) * 0.021 + floor(beds) * 0.37, vWPos.y * 0.01)).r - 0.5) * 2.0 + 0.3);
+            vec3 rockCol = mix(vec3(0.36, 0.32, 0.29), vec3(0.56, 0.50, 0.43), smoothstep(0.35, 0.65, strata));
+            rockCol *= mix(0.7, 1.0, ledge) * mix(0.86, 1.0, cracks);
+            rockCol *= mix(0.92, 1.1, smoothstep(0.1, 0.9, bed)); // each bed lighter toward its top edge
             rockCol = mix(rockCol, vec3(0.60, 0.54, 0.45), smoothstep(0.45, 0.8, blotch) * 0.6);
             rockCol *= 0.9 + 0.2 * grain;
             // moss creeps over the gentler ledges
