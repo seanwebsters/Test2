@@ -24,7 +24,7 @@ Open http://localhost:5173 and press **Begin wandering**.
 | Arrow keys (or `W` `A` `S` `D`) | Wander. Keep going and the Calmling breaks into a run |
 | `Shift` + arrow keys | Turn and tilt the camera |
 | Mouse | Look around (click the view to capture the mouse); wheel zooms |
-| `Space` | Hop (hold for a higher hop) |
+| `Space` | Hop. Keep holding while falling to glide down under a leaf |
 | `B` | Sit down and take three guided deep breaths. Move to stand up |
 | `E` | Say hello to a Calmling. Once met, `E` invites them to walk with you (one at a time) or says goodbye |
 | `L` | Calmling log: who you have met, with a photo and what their name means |

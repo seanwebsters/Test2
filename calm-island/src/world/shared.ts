@@ -6,6 +6,10 @@ export const globalUniforms = {
   uTime: { value: 0 },
   uSunDir: { value: new THREE.Vector3(-0.5, 0.75, 0.45).normalize() },
   uWorldSize: { value: WORLD_SIZE },
+  /** 1 in daylight, lower at night: dims things that light themselves */
+  uDayLight: { value: 1 },
+  /** where the player's Calmling is, for plants that react to it */
+  uPlayer: { value: new THREE.Vector3() },
 };
 
 export const SUN_DIR = globalUniforms.uSunDir.value;

@@ -5,6 +5,7 @@ import { CameraRig } from '../player/CameraRig';
 import { Player } from '../player/Player';
 import { UI, type LogEntry } from '../ui/UI';
 import { Ambient } from '../world/Ambient';
+import { DayCycle } from '../world/DayCycle';
 import { Grass } from '../world/Grass';
 import { SPAWN, getIsland, type Island, type Region } from '../world/islandMap';
 import { SKY_HORIZON, Sky } from '../world/Sky';
@@ -58,6 +59,8 @@ export class Game {
   private npcs: Npc[] = [];
   private met = new Set<string>();
   private companion: Npc | null = null;
+  private bonds = new Map<string, number>();
+  private day = new DayCycle();
   private nearby: Npc | null = null;
   private portraits = new Map<string, string>();
   private portraitTarget = new THREE.WebGLRenderTarget(256, 256);
@@ -109,6 +112,8 @@ export class Game {
         this.playTime = 0;
         this.breathsDone = 0;
         this.met.clear();
+        this.bonds.clear();
+        this.day.hour = 9;
         this.setCompanion(null);
         this.player.teleport(SPAWN.x, SPAWN.z, 0.5);
         this.rig.yaw = 0;
@@ -207,6 +212,8 @@ export class Game {
       this.playTime = save.playTime;
       this.breathsDone = save.breaths ?? 0;
       for (const id of save.met ?? []) this.met.add(id);
+      for (const [id, t] of Object.entries(save.bonds ?? {})) this.bonds.set(id, t);
+      if (typeof save.hour === 'number') this.day.hour = save.hour;
       const friend = this.npcs.find((n) => n.who.id === save.companion);
       if (friend) {
         this.setCompanion(friend);
@@ -296,6 +303,7 @@ export class Game {
       this.player.update(dt, this.input, this.rig.yaw);
       this.rig.update(dt, this.input, this.player, this.settings, this.breathing.active ? this.player.yaw : null);
       this.updateMeetings();
+      this.updateFriendship(dt);
       this.playTime += dt;
       this.checkRegion();
       this.saveIn -= dt;
@@ -357,6 +365,24 @@ export class Game {
     this.save();
   }
 
+  /** Walking together slowly fills three hearts; the second one earns a story. */
+  private hearts(id: string): number {
+    const t = this.bonds.get(id) ?? 0;
+    return t >= 300 ? 3 : t >= 120 ? 2 : t >= 30 ? 1 : 0;
+  }
+
+  private updateFriendship(dt: number): void {
+    const c = this.companion;
+    if (!c || this.player.speed < 1) return;
+    const before = this.hearts(c.who.id);
+    this.bonds.set(c.who.id, (this.bonds.get(c.who.id) ?? 0) + dt);
+    const now = this.hearts(c.who.id);
+    if (now === before) return;
+    if (now === 2) this.ui.toast('A story for the log', c.who.name, `“${c.who.story}”`);
+    else this.ui.toast('', now === 3 ? 'Best of friends' : 'Friendship grew', `${c.who.name} ${'♥'.repeat(now)}`);
+    this.save();
+  }
+
   /** Only one friend walks with you; the previous one wanders home. */
   private setCompanion(npc: Npc | null): void {
     if (this.companion && this.companion !== npc) {
@@ -381,6 +407,7 @@ export class Game {
     cam.lookAt(npc.pos.x, npc.pos.y + 0.95 * s, npc.pos.z);
     const wasVisible = npc.model.root.visible;
     npc.model.root.visible = true;
+    this.player.model.root.visible = false; // keep the photographer out of the shot
     npc.sync();
     const fog = this.scene.fog;
     this.renderer.setRenderTarget(this.portraitTarget);
@@ -390,6 +417,7 @@ export class Game {
     this.renderer.setRenderTarget(null);
     this.scene.fog = fog;
     npc.model.root.visible = wasVisible;
+    this.player.model.root.visible = true;
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = size;
     const ctx = canvas.getContext('2d')!;
@@ -437,6 +465,8 @@ export class Game {
         hint: `Someone lives near ${this.nearestRegionName(npc.home.x, npc.home.z)}.`,
         met,
         companion: npc === this.companion,
+        hearts: this.hearts(npc.who.id),
+        story: this.hearts(npc.who.id) >= 2 ? npc.who.story : null,
         portrait: this.portraits.get(npc.who.id) ?? null,
       };
     });
@@ -487,14 +517,16 @@ export class Game {
   private updateWorld(dt: number): void {
     globalUniforms.uTime.value += dt;
     const p = this.player.pos;
-    this.sky.update(dt, this.camera);
+    this.day.update(dt, this.sun, this.hemi, this.scene.fog as THREE.FogExp2);
+    this.sky.update(dt, this.camera, this.day.night);
+    globalUniforms.uPlayer.value.copy(p);
     this.camera.getWorldDirection(this.fwd);
     this.fwd.y = 0;
     this.fwd.normalize();
     this.grassNear.update(this.grassCenter.copy(p).addScaledVector(this.fwd, 4), p);
     this.grassFar.update(this.grassCenter.copy(p).addScaledVector(this.fwd, 36), p);
     this.vegetation.update(this.camera.position, QUALITY_PRESETS[this.settings.quality].distance);
-    this.ambient.update(globalUniforms.uTime.value, p);
+    this.ambient.update(dt, globalUniforms.uTime.value, p, this.player.speed, this.player.grounded, this.day.night);
     for (const npc of this.npcs) npc.update(dt, globalUniforms.uTime.value, this.player, this.camera.position);
     // keep the shadow box centred on the Calmling, snapped so edges don't shimmer
     const snap = 92 / this.sun.shadow.mapSize.x * 4;
@@ -534,6 +566,8 @@ export class Game {
       breaths: this.breathsDone,
       met: [...this.met],
       companion: this.companion?.who.id ?? null,
+      bonds: Object.fromEntries(this.bonds),
+      hour: this.day.hour,
     });
   }
 
@@ -553,6 +587,9 @@ export class Game {
       met: [...this.met],
       companion: this.companion?.who.id ?? null,
       nearby: this.nearby?.who.id ?? null,
+      gliding: this.player.gliding,
+      hour: this.day.hour,
+      vy: this.player.vel.y,
       speed: this.player.speed,
       playing: this.playing,
       fps: this.fps,

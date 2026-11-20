@@ -18,6 +18,7 @@ export interface CalmlingPose {
   sitting: boolean;
   /** 0..1 lung fill during a breathing exercise */
   breath: number;
+  gliding: boolean;
 }
 
 /** Everything that makes one Calmling look different from another. */
@@ -85,6 +86,8 @@ export class CalmlingModel {
   private sit = 0;
   private breath = 0;
   private eyesShut = 0;
+  private glide = 0;
+  private leaf: THREE.Group | null = null;
 
   constructor(readonly look: CalmlingLook = BLUE_LOOK, hero = true) {
     const base = new THREE.Color(0xffffff);
@@ -346,7 +349,15 @@ export class CalmlingModel {
     this.legR.position.y = 0.37 + Math.max(0, -c) * 0.05 * this.move + bounce * 0.4 - this.sit * 0.2;
 
     const armSwing = lerp(0.55, 1.05, this.run) * this.move;
-    const lift = this.air * 1.15 + this.run * 0.18 + this.swim * 0.9;
+    this.glide = damp(this.glide, pose.gliding ? 1 : 0, 9, dt);
+    if (this.glide > 0.01 && !this.leaf) this.tilt.add((this.leaf = makeLeaf()));
+    if (this.leaf) {
+      this.leaf.visible = this.glide > 0.01;
+      this.leaf.scale.setScalar(this.glide);
+      this.leaf.rotation.z = Math.sin(t * 2.1) * 0.08;
+      this.leaf.rotation.x = 0.1 + Math.sin(t * 1.6) * 0.05;
+    }
+    const lift = this.air * 1.15 + this.run * 0.18 + this.swim * 0.9 + this.glide * 1.5;
     const idleSway = Math.sin(t * 1.9) * 0.04 * (1 - this.move);
     this.armL.rotation.x = -s * armSwing + Math.sin(t * 4) * 0.5 * this.swim;
     this.armR.rotation.x = s * armSwing - Math.sin(t * 4) * 0.5 * this.swim;
@@ -899,4 +910,31 @@ function addExtras(
       add(m, limb);
     }
   }
+}
+
+/** The big leaf a Calmling holds overhead to glide. */
+function makeLeaf(): THREE.Group {
+  const g = new THREE.Group();
+  const blade = new THREE.CircleGeometry(1, 28);
+  const p = blade.attributes.position;
+  const col = new Float32Array(p.count * 3);
+  const c = new THREE.Color();
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i);
+    const y = p.getY(i);
+    // a pointed leaf, domed like an umbrella, with a pale midrib
+    const taper = 1 - 0.55 * Math.max(0, y) ** 2;
+    p.setXYZ(i, x * 0.95 * taper, -(x * x + y * y) * 0.34 + Math.abs(x) * 0.06, y * 1.25);
+    c.set(0x4fb04a).lerp(new THREE.Color(0xa6e06a), Math.max(0, 1 - Math.abs(x) * 5) * 0.7 + (x * x + y * y) * 0.25);
+    col.set([c.r, c.g, c.b], i * 3);
+  }
+  blade.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  blade.computeVertexNormals();
+  const leaf = new THREE.Mesh(blade, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+  leaf.castShadow = true;
+  leaf.position.y = 0.62;
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.028, 0.62, 6).translate(0, 0.31, 0), new THREE.MeshLambertMaterial({ color: 0x3f9a40 }));
+  g.add(leaf, stem);
+  g.position.set(0, 1.42, 0.02);
+  return g;
 }

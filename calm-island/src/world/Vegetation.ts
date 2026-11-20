@@ -32,12 +32,13 @@ const SECTOR = 128;
 const SECTORS = (HALF * 2) / SECTOR;
 
 /** Lambert material with vertex colours and a gentle wind sway above `base`. */
-function foliageMaterial(sway: number, base: number, doubleSide = false, leafy = false): THREE.MeshLambertMaterial {
+function foliageMaterial(sway: number, base: number, doubleSide = false, leafy = false, bloom = false): THREE.MeshLambertMaterial {
   const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: doubleSide ? THREE.DoubleSide : THREE.FrontSide });
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = globalUniforms.uTime;
+    shader.uniforms.uPlayer = globalUniforms.uPlayer;
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nuniform float uTime;')
+      .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform vec3 uPlayer;')
       .replace(
         '#include <begin_vertex>',
         /* glsl */ `#include <begin_vertex>
@@ -49,6 +50,12 @@ function foliageMaterial(sway: number, base: number, doubleSide = false, leafy =
         float swayAmt = ${sway.toFixed(4)} * max(position.y - ${base.toFixed(2)}, 0.0);
         transformed.x += (sin(uTime * 1.3 + swayPhase) + 0.5 * sin(uTime * 2.9 + swayPhase * 1.7 + position.y)) * swayAmt;
         transformed.z += cos(uTime * 1.1 + swayPhase * 1.3) * swayAmt * 0.7;
+        ${bloom ? `
+        #ifdef USE_INSTANCING
+          // flowers wait half-closed and open up as the Calmling comes near
+          float near = 1.0 - smoothstep(2.5, 8.0, distance(instanceMatrix[3].xyz, uPlayer));
+          transformed *= mix(0.6, 1.12, near * near * (3.0 - 2.0 * near));
+        #endif` : ''}
         ${leafy ? `
         #ifdef USE_INSTANCING
           vLeafPos = (instanceMatrix * vec4(position, 1.0)).xyz;
@@ -109,7 +116,7 @@ export class Vegetation {
     const small = foliageMaterial(0.05, 0.1, false, true);
     const leafy = foliageMaterial(0.035, 0.2, true);
     const palmMat = foliageMaterial(0.014, 3, true);
-    const flowerMat = foliageMaterial(0.16, 0.05, true);
+    const flowerMat = foliageMaterial(0.16, 0.05, true, false, true);
     const rockMat = new THREE.MeshLambertMaterial({ vertexColors: true });
 
     const treeKind = (make: (detail: number) => THREE.BufferGeometry): Kind => ({
