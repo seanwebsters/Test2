@@ -10,6 +10,9 @@ export interface LogEntry {
   met: boolean;
   companion: boolean;
   portrait: string | null;
+  /** friendship, 0–3 hearts */
+  hearts: number;
+  story: string | null;
 }
 
 export interface UIHandlers {
@@ -148,9 +151,12 @@ export class UI {
       p.textContent = e.met ? e.meaning : e.hint;
       item.append(h, p);
       if (e.met) {
+        const hearts = document.createElement('p');
+        hearts.textContent = '♥'.repeat(e.hearts) + '♡'.repeat(3 - e.hearts);
+        hearts.style.cssText = 'color:#f2678a;font-size:17px;letter-spacing:.15em';
         const q = document.createElement('p');
-        q.textContent = `“${e.hello}”`;
-        item.append(q);
+        q.textContent = e.story ? `“${e.story}”` : `“${e.hello}” Walk together to hear more.`;
+        item.append(hearts, q);
       }
       if (e.companion) {
         const pill = document.createElement('span');

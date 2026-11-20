@@ -30,6 +30,7 @@ uniform vec3 uSky;
 uniform float uDepthK;
 uniform float uFlow;
 uniform float uSurf;
+uniform float uDayLight;
 varying vec3 vWorld;
 varying vec2 vUv;
 ${NOISE_GLSL}
@@ -84,7 +85,7 @@ void main() {
   alpha = max(alpha, foam * 0.95);
   alpha = mix(alpha, 1.0, fres * 0.6) * edge;
 
-  gl_FragColor = vec4(col, alpha);
+  gl_FragColor = vec4(col * uDayLight, alpha);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
   #include <fog_fragment>
@@ -95,6 +96,7 @@ const FALL_FRAG = /* glsl */ `
 #include <common>
 #include <fog_pars_fragment>
 uniform float uTime;
+uniform float uDayLight;
 varying vec3 vWorld;
 varying vec2 vUv;
 ${NOISE_GLSL}
@@ -109,7 +111,7 @@ void main() {
   float side = smoothstep(0.0, 0.14, vUv.x) * smoothstep(1.0, 0.86, vUv.x);
   float ragged = smoothstep(0.0, 0.25, side + (a - 0.5) * 0.3);
   float alpha = ragged * mix(0.82, 1.0, streak);
-  gl_FragColor = vec4(col, alpha);
+  gl_FragColor = vec4(col * uDayLight, alpha);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
   #include <fog_fragment>
@@ -135,11 +137,12 @@ void main() {
 `;
 
 const MIST_FRAG = /* glsl */ `
+uniform float uDayLight;
 varying float vAlpha;
 void main() {
   float d = length(gl_PointCoord - 0.5);
   float a = smoothstep(0.5, 0.05, d) * vAlpha;
-  gl_FragColor = vec4(vec3(1.0), a);
+  gl_FragColor = vec4(vec3(uDayLight), a);
 }
 `;
 
@@ -194,7 +197,7 @@ export class Water {
     this.mist = new THREE.ShaderMaterial({
       vertexShader: MIST_VERT,
       fragmentShader: MIST_FRAG,
-      uniforms: { uTime: globalUniforms.uTime, uScale: { value: 600 } },
+      uniforms: { uTime: globalUniforms.uTime, uDayLight: globalUniforms.uDayLight, uScale: { value: 600 } },
       transparent: true,
       depthWrite: false,
     });
@@ -227,6 +230,7 @@ export class Water {
       uniforms: {
         ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
         uTime: globalUniforms.uTime,
+        uDayLight: globalUniforms.uDayLight,
         uWorldSize: globalUniforms.uWorldSize,
         uSunDir: globalUniforms.uSunDir,
         uHeightTex: { value: this.heightTex },
@@ -324,7 +328,7 @@ export class Water {
     const mat = new THREE.ShaderMaterial({
       vertexShader: VERT,
       fragmentShader: FALL_FRAG,
-      uniforms: { ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog), uTime: globalUniforms.uTime },
+      uniforms: { ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog), uTime: globalUniforms.uTime, uDayLight: globalUniforms.uDayLight },
       transparent: true,
       side: THREE.DoubleSide,
       fog: true,

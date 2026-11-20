@@ -10,6 +10,7 @@ export class Sky {
   readonly group = new THREE.Group();
   private dome: THREE.Mesh;
   private clouds: { mesh: THREE.InstancedMesh; speed: number }[] = [];
+  private stars: THREE.Points;
 
   constructor() {
     this.dome = new THREE.Mesh(
@@ -22,6 +23,7 @@ export class Sky {
           uTop: { value: SKY_TOP },
           uHorizon: { value: SKY_HORIZON },
           uSunDir: globalUniforms.uSunDir,
+          uDayLight: globalUniforms.uDayLight,
         },
         vertexShader: /* glsl */ `
           varying vec3 vDir;
@@ -33,6 +35,7 @@ export class Sky {
           uniform vec3 uTop;
           uniform vec3 uHorizon;
           uniform vec3 uSunDir;
+          uniform float uDayLight;
           varying vec3 vDir;
           void main() {
             vec3 d = normalize(vDir);
@@ -40,7 +43,9 @@ export class Sky {
             vec3 col = mix(uHorizon, uTop, pow(h, 0.5));
             col = mix(col, uHorizon, smoothstep(0.02, -0.1, d.y));
             float s = max(dot(d, uSunDir), 0.0);
-            col += vec3(1.0, 0.93, 0.78) * (pow(s, 1400.0) * 6.0 + pow(s, 40.0) * 0.22 + pow(s, 5.0) * 0.07);
+            // a warm sun by day, a small cool moon by night
+            vec3 disc = mix(vec3(0.75, 0.85, 1.0), vec3(1.0, 0.93, 0.78), uDayLight);
+            col += disc * (pow(s, 1400.0) * 6.0 + (pow(s, 40.0) * 0.22 + pow(s, 5.0) * 0.07) * uDayLight);
             gl_FragColor = vec4(col, 1.0);
             #include <tonemapping_fragment>
             #include <colorspace_fragment>
@@ -51,10 +56,27 @@ export class Sky {
     this.dome.frustumCulled = false;
     this.group.add(this.dome);
 
+    // stars, hidden until dusk
+    const sr = mulberry32(4);
+    const sp = new Float32Array(1400 * 3);
+    for (let i = 0; i < 1400; i++) {
+      const y = sr() * 0.95 + 0.03;
+      const r = Math.sqrt(1 - y * y);
+      const a2 = sr() * Math.PI * 2;
+      sp.set([Math.cos(a2) * r * 3200, y * 3200, Math.sin(a2) * r * 3200], i * 3);
+    }
+    const sg = new THREE.BufferGeometry();
+    sg.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+    this.stars = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xffffff, size: 2.2, sizeAttenuation: false, transparent: true, opacity: 0, depthWrite: false, fog: false }));
+    this.stars.frustumCulled = false;
+    this.stars.renderOrder = -9;
+    this.group.add(this.stars);
+
     const cloudMat = new THREE.ShaderMaterial({
       fog: false,
       uniforms: {
         uSunDir: globalUniforms.uSunDir,
+        uDayLight: globalUniforms.uDayLight,
         uHorizon: { value: SKY_HORIZON },
       },
       vertexShader: /* glsl */ `
@@ -68,6 +90,7 @@ export class Sky {
         }`,
       fragmentShader: /* glsl */ `
         uniform vec3 uSunDir;
+        uniform float uDayLight;
         uniform vec3 uHorizon;
         varying vec3 vN;
         varying vec3 vW;
@@ -75,7 +98,7 @@ export class Sky {
           vec3 n = normalize(vN);
           float l = dot(n, uSunDir) * 0.45 + n.y * 0.4 + 0.4;
           l = smoothstep(0.05, 0.85, l);
-          vec3 col = mix(vec3(0.68, 0.78, 0.93), vec3(1.0), l);
+          vec3 col = mix(vec3(0.68, 0.78, 0.93), vec3(1.0), l) * mix(vec3(0.3, 0.36, 0.6), vec3(1.0), uDayLight);
           float far = smoothstep(900.0, 3000.0, length(vW.xz - cameraPosition.xz));
           col = mix(col, uHorizon, far * 0.75);
           gl_FragColor = vec4(col, 1.0);
@@ -116,8 +139,11 @@ export class Sky {
     void SUN_DIR;
   }
 
-  update(dt: number, camera: THREE.Camera): void {
+  update(dt: number, camera: THREE.Camera, night = 0): void {
     this.dome.position.copy(camera.position);
+    this.stars.position.copy(camera.position);
+    (this.stars.material as THREE.PointsMaterial).opacity = night * 0.95;
+    this.stars.visible = night > 0.01;
     for (const c of this.clouds) {
       c.mesh.position.x += c.speed * dt;
       if (c.mesh.position.x > 2700) c.mesh.position.x = -2700;

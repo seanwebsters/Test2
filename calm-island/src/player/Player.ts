@@ -26,6 +26,8 @@ export class Player {
   swimming = false;
   /** resting on the ground; any movement stands back up */
   sitting = false;
+  /** floating down under a leaf: hold jump while falling */
+  gliding = false;
   /** 0..1 lung fill while breathing, read by the model */
   breath = 0;
   private moveTime = 0;
@@ -41,7 +43,7 @@ export class Player {
   constructor(private island: Island, private colliders: Colliders) {
     this.pose = {
       speed: 0, walkSpeed: WALK, runSpeed: RUN, grounded: true, swimming: false,
-      verticalSpeed: 0, turnRate: 0, accel: this.accel, yaw: 0, sitting: false, breath: 0,
+      verticalSpeed: 0, turnRate: 0, accel: this.accel, yaw: 0, sitting: false, breath: 0, gliding: false,
     };
     this.teleport(SPAWN.x, SPAWN.z);
   }
@@ -89,10 +91,10 @@ export class Player {
     // a gentle push on the thumb stick stays a walk
     this.moveTime = amount > 0.08 ? this.moveTime + dt : 0;
     const run = smoothstep(0.8, 1.7, this.moveTime) * smoothstep(0.6, 0.95, amount);
-    const top = this.swimming ? SWIM : lerp(WALK, RUN, run);
+    const top = this.swimming ? SWIM : this.gliding ? 8.6 : lerp(WALK, RUN, run);
     const hasInput = wx !== 0 || wz !== 0;
     // quick to start, a touch longer to settle: weighty but never sluggish
-    const rate = this.swimming ? 4 : this.grounded ? (hasInput ? 11 : 9) : 2.5;
+    const rate = this.swimming ? 4 : this.grounded ? (hasInput ? 11 : 9) : this.gliding ? 3.2 : 2.5;
     this.vel.x = damp(this.vel.x, wx * top, rate, dt);
     this.vel.z = damp(this.vel.z, wz * top, rate, dt);
 
@@ -178,7 +180,10 @@ export class Player {
       }
     }
     if (!this.grounded && !this.swimming) {
-      this.vel.y -= GRAVITY * dt;
+      // under the leaf the fall eases to a gentle drift instead of accelerating
+      this.gliding = input.jumpHeld() && this.vel.y < -0.8;
+      if (this.gliding) this.vel.y = damp(this.vel.y, -1.5, 6, dt);
+      else this.vel.y -= GRAVITY * dt;
       this.pos.y += this.vel.y * dt;
       if (deep && this.pos.y <= floatY) {
         this.swimming = true;
@@ -211,6 +216,8 @@ export class Player {
     this.pose.verticalSpeed = this.vel.y;
     this.pose.turnRate = this.turnRate;
     this.pose.yaw = this.yaw;
+    if (this.grounded || this.swimming) this.gliding = false;
+    this.pose.gliding = this.gliding;
     this.pose.sitting = this.sitting;
     this.pose.breath = this.breath;
     this.model.update(dt, this.pose);

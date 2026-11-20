@@ -10,6 +10,10 @@ export interface SaveData {
   /** ids of the Calmlings you have met, and who is walking with you */
   met?: string[];
   companion?: string | null;
+  /** seconds spent walking with each Calmling */
+  bonds?: Record<string, number>;
+  /** time of day, 0–24 */
+  hour?: number;
 }
 
 const KEY = 'calmlings.save.v1';

@@ -43,7 +43,7 @@ export class Npc {
     this.yaw = index * 1.7;
     this.pose = {
       speed: 0, walkSpeed: 3.6, runSpeed: 7.8, grounded: true, swimming: false, verticalSpeed: 0,
-      turnRate: 0, accel: this.accel, yaw: 0, sitting: false, breath: 0,
+      turnRate: 0, accel: this.accel, yaw: 0, sitting: false, breath: 0, gliding: false,
     };
     this.sync();
   }
