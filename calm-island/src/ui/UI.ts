@@ -79,8 +79,16 @@ export class UI {
     $('loading-text').textContent = text;
   }
 
+  /** The logo intro stays up for a few seconds even if the island loads instantly. */
+  introMinimum = 3600;
+
   showStart(returning: boolean): void {
-    $('loading').classList.add('hidden');
+    const intro = $('loading');
+    const wait = Math.max(0, this.introMinimum - performance.now());
+    window.setTimeout(() => {
+      intro.classList.add('out');
+      window.setTimeout(() => intro.classList.add('hidden'), 1200);
+    }, wait);
     $('start').classList.remove('hidden');
     $('play').textContent = returning ? 'Continue wandering' : 'Begin wandering';
     $('play').focus();

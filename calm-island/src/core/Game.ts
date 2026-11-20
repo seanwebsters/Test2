@@ -121,6 +121,7 @@ export class Game {
       },
     });
     this.ui.touch = touch;
+    if (opts.test) this.ui.introMinimum = 0;
     document.body.classList.toggle('is-touch', touch);
     new TouchControls(this.input, canvas, () => this.pause());
     window.addEventListener('resize', () => this.resize());

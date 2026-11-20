@@ -16,7 +16,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #bfe6ff; }
   backdrop-filter: blur(10px) saturate(1.1);
   animation: fade .5s ease both;
 }
-#loading { background: linear-gradient(#58a9f2, #bfe6ff 62%, #dff6d8); backdrop-filter: none; }
+
 .card {
   width: min(440px, 100%); padding: 36px 36px 30px; border-radius: 32px; text-align: center;
   background: rgba(255,255,255,.86); box-shadow: 0 24px 70px rgba(25,80,140,.28), inset 0 1px 0 #fff;
@@ -109,3 +109,23 @@ body.is-touch #prompt { display: none; }
 .log-item p { margin: 0; font-size: 13.5px; color: var(--soft); line-height: 1.35; }
 .log-item .pill { justify-self: start; margin-top: 4px; padding: 3px 10px; border-radius: 99px; font-size: 12px; font-weight: 700; color: #fff; background: var(--blue); }
 .log-item.unmet { opacity: .8; }
+
+/* ---- intro ---- */
+.intro { background: radial-gradient(120% 90% at 50% 45%, #12307e 0%, #0a1c5a 55%, #050f38 100%); backdrop-filter: none; overflow: hidden; animation: none; transition: opacity 1.1s ease; z-index: 20; }
+.intro.out { opacity: 0; pointer-events: none; }
+.intro-drift { position: absolute; inset: -30%; opacity: .5; background:
+  radial-gradient(40% 14% at 30% 30%, rgba(120,170,255,.22), transparent 70%),
+  radial-gradient(46% 12% at 72% 62%, rgba(120,170,255,.18), transparent 70%),
+  radial-gradient(36% 10% at 55% 82%, rgba(150,190,255,.14), transparent 70%);
+  transform: rotate(-14deg); animation: drift 16s ease-in-out infinite alternate; }
+.intro-inner { position: relative; display: grid; justify-items: center; width: min(620px, 82vw); }
+.intro-logo { width: 100%; height: auto; opacity: 0; transform: scale(.94); animation: logo-in 1.6s cubic-bezier(.2,.7,.2,1) .25s forwards; filter: drop-shadow(0 10px 40px rgba(60,130,255,.45)); }
+.intro-title { margin-top: 6px; color: #cfe2ff; font-size: clamp(15px, 2.4vw, 22px); letter-spacing: .5em; text-transform: uppercase; font-weight: 700; padding-left: .5em; opacity: 0; animation: rise .9s ease 1.3s forwards; }
+.intro .bar { width: min(260px, 60%); height: 6px; margin: 34px 0 12px; background: rgba(255,255,255,.14); opacity: 0; animation: rise .8s ease 1.7s forwards; }
+.intro #bar-fill { background: linear-gradient(90deg, #7fc4ff, #ffffff); }
+.intro #loading-text { color: #9fbdf0; font-size: 14px; opacity: 0; animation: rise .8s ease 1.9s forwards; }
+.logo-mark { height: 62px; margin: 0 auto 2px; background: linear-gradient(#55b3f5, #2f86dc); -webkit-mask: url(/brand/calmlings-logo.png) center / contain no-repeat; mask: url(/brand/calmlings-logo.png) center / contain no-repeat; }
+@keyframes logo-in { to { opacity: 1; transform: scale(1); } }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes drift { from { transform: rotate(-14deg) translateX(-4%); } to { transform: rotate(-14deg) translateX(4%); } }
+@media (prefers-reduced-motion: reduce) { .intro-logo, .intro-title, .intro .bar, .intro #loading-text { animation: none; opacity: 1; transform: none; } .intro-drift { animation: none; } }
