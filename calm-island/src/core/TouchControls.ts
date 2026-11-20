@@ -87,5 +87,9 @@ export class TouchControls {
     button('btn-skim', 'skim');
     button('btn-kite', 'kite');
     document.getElementById('btn-menu')!.addEventListener('click', onMenu);
+    // a long press should never pop up the browser's own menu over the game
+    window.addEventListener('contextmenu', (e) => {
+      if (document.body.classList.contains('is-touch')) e.preventDefault();
+    });
   }
 }
