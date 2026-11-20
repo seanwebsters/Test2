@@ -1,0 +1,289 @@
+import * as THREE from 'three';
+import { clamp, lerp, smoothstep } from '../core/math';
+import { CELL, GRID, HALF, WORLD_SIZE, type Island } from './islandMap';
+import { Noise2D } from './noise';
+
+type RGB = [number, number, number];
+const hex = (h: number): RGB => [((h >> 16) & 255) / 255, ((h >> 8) & 255) / 255, (h & 255) / 255];
+const mix3 = (a: RGB, b: RGB, t: number, out: RGB): RGB => {
+  out[0] = a[0] + (b[0] - a[0]) * t;
+  out[1] = a[1] + (b[1] - a[1]) * t;
+  out[2] = a[2] + (b[2] - a[2]) * t;
+  return out;
+};
+
+const GRASS_A = hex(0x7ccb3a);
+const GRASS_B = hex(0x4fae35);
+const GRASS_SUN = hex(0xa9d94a);
+const GRASS_FOREST = hex(0x3d8f38);
+const ALPINE = hex(0x8fa878);
+const SAND = hex(0xf3e2b3);
+const SAND_WET = hex(0xd9c493);
+const SEABED = hex(0xe9e4c0);
+const BED = hex(0xcbbd92);
+const PATH = hex(0xdcbd86);
+const PATH_EDGE = hex(0xb9a268);
+const ROCK_A = hex(0x9c9284);
+const ROCK_B = hex(0x7b7468);
+const ROCK_WARM = hex(0xb39c7c);
+const SNOW = hex(0xf6f9ff);
+
+/**
+ * Paints the island into one colour texture (rgb = ground colour, a = how much
+ * grass grows there). The terrain mesh and the grass blades both read it, so
+ * the blades always melt into the ground they stand on.
+ */
+export function bakeGroundTexture(island: Island, res: number): THREE.DataTexture {
+  const data = new Uint8Array(res * res * 4);
+  const n1 = new Noise2D(77);
+  const n2 = new Noise2D(303);
+  const c: RGB = [0, 0, 0];
+  const rock: RGB = [0, 0, 0];
+  const scale = (GRID - 1) / res; // grid cells per texel
+  const { height, sand, path, forest, wet } = island;
+
+  const bil = (g: Float32Array, fx: number, fz: number): number => {
+    const i = Math.min(Math.floor(fx), GRID - 2);
+    const j = Math.min(Math.floor(fz), GRID - 2);
+    const tx = fx - i;
+    const tz = fz - j;
+    const k = j * GRID + i;
+    const a = g[k];
+    const b = g[k + 1];
+    const cc = g[k + GRID];
+    const d = g[k + GRID + 1];
+    return a + (b - a) * tx + (cc - a) * tz + (a - b - cc + d) * tx * tz;
+  };
+  const maxF = GRID - 1.001;
+
+  for (let j = 0; j < res; j++) {
+    const fz = clamp((j + 0.5) * scale, 0, maxF);
+    const z = fz * CELL - HALF;
+    for (let i = 0; i < res; i++) {
+      const fx = clamp((i + 0.5) * scale, 0, maxF);
+      const x = fx * CELL - HALF;
+      const o = (j * res + i) * 4;
+      const h = bil(height, fx, fz);
+      if (h < -7) {
+        data[o] = SEABED[0] * 255;
+        data[o + 1] = SEABED[1] * 255;
+        data[o + 2] = SEABED[2] * 255;
+        data[o + 3] = 0;
+        continue;
+      }
+      const e = 0.5;
+      const gx = (bil(height, Math.min(fx + e, maxF), fz) - bil(height, Math.max(fx - e, 0), fz)) / (2 * e * CELL);
+      const gz = (bil(height, fx, Math.min(fz + e, maxF)) - bil(height, fx, Math.max(fz - e, 0))) / (2 * e * CELL);
+      const slope = Math.hypot(gx, gz);
+      const sd = bil(sand, fx, fz);
+      const pt = bil(path, fx, fz);
+      const fr = bil(forest, fx, fz);
+      const wt = bil(wet, fx, fz);
+
+      const big = n1.simplex(x * 0.011, z * 0.011) * 0.5 + 0.5;
+      const mid = n1.simplex(x * 0.045 + 9, z * 0.045) * 0.5 + 0.5;
+      const fine = n2.simplex(x * 0.42, z * 0.42);
+
+      // grass
+      mix3(GRASS_A, GRASS_B, smoothstep(0.25, 0.75, big), c);
+      mix3(c, GRASS_SUN, smoothstep(0.55, 0.9, mid) * 0.5, c);
+      mix3(c, GRASS_FOREST, fr * 0.6, c);
+      const alpine = smoothstep(58, 98, h + big * 8);
+      mix3(c, ALPINE, alpine, c);
+      const shade = 0.95 + 0.07 * fine + 0.05 * (mid - 0.5);
+      c[0] *= shade;
+      c[1] *= shade;
+      c[2] *= shade;
+
+      let grass = 1 - smoothstep(64, 96, h);
+
+      // path
+      const pathEdge = smoothstep(0.02, 0.5, pt);
+      if (pathEdge > 0) {
+        const pmix = smoothstep(0.35, 0.75, pt + fine * 0.12);
+        mix3(c, PATH_EDGE, pathEdge * 0.35 * (1 - pmix), c);
+        mix3(c, PATH, pmix * (0.92 + 0.08 * fine), c);
+        grass *= 1 - smoothstep(0.2, 0.55, pt);
+      }
+
+      // sand: beaches, then the beds and banks of inland water
+      const sandAmt = smoothstep(0.3, 0.7, sd + fine * 0.08);
+      if (sandAmt > 0) {
+        const s2 = mix3(SAND, SAND_WET, smoothstep(0.9, 0.15, h), rock);
+        if (h < 0) mix3(s2, SEABED, smoothstep(0, -3, h), s2);
+        s2[0] *= 1 + fine * 0.025;
+        s2[1] *= 1 + fine * 0.025;
+        mix3(c, s2, sandAmt, c);
+        grass *= 1 - sandAmt;
+      }
+      const bedAmt = smoothstep(0.08, 0.5, wt);
+      if (bedAmt > 0) {
+        mix3(c, BED, bedAmt, c);
+        grass *= 1 - smoothstep(0.02, 0.3, wt);
+      }
+
+      // rock on steep ground, with soft strata
+      const rockAmt = smoothstep(0.62, 0.95, slope + fine * 0.06);
+      if (rockAmt > 0) {
+        const strata = Math.sin(h * 0.85 + n1.simplex(x * 0.03, z * 0.03) * 3) * 0.5 + 0.5;
+        mix3(ROCK_A, ROCK_B, strata, rock);
+        mix3(rock, ROCK_WARM, smoothstep(0.4, 0.9, mid) * 0.5, rock);
+        const rs = 0.92 + 0.12 * fine;
+        rock[0] *= rs;
+        rock[1] *= rs;
+        rock[2] *= rs;
+        mix3(c, rock, rockAmt, c);
+        grass *= 1 - rockAmt;
+      }
+
+      const snow = smoothstep(108, 124, h + big * 10) * (1 - smoothstep(1.3, 2.2, slope));
+      if (snow > 0) mix3(c, SNOW, snow, c);
+
+      if (h < 0.35) grass = 0;
+      data[o] = clamp(c[0]) * 255;
+      data[o + 1] = clamp(c[1]) * 255;
+      data[o + 2] = clamp(c[2]) * 255;
+      data[o + 3] = clamp(grass) * 255;
+    }
+  }
+
+  const tex = new THREE.DataTexture(data, res, res, THREE.RGBAFormat, THREE.UnsignedByteType);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.generateMipmaps = true;
+  tex.anisotropy = 8;
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+function makeDetailTexture(): THREE.DataTexture {
+  const size = 256;
+  const n = new Noise2D(5);
+  const data = new Uint8Array(size * size * 4);
+  // tileable noise via 4-corner blend
+  const f = (x: number, y: number): number => n.fbm(x * 0.06, y * 0.06, 3) * 0.5 + 0.5;
+  for (let j = 0; j < size; j++) {
+    for (let i = 0; i < size; i++) {
+      const u = i / size;
+      const v = j / size;
+      const val =
+        lerp(lerp(f(i, j), f(i - size, j), u), lerp(f(i, j - size), f(i - size, j - size), u), v);
+      const b = clamp(val) * 255;
+      const o = (j * size + i) * 4;
+      data[o] = data[o + 1] = data[o + 2] = b;
+      data[o + 3] = 255;
+    }
+  }
+  const tex = new THREE.DataTexture(data, size, size);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.generateMipmaps = true;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+/** The island surface, split into chunks so off-screen ground is culled. */
+export class Terrain {
+  readonly group = new THREE.Group();
+  readonly material: THREE.MeshLambertMaterial;
+
+  constructor(island: Island, groundTex: THREE.DataTexture, step = 1) {
+    const detail = makeDetailTexture();
+    this.material = new THREE.MeshLambertMaterial({ map: groundTex });
+    this.material.onBeforeCompile = (shader) => {
+      shader.uniforms.uDetail = { value: detail };
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nvarying vec3 vWNormal;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = position;\nvWNormal = normal;');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <map_pars_fragment>', '#include <map_pars_fragment>\nuniform sampler2D uDetail;\nvarying vec3 vWPos;\nvarying vec3 vWNormal;')
+        .replace(
+          '#include <map_fragment>',
+          /* glsl */ `#include <map_fragment>
+          float det = texture2D(uDetail, vMapUv * 170.0).r * 0.6 + texture2D(uDetail, vMapUv * 37.0).r * 0.4;
+          diffuseColor.rgb *= 0.9 + 0.2 * det;
+          diffuseColor.a = 1.0;
+          // Cliffs are too steep for the top-down ground texture, so their
+          // rock is drawn here in world space: warped strata with fine grain.
+          float steepness = 1.0 - normalize(vWNormal).y;
+          float rockMask = smoothstep(0.26, 0.46, steepness + (det - 0.5) * 0.12);
+          if (rockMask > 0.0) {
+            float warp = texture2D(uDetail, vWPos.xz * 0.004).r;
+            float blotch = texture2D(uDetail, vec2((vWPos.x + vWPos.z) * 0.012, vWPos.y * 0.012)).r;
+            float strata = texture2D(uDetail, vec2((vWPos.x - vWPos.z) * 0.0016, vWPos.y * 0.021 + warp * 0.12)).r;
+            float grain = texture2D(uDetail, vec2((vWPos.x - vWPos.z) * 0.06, vWPos.y * 0.19)).r;
+            vec3 rockCol = mix(vec3(0.34, 0.30, 0.27), vec3(0.50, 0.45, 0.38), smoothstep(0.35, 0.65, strata));
+            rockCol = mix(rockCol, vec3(0.60, 0.54, 0.45), smoothstep(0.45, 0.8, blotch) * 0.6);
+            rockCol *= 0.9 + 0.2 * grain;
+            // moss creeps over the gentler ledges
+            float moss = smoothstep(0.62, 0.38, steepness) * smoothstep(0.45, 0.7, grain + warp * 0.3);
+            rockCol = mix(rockCol, vec3(0.20, 0.42, 0.10), moss * 0.6);
+            diffuseColor.rgb = mix(diffuseColor.rgb, rockCol, rockMask);
+          }`,
+        );
+    };
+
+    const CHUNKS = 8;
+    const cells = (GRID - 1) / CHUNKS; // grid cells per chunk side
+    const vps = cells / step + 1;
+    const index: number[] = [];
+    for (let j = 0; j < vps - 1; j++) {
+      for (let i = 0; i < vps - 1; i++) {
+        const a = j * vps + i;
+        const b = a + 1;
+        const c = a + vps;
+        const d = c + 1;
+        index.push(a, c, b, b, c, d);
+      }
+    }
+    const H = (i: number, j: number): number =>
+      island.height[clamp(j, 0, GRID - 1) * GRID + clamp(i, 0, GRID - 1)];
+
+    for (let cj = 0; cj < CHUNKS; cj++) {
+      for (let ci = 0; ci < CHUNKS; ci++) {
+        const pos = new Float32Array(vps * vps * 3);
+        const nor = new Float32Array(vps * vps * 3);
+        const uv = new Float32Array(vps * vps * 2);
+        let p = 0;
+        let u = 0;
+        let above = false;
+        for (let j = 0; j < vps; j++) {
+          for (let i = 0; i < vps; i++) {
+            const gi = ci * cells + i * step;
+            const gj = cj * cells + j * step;
+            const h = H(gi, gj);
+            if (h > -30) above = true;
+            pos[p] = gi * CELL - HALF;
+            pos[p + 1] = h;
+            pos[p + 2] = gj * CELL - HALF;
+            const nx = -(H(gi + 1, gj) - H(gi - 1, gj)) / (2 * CELL);
+            const nz = -(H(gi, gj + 1) - H(gi, gj - 1)) / (2 * CELL);
+            const l = Math.hypot(nx, 1, nz);
+            nor[p] = nx / l;
+            nor[p + 1] = 1 / l;
+            nor[p + 2] = nz / l;
+            p += 3;
+            uv[u++] = gi / (GRID - 1);
+            uv[u++] = gj / (GRID - 1);
+          }
+        }
+        if (!above) continue; // open sea: the water hides nothing here
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+        geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+        geo.setIndex(index);
+        geo.computeBoundingSphere();
+        geo.computeBoundingBox();
+        const mesh = new THREE.Mesh(geo, this.material);
+        mesh.receiveShadow = true;
+        mesh.matrixAutoUpdate = false;
+        this.group.add(mesh);
+      }
+    }
+    void WORLD_SIZE;
+  }
+}

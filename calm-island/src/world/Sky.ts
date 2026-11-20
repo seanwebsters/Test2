@@ -1,0 +1,126 @@
+import * as THREE from 'three';
+import { mulberry32 } from '../core/math';
+import { SUN_DIR, globalUniforms } from './shared';
+
+export const SKY_TOP = new THREE.Color(0x2f86ea);
+export const SKY_HORIZON = new THREE.Color(0xbfe6ff);
+
+/** Gradient sky dome, sun glow and slow, fat cumulus clouds. */
+export class Sky {
+  readonly group = new THREE.Group();
+  private dome: THREE.Mesh;
+  private clouds: { mesh: THREE.InstancedMesh; speed: number }[] = [];
+
+  constructor() {
+    this.dome = new THREE.Mesh(
+      new THREE.SphereGeometry(3500, 32, 16),
+      new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        depthWrite: false,
+        fog: false,
+        uniforms: {
+          uTop: { value: SKY_TOP },
+          uHorizon: { value: SKY_HORIZON },
+          uSunDir: globalUniforms.uSunDir,
+        },
+        vertexShader: /* glsl */ `
+          varying vec3 vDir;
+          void main() {
+            vDir = position;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }`,
+        fragmentShader: /* glsl */ `
+          uniform vec3 uTop;
+          uniform vec3 uHorizon;
+          uniform vec3 uSunDir;
+          varying vec3 vDir;
+          void main() {
+            vec3 d = normalize(vDir);
+            float h = clamp(d.y, 0.0, 1.0);
+            vec3 col = mix(uHorizon, uTop, pow(h, 0.5));
+            col = mix(col, uHorizon, smoothstep(0.02, -0.1, d.y));
+            float s = max(dot(d, uSunDir), 0.0);
+            col += vec3(1.0, 0.93, 0.78) * (pow(s, 1400.0) * 6.0 + pow(s, 40.0) * 0.22 + pow(s, 5.0) * 0.07);
+            gl_FragColor = vec4(col, 1.0);
+            #include <tonemapping_fragment>
+            #include <colorspace_fragment>
+          }`,
+      }),
+    );
+    this.dome.renderOrder = -10;
+    this.dome.frustumCulled = false;
+    this.group.add(this.dome);
+
+    const cloudMat = new THREE.ShaderMaterial({
+      fog: false,
+      uniforms: {
+        uSunDir: globalUniforms.uSunDir,
+        uHorizon: { value: SKY_HORIZON },
+      },
+      vertexShader: /* glsl */ `
+        varying vec3 vN;
+        varying vec3 vW;
+        void main() {
+          vec4 wp = modelMatrix * instanceMatrix * vec4(position, 1.0);
+          vN = normalize(mat3(modelMatrix) * mat3(instanceMatrix) * normal);
+          vW = wp.xyz;
+          gl_Position = projectionMatrix * viewMatrix * wp;
+        }`,
+      fragmentShader: /* glsl */ `
+        uniform vec3 uSunDir;
+        uniform vec3 uHorizon;
+        varying vec3 vN;
+        varying vec3 vW;
+        void main() {
+          vec3 n = normalize(vN);
+          float l = dot(n, uSunDir) * 0.45 + n.y * 0.4 + 0.4;
+          l = smoothstep(0.05, 0.85, l);
+          vec3 col = mix(vec3(0.68, 0.78, 0.93), vec3(1.0), l);
+          float far = smoothstep(900.0, 3000.0, length(vW.xz - cameraPosition.xz));
+          col = mix(col, uHorizon, far * 0.75);
+          gl_FragColor = vec4(col, 1.0);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+        }`,
+    });
+
+    const puff = new THREE.IcosahedronGeometry(1, 3);
+    const rnd = mulberry32(99);
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const s = new THREE.Vector3();
+    const p = new THREE.Vector3();
+    for (let c = 0; c < 44; c++) {
+      const puffs = 9 + Math.floor(rnd() * 9);
+      const mesh = new THREE.InstancedMesh(puff, cloudMat, puffs);
+      const horizon = c % 2 === 0; // half the clouds are big banks low on the horizon
+      const size = horizon ? 1.8 + rnd() * 1.8 : 0.7 + rnd() * 1.1;
+      const len = (60 + rnd() * 80) * size;
+      for (let i = 0; i < puffs; i++) {
+        const t = i / (puffs - 1);
+        const mid = 1 - Math.abs(t * 2 - 1);
+        const r = (16 + 26 * mid * (0.6 + rnd() * 0.6)) * size;
+        p.set((t - 0.5) * len + (rnd() - 0.5) * 12, r * 0.55 + rnd() * 6 * mid, (rnd() - 0.5) * 34 * size);
+        s.set(r, r * 0.78, r);
+        m.compose(p, q, s);
+        mesh.setMatrixAt(i, m);
+      }
+      const ang = rnd() * Math.PI * 2;
+      const dist = horizon ? 1700 + rnd() * 900 : 400 + rnd() * 1500;
+      mesh.position.set(Math.cos(ang) * dist, horizon ? 90 + rnd() * 160 : 230 + rnd() * 170, Math.sin(ang) * dist);
+      mesh.rotation.y = (rnd() - 0.5) * 0.6;
+      mesh.frustumCulled = false;
+      this.clouds.push({ mesh, speed: 2 + rnd() * 2.5 });
+      this.group.add(mesh);
+    }
+    void SUN_DIR;
+  }
+
+  update(dt: number, camera: THREE.Camera): void {
+    this.dome.position.copy(camera.position);
+    for (const c of this.clouds) {
+      c.mesh.position.x += c.speed * dt;
+      if (c.mesh.position.x > 2700) c.mesh.position.x = -2700;
+    }
+  }
+}

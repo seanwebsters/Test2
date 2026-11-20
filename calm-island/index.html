@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Calmlings: Calm Island</title>
+    <link rel="stylesheet" href="/src/ui/style.css" />
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+
+    <div id="hud" class="hidden">
+      <div id="toast"><div class="toast-kicker"></div><div class="toast-title"></div><div class="toast-blurb"></div></div>
+      <div id="hints">
+        <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> wander</span>
+        <span><kbd>Shift</kbd> run</span>
+        <span><kbd>Space</kbd> hop</span>
+        <span><kbd>Mouse</kbd> look</span>
+        <span><kbd>Esc</kbd> menu</span>
+      </div>
+      <div id="fps" class="hidden"></div>
+    </div>
+
+    <div id="loading" class="screen">
+      <div class="card">
+        <div class="kicker">Calmlings</div>
+        <h1>Calm Island</h1>
+        <div class="bar"><div id="bar-fill"></div></div>
+        <p id="loading-text">Waking the island…</p>
+      </div>
+    </div>
+
+    <div id="start" class="screen hidden">
+      <div class="card">
+        <div class="kicker">Calmlings</div>
+        <h1>Calm Island</h1>
+        <p class="lead">No goals. No clock. Just an island to wander.</p>
+        <button id="play" class="primary">Begin wandering</button>
+        <div class="controls">
+          <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> wander</span>
+          <span><kbd>Shift</kbd> run</span>
+          <span><kbd>Space</kbd> hop</span>
+          <span><kbd>Mouse</kbd> look around</span>
+          <span><kbd>Wheel</kbd> zoom</span>
+          <span><kbd>Esc</kbd> menu</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="menu" class="screen hidden">
+      <div class="card wide">
+        <h2>Taking a breath</h2>
+        <p class="lead" id="menu-stats"></p>
+        <div class="rows">
+          <label>Graphics
+            <select id="set-quality">
+              <option value="low">Gentle (fastest)</option>
+              <option value="medium">Balanced</option>
+              <option value="high">Lush (best looking)</option>
+            </select>
+          </label>
+          <label>Music <input type="range" id="set-music" min="0" max="1" step="0.05" /></label>
+          <label>Shadows <input type="checkbox" id="set-shadows" /></label>
+          <label>Grass <input type="range" id="set-grass" min="0.1" max="1" step="0.05" /></label>
+          <label>Sharpness <input type="range" id="set-scale" min="0.5" max="1" step="0.05" /></label>
+          <label>Look speed <input type="range" id="set-sens" min="0.3" max="2.5" step="0.05" /></label>
+          <label>Invert look up/down <input type="checkbox" id="set-invert" /></label>
+          <label>Show frame rate <input type="checkbox" id="set-fps" /></label>
+        </div>
+        <div class="buttons">
+          <button id="resume" class="primary">Keep wandering</button>
+          <button id="home">Return to the garden</button>
+          <button id="reset" class="quiet">Start afresh</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="error" class="screen hidden"><div class="card"><h2>The island couldn't wake up</h2><p id="error-text"></p></div></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
