@@ -72,6 +72,44 @@ export class Sky {
     this.stars.renderOrder = -9;
     this.group.add(this.stars);
 
+    // a veil of high cirrus drifting far above the cumulus
+    const cirrus = new THREE.Mesh(
+      new THREE.PlaneGeometry(9000, 9000).rotateX(Math.PI / 2),
+      new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        fog: false,
+        uniforms: { uTime: globalUniforms.uTime, uDayLight: globalUniforms.uDayLight, uHorizon: { value: SKY_HORIZON } },
+        vertexShader: /* glsl */ `
+          varying vec2 vP;
+          void main() {
+            vP = position.xz;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }`,
+        fragmentShader: /* glsl */ `
+          uniform float uTime;
+          uniform float uDayLight;
+          uniform vec3 uHorizon;
+          varying vec2 vP;
+          float h(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+          float n(vec2 p) { vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+            return mix(mix(h(i), h(i + vec2(1.0, 0.0)), f.x), mix(h(i + vec2(0.0, 1.0)), h(i + vec2(1.0, 1.0)), f.x), f.y); }
+          void main() {
+            // stretched noise makes long combed streaks
+            vec2 p = vP * vec2(0.0011, 0.0034) + vec2(uTime * 0.004, 0.0);
+            float c = n(p) * 0.55 + n(p * 2.3 + 4.0) * 0.3 + n(p * 5.1 + 9.0) * 0.15;
+            float a = smoothstep(0.52, 0.86, c) * 0.5 * (1.0 - smoothstep(2200.0, 4400.0, length(vP)));
+            gl_FragColor = vec4(mix(uHorizon, vec3(1.0), 0.75) * mix(0.35, 1.0, uDayLight), a);
+            #include <tonemapping_fragment>
+            #include <colorspace_fragment>
+          }`,
+      }),
+    );
+    cirrus.position.y = 900;
+    cirrus.renderOrder = -8;
+    cirrus.frustumCulled = false;
+    this.group.add(cirrus);
+
     const cloudMat = new THREE.ShaderMaterial({
       fog: false,
       uniforms: {

@@ -261,7 +261,7 @@ export class Game {
     this.post = new PostFX(this.renderer, this.scene, this.camera);
 
     await step(0.86, 'Combing the grass…');
-    this.grassNear = new Grass(heightTex, groundTex, { patch: 44, maxBlades: 120000, bladeHeight: 0.42, bladeWidth: 0.09, seed: 1 });
+    this.grassNear = new Grass(heightTex, groundTex, { patch: 42, maxBlades: 190000, bladeHeight: 0.46, bladeWidth: 0.062, seed: 1 });
     this.grassFar = new Grass(heightTex, groundTex, { patch: 110, maxBlades: 110000, bladeHeight: 0.5, bladeWidth: 0.2, seed: 2, simple: true, inner: 15 });
     this.scene.add(this.grassFar.mesh, this.grassNear.mesh);
     this.ambient = new Ambient(this.island);

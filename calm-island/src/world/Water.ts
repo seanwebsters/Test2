@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { HIGH_SHORE, LOW_SHORE, RIVER_HALF_WIDTH, SEA_LEVEL, WATER_DROP, polylineAt, type Island } from './islandMap';
+import { SKY_TOP } from './Sky';
 import { NOISE_GLSL, WORLD_UV_GLSL, globalUniforms } from './shared';
 
 const VERT = /* glsl */ `
@@ -27,6 +28,7 @@ uniform vec3 uSunDir;
 uniform vec3 uShallow;
 uniform vec3 uDeep;
 uniform vec3 uSky;
+uniform vec3 uSkyTop;
 uniform float uDepthK;
 uniform float uFlow;
 uniform float uSurf;
@@ -36,7 +38,7 @@ varying vec2 vUv;
 ${NOISE_GLSL}
 ${WORLD_UV_GLSL}
 float waveH(vec2 p, float t) {
-  return fbm2(p * 0.22 + t * vec2(0.11, 0.07)) + 0.5 * fbm2(p * 0.55 - t * vec2(0.09, 0.14));
+  return fbm2(p * 0.22 + t * vec2(0.11, 0.07)) + 0.5 * fbm2(p * 0.55 - t * vec2(0.09, 0.14)) + 0.22 * fbm2(p * 1.7 + t * vec2(0.2, -0.16));
 }
 void main() {
   float ground = texture2D(uHeightTex, worldUv(vWorld.xz)).r;
@@ -60,7 +62,10 @@ void main() {
   // dancing light on the shallows
   float ca = vnoise(p * 0.8 + N.xz * 4.0 + uTime * 0.35);
   col += pow(ca, 4.0) * 0.35 * (1.0 - dk);
-  col = mix(col, uSky, fres * 0.5);
+  // the surface mirrors the sky: pale at the horizon, deep blue overhead
+  vec3 Rv = reflect(-V, N);
+  vec3 skyRefl = mix(uSky, uSkyTop, pow(clamp(Rv.y, 0.0, 1.0), 0.6));
+  col = mix(col, skyRefl, clamp(fres * 0.85 + 0.06, 0.0, 1.0));
 
   vec3 R = reflect(-uSunDir, N);
   float spec = pow(max(dot(R, V), 0.0), 220.0);
@@ -237,6 +242,7 @@ export class Water {
         uShallow: { value: new THREE.Color(o.shallow) },
         uDeep: { value: new THREE.Color(o.deep) },
         uSky: { value: sky },
+        uSkyTop: { value: SKY_TOP },
         uDepthK: { value: o.depthK },
         uFlow: { value: o.flow ? 1 : 0 },
         uSurf: { value: o.surf ?? 0 },

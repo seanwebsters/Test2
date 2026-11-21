@@ -20,7 +20,7 @@ export class Seeds {
     };
     const far = (x: number, z: number, d: number): boolean => this.spots.every((s) => Math.hypot(s.x - x, s.z - z) > d);
     const geo = new THREE.OctahedronGeometry(0.2, 1).scale(0.8, 1.25, 0.8);
-    const mat = new THREE.MeshBasicMaterial({ color: 0xeaffa0 });
+    const mat = new THREE.MeshBasicMaterial({ color: 0xc9e27c });
     const place = (x: number, z: number): void => {
       const mesh = new THREE.Mesh(geo, mat);
       mesh.position.set(x, island.heightAt(x, z) + 0.75, z);

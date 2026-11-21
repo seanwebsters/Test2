@@ -245,12 +245,43 @@ export class Terrain {
         .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nvarying vec3 vWNormal;')
         .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = position;\nvWNormal = normal;');
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <map_pars_fragment>', '#include <map_pars_fragment>\nuniform sampler2D uDetail;\nvarying vec3 vWPos;\nvarying vec3 vWNormal;')
+        .replace(
+          '#include <map_pars_fragment>',
+          /* glsl */ `#include <map_pars_fragment>
+          uniform sampler2D uDetail;
+          varying vec3 vWPos;
+          varying vec3 vWNormal;
+          float gHash(vec2 p) {
+            p = fract(p * vec2(123.34, 456.21));
+            p += dot(p, p + 45.32);
+            return fract(p.x * p.y);
+          }
+          float gNoise(vec2 p) {
+            vec2 i = floor(p);
+            vec2 f = fract(p);
+            f = f * f * (3.0 - 2.0 * f);
+            return mix(mix(gHash(i), gHash(i + vec2(1.0, 0.0)), f.x), mix(gHash(i + vec2(0.0, 1.0)), gHash(i + vec2(1.0, 1.0)), f.x), f.y);
+          }`,
+        )
         .replace(
           '#include <map_fragment>',
           /* glsl */ `#include <map_fragment>
           float det = texture2D(uDetail, vMapUv * 170.0).r * 0.6 + texture2D(uDetail, vMapUv * 37.0).r * 0.4;
-          diffuseColor.rgb *= 0.9 + 0.2 * det;
+          float grassAmt = sampledDiffuseColor.a;
+          // fine, medium and broad variation so the ground never reads as flat colour
+          float fine = gNoise(vWPos.xz * 7.0);
+          float clumps = gNoise(vWPos.xz * 1.6 + 11.0);
+          float broad = gNoise(vWPos.xz * 0.21 + 3.0);
+          diffuseColor.rgb *= 0.8 + 0.1 * det + 0.1 * fine + 0.12 * clumps + 0.12 * broad;
+          // meadows: darker hollows between tufts, lighter sun-bleached crowns
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.1, 1.08, 0.82), grassAmt * smoothstep(0.55, 0.9, clumps) * 0.5);
+          // bare ground: wind ripples in the sand, glints of mica, and a darker wet band at the water's edge
+          float bare = 1.0 - grassAmt;
+          float ripple = sin(vWPos.x * 2.4 + vWPos.z * 0.9 + gNoise(vWPos.xz * 0.5) * 7.0) * 0.5 + 0.5;
+          diffuseColor.rgb *= 1.0 - bare * smoothstep(5.0, 1.0, vWPos.y) * (0.07 * ripple);
+          float glint = fract(sin(dot(floor(vWPos.xz * 23.0), vec2(127.1, 311.7))) * 43758.5453);
+          diffuseColor.rgb += bare * step(0.985, glint) * 0.16 * smoothstep(8.0, 2.0, vWPos.y);
+          diffuseColor.rgb *= mix(0.74, 1.0, smoothstep(-0.3, 0.7, vWPos.y + (fine - 0.5) * 0.4));
           diffuseColor.a = 1.0;
           // Cliffs are too steep for the top-down ground texture, so their
           // rock is drawn here in world space: warped strata with fine grain.
