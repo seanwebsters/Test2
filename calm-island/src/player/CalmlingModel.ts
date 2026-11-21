@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { clamp, damp, lerp, mulberry32, smoothstep } from '../core/math';
-import { globalUniforms } from '../world/shared';
+import { SUN_DIR, globalUniforms } from '../world/shared';
 
 export interface CalmlingPose {
   /** horizontal speed in m/s */
@@ -46,7 +46,7 @@ export interface CalmlingLook {
   scale?: number;
 }
 
-export const BLUE_LOOK: CalmlingLook = { fur: 0x5cb4ec, style: 'spiky' };
+export const BLUE_LOOK: CalmlingLook = { fur: 0x3f9de4, tip: 0xb4e2fb, style: 'spiky' };
 
 const BODY_Y = 0.78;
 const RX = 0.5;
@@ -69,6 +69,9 @@ export class CalmlingModel {
   private legR = new THREE.Group();
   private eyes = new THREE.Group();
   private pupils: THREE.Object3D[] = [];
+  private glints: THREE.Object3D[] = [];
+  private shine = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  private blob: THREE.Mesh;
   private furUniforms = { uFurSway: { value: new THREE.Vector3() } };
 
   private phase = 0;
@@ -110,6 +113,8 @@ export class CalmlingModel {
     furMat.onBeforeCompile = (shader) => {
       shader.uniforms.uTime = globalUniforms.uTime;
       shader.uniforms.uFurSway = this.furUniforms.uFurSway;
+      shader.uniforms.uSunDirW = globalUniforms.uSunDir;
+      shader.uniforms.uDayLight = globalUniforms.uDayLight;
       shader.vertexShader = shader.vertexShader
         .replace(
           '#include <common>',
@@ -139,6 +144,8 @@ export class CalmlingModel {
           `#include <common>
           varying vec3 vDir;
           varying float vShell;
+          uniform vec3 uSunDirW;
+          uniform float uDayLight;
           float furHash(vec3 p) {
             p = fract(p * vec3(0.1031, 0.1030, 0.0973));
             p += dot(p, p.yxz + 33.33);
@@ -164,7 +171,13 @@ export class CalmlingModel {
           '#include <opaque_fragment>',
           /* glsl */ `
           float rim = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 2.4);
+          vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
+          float toSun = dot(normal, sunV);
+          // sky light wraps the silhouette; where the sun is behind, the fine edges catch it warm
           outgoingLight += diffuseColor.rgb * rim * 0.3 + vec3(0.6, 0.82, 1.0) * rim * 0.08;
+          outgoingLight += vec3(1.0, 0.84, 0.58) * rim * smoothstep(-0.25, 0.7, toSun) * 0.42 * uDayLight;
+          // the side turned from the sun keeps a rich, cool blue instead of going grey
+          outgoingLight += diffuseColor.rgb * vec3(0.05, 0.1, 0.24) * smoothstep(0.2, -0.6, toSun);
           #include <opaque_fragment>`,
         );
     };
@@ -179,6 +192,8 @@ export class CalmlingModel {
     tuftMat.onBeforeCompile = (shader) => {
       shader.uniforms.uTime = globalUniforms.uTime;
       shader.uniforms.uFurSway = this.furUniforms.uFurSway;
+      shader.uniforms.uSunDirW = globalUniforms.uSunDir;
+      shader.uniforms.uDayLight = globalUniforms.uDayLight;
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform vec3 uFurSway;\nattribute vec2 aTuft;\nvarying vec2 vTuft;')
         .replace(
@@ -191,7 +206,7 @@ export class CalmlingModel {
           vTuft = aTuft;`,
         );
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nvarying vec2 vTuft;')
+        .replace('#include <common>', '#include <common>\nvarying vec2 vTuft;\nuniform vec3 uSunDirW;\nuniform float uDayLight;')
         .replace(
           '#include <color_fragment>',
           /* glsl */ `#include <color_fragment>
@@ -203,7 +218,13 @@ export class CalmlingModel {
           '#include <opaque_fragment>',
           /* glsl */ `
           float rim = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 2.4);
+          vec3 sunV = normalize((viewMatrix * vec4(uSunDirW, 0.0)).xyz);
+          float toSun = dot(normal, sunV);
+          // sky light wraps the silhouette; where the sun is behind, the fine edges catch it warm
           outgoingLight += diffuseColor.rgb * rim * 0.3 + vec3(0.6, 0.82, 1.0) * rim * 0.08;
+          outgoingLight += vec3(1.0, 0.84, 0.58) * rim * smoothstep(-0.25, 0.7, toSun) * 0.42 * uDayLight;
+          // the side turned from the sun keeps a rich, cool blue instead of going grey
+          outgoingLight += diffuseColor.rgb * vec3(0.05, 0.1, 0.24) * smoothstep(0.2, -0.6, toSun);
           #include <opaque_fragment>`,
         );
     };
@@ -219,10 +240,10 @@ export class CalmlingModel {
     this.body.add(caster);
 
     // ---- face ------------------------------------------------------------
-    const white = new THREE.MeshStandardMaterial({ color: 0xf2f4ff, roughness: 0.3, emissive: 0x8c92a8 });
-    const iris = new THREE.MeshStandardMaterial({ color: look.iris ?? 0x4a9cf0, roughness: 0.3, emissive: new THREE.Color(look.iris ?? 0x4a9cf0).multiplyScalar(0.35) });
-    const pupil = new THREE.MeshStandardMaterial({ color: 0x0a1638, roughness: 0.2 });
-    const shine = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const white = new THREE.MeshStandardMaterial({ color: 0xf2f4ff, roughness: 0.16, emissive: 0x8c92a8 });
+    const iris = new THREE.MeshStandardMaterial({ color: look.iris ?? 0x4a9cf0, roughness: 0.1, emissive: new THREE.Color(look.iris ?? 0x4a9cf0).multiplyScalar(0.35) });
+    const pupil = new THREE.MeshStandardMaterial({ color: 0x0a1638, roughness: 0.06 });
+    const shine = this.shine;
     for (const side of [-1, 1]) {
       const eye = new THREE.Group();
       eye.position.set(side * 0.178, 0.2, 0.34);
@@ -243,6 +264,7 @@ export class CalmlingModel {
       const glint2 = new THREE.Mesh(new THREE.SphereGeometry(0.009, 8, 6), shine);
       glint2.position.set(-0.03, -0.034, 0.05);
       look.add(irisMesh, pupilMesh, glint, glint2);
+      this.glints.push(glint);
       eye.add(look);
       this.pupils.push(look);
       this.eyes.add(eye);
@@ -297,10 +319,17 @@ export class CalmlingModel {
     this.body.position.y = BODY_Y;
     this.tilt.add(this.body);
     this.root.add(this.tilt);
+    // a soft pool of contact shade under the feet, so the Calmling sits on the ground
+    this.blob = new THREE.Mesh(blobGeo, new THREE.MeshBasicMaterial({ map: blobTexture(), transparent: true, depthWrite: false, opacity: 0.5, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    this.blob.rotation.x = -Math.PI / 2;
+    this.blob.position.y = 0.035;
+    this.blob.renderOrder = 1;
+    this.root.add(this.blob);
   }
 
   /** Give the fur a kick (landing, jumping). Positive stretches, negative squashes. */
   impulse(amount: number): void {
+    this.furVel.y += amount * 0.3; // the fur carries on after the body stops, then settles
     this.squashVel += amount;
   }
 
@@ -336,7 +365,13 @@ export class CalmlingModel {
     const stride = lerp(0.62, 1.0, this.run) * this.move;
     const bounce = Math.abs(c) * lerp(0.035, 0.085, this.run) * this.move;
     this.body.position.y = BODY_Y + bounce + (sy - 1) * 0.3 + Math.sin(t * 2.2) * 0.03 * this.swim - this.sit * 0.27 + this.breath * 0.04;
-    this.tilt.rotation.z = s * lerp(0.075, 0.04, this.run) * this.move - clamp(pose.turnRate * 0.035, -0.22, 0.22) * this.move;
+    // standing still, the weight drifts slowly from one foot to the other
+    const idle = (1 - this.move) * (1 - this.sit) * (1 - this.air) * (1 - this.swim);
+    const shift = Math.sin(t * 0.55) * idle;
+    this.body.position.x = shift * 0.022;
+    this.tilt.rotation.z = s * lerp(0.075, 0.04, this.run) * this.move - clamp(pose.turnRate * 0.035, -0.22, 0.22) * this.move + shift * 0.03;
+    this.blob.visible = this.air < 0.6 && this.swim < 0.5;
+    (this.blob.material as THREE.MeshBasicMaterial).opacity = 0.5 * (1 - this.air) * (0.35 + 0.65 * globalUniforms.uDayLight.value);
     this.tilt.rotation.x = -1.15 * this.sleep - 0.06 * this.sit - 0.03 * this.breath + 0.07 * this.move + 0.15 * this.run + this.air * clamp(-pose.verticalSpeed * 0.02, -0.15, 0.2) + this.swim * 0.25;
 
     const tuck = this.air * 0.55;
@@ -382,6 +417,10 @@ export class CalmlingModel {
     this.eyes.position.y = (1 - lid) * 0.1;
     const glance = this.move > 0.1 ? 0 : Math.sin(t * 0.43) * Math.sin(t * 0.17 + 1) * 0.6;
     this.lookX = damp(this.lookX, clamp(pose.turnRate * 0.25 + glance, -1, 1), 6, dt);
+    // catchlights sit on the side of each eye the sun is on, and dim when it is gone
+    const sunSide = clamp(SUN_DIR.x * Math.cos(pose.yaw) - SUN_DIR.z * Math.sin(pose.yaw), -1, 1);
+    for (const g of this.glints) g.position.set(0.006 + sunSide * 0.036, 0.022 + clamp(SUN_DIR.y, 0, 1) * 0.026, 0.05);
+    this.shine.color.setScalar(0.5 + 0.5 * globalUniforms.uDayLight.value);
     this.pupils[0].position.x = 0.05 + this.lookX * 0.026;
     this.pupils[1].position.x = -0.05 + this.lookX * 0.026;
 
@@ -398,6 +437,22 @@ export class CalmlingModel {
     this.furUniforms.uFurSway.value.copy(this.furOffset);
     void smoothstep;
   }
+}
+
+const blobGeo = new THREE.PlaneGeometry(1.7, 1.7);
+let blobTex: THREE.CanvasTexture | null = null;
+function blobTexture(): THREE.CanvasTexture {
+  if (blobTex) return blobTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const ctx = c.getContext('2d')!;
+  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, 'rgba(10,30,20,0.9)');
+  g.addColorStop(0.45, 'rgba(10,30,20,0.5)');
+  g.addColorStop(1, 'rgba(10,30,20,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 64, 64);
+  return (blobTex = new THREE.CanvasTexture(c));
 }
 
 /**

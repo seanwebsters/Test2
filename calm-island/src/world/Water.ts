@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { HIGH_SHORE, LOW_SHORE, RIVER_HALF_WIDTH, SEA_LEVEL, WATER_DROP, polylineAt, type Island } from './islandMap';
 import { SKY_TOP } from './Sky';
-import { NOISE_GLSL, WORLD_UV_GLSL, fogMask, globalUniforms, skyTex } from './shared';
+import { NOISE_GLSL, WORLD_UV_GLSL, fogMask, globalUniforms, skyTex, canopyTex } from './shared';
 
 const VERT = /* glsl */ `
 #include <common>
@@ -323,7 +323,7 @@ export class Water {
       uniforms: {
         ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
         uFogMask: { value: fogMask },
-        uSkyTex: { value: skyTex },
+        uSkyTex: { value: skyTex }, uCanopy: { value: canopyTex },
         uTime: globalUniforms.uTime,
         uDayLight: globalUniforms.uDayLight,
         uWorldSize: globalUniforms.uWorldSize,
@@ -431,7 +431,7 @@ export class Water {
       fragmentShader: FALL_FRAG,
       uniforms: { ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
         uFogMask: { value: fogMask },
-        uSkyTex: { value: skyTex }, uTime: globalUniforms.uTime, uDayLight: globalUniforms.uDayLight },
+        uSkyTex: { value: skyTex }, uCanopy: { value: canopyTex }, uTime: globalUniforms.uTime, uDayLight: globalUniforms.uDayLight },
       transparent: true,
       side: THREE.DoubleSide,
       fog: true,

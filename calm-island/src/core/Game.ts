@@ -23,7 +23,7 @@ import { Terrain, bakeGroundTexture } from '../world/Terrain';
 import { loadNatureModels } from '../world/NatureModels';
 import { Vegetation } from '../world/Vegetation';
 import { Water } from '../world/Water';
-import { SUN_DIR, clearFog, fogClearAt, globalUniforms, makeHeightTexture, resetFog } from '../world/shared';
+import { SUN_DIR, clearFog, fogClearAt, globalUniforms, makeHeightTexture, resetFog, paintCanopy } from '../world/shared';
 import { Ambience } from './Ambience';
 import { BREATHS, Breathing } from './Breathing';
 import { Input } from './Input';
@@ -305,6 +305,7 @@ export class Game {
     this.scene.add(this.vegetation.group);
 
     await step(0.55, 'Painting meadows and beaches…');
+    paintCanopy(this.vegetation.shade);
     const groundTex = bakeGroundTexture(this.island, low ? 1024 : 2048, this.vegetation.shade);
     groundTex.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
     this.groundTex = groundTex;

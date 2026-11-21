@@ -6,8 +6,22 @@ import { GRID, WORLD_SIZE, type Island } from './islandMap';
 // so each line of hills and trees sits a little paler than the one in front.
 THREE.ShaderChunk.fog_fragment = THREE.ShaderChunk.fog_fragment.replace(
   'gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );',
-  `float hazeAmt = (1.0 - exp(-vFogDepth * 0.003)) * 0.24;
-	gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor * vec3(0.86, 0.95, 1.1), hazeAmt);
+  `// Sunlight through leaves: under a tree's crown the light breaks into moving flecks.
+	// It is applied to everything near the ground there (earth, grass, rocks, the Calmling),
+	// so the dapple holds together from any camera angle.
+	vec4 dSky = texture2D(uSkyTex, vec2(0.25, 0.5));
+	float dSun = texture2D(uSkyTex, vec2(0.75, 0.5)).a;
+	float canopy = texture2D(uCanopy, vFogWorld.xz / ${WORLD_SIZE.toFixed(1)} + 0.5).r * dSun;
+	if (canopy > 0.01) {
+		vec2 dp = vFogWorld.xz * 1.5 + vFogWorld.y * 0.4 + vec2(sin(dSky.a * 0.6), cos(dSky.a * 0.47)) * 0.22;
+		float fl = czNoise(dp) * 0.62 + czNoise(dp * 2.7 + 11.0) * 0.38;
+		float fleck = smoothstep(0.5, 0.66, fl);
+		gl_FragColor.rgb *= mix(vec3(1.0), mix(vec3(0.84, 0.88, 0.96), vec3(1.14, 1.07, 0.92), fleck), canopy);
+	}
+	// Aerial perspective: each line of hills sits bluer and paler than the one in front,
+	// while the first hundred metres or so stay clear.
+	float hazeAmt = (1.0 - exp(-vFogDepth * 0.0024)) * 0.46;
+	gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor * vec3(0.78, 0.88, 1.16), hazeAmt);
 	gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );`,
 );
 
@@ -62,10 +76,39 @@ export function fogClearAt(x: number, z: number): number {
 // The sky's two colours, kept in a tiny texture so every material can read
 // them live (plain colour uniforms are copied per material and would go stale).
 const skyData = new Float32Array(8);
+
+/** Where tree crowns hang over the ground: 0 open sky, 1 deep under leaves. */
+export const CANOPY_RES = 1024;
+const canopyData = new Uint8Array(CANOPY_RES * CANOPY_RES);
+export const canopyTex = new THREE.DataTexture(canopyData, CANOPY_RES, CANOPY_RES, THREE.RedFormat, THREE.UnsignedByteType);
+canopyTex.minFilter = canopyTex.magFilter = THREE.LinearFilter;
+canopyTex.needsUpdate = true;
+/** Paint the canopy map from a flat list of x, z, radius for every tree crown. */
+export function paintCanopy(spots: number[]): void {
+  canopyData.fill(0);
+  const k = CANOPY_RES / WORLD_SIZE;
+  for (let n = 0; n < spots.length; n += 3) {
+    if (spots[n + 2] < 2.6) continue; // rocks and bushes cast no dapple
+    const cx = (spots[n] / WORLD_SIZE + 0.5) * CANOPY_RES;
+    const cz = (spots[n + 1] / WORLD_SIZE + 0.5) * CANOPY_RES;
+    const rr = spots[n + 2] * 1.35 * k;
+    for (let j = Math.max(0, Math.floor(cz - rr)); j <= Math.min(CANOPY_RES - 1, Math.ceil(cz + rr)); j++) {
+      for (let i = Math.max(0, Math.floor(cx - rr)); i <= Math.min(CANOPY_RES - 1, Math.ceil(cx + rr)); i++) {
+        const d = Math.hypot(i + 0.5 - cx, j + 0.5 - cz) / rr;
+        if (d >= 1) continue;
+        const v = Math.round((1 - d * d) * 235);
+        const idx = j * CANOPY_RES + i;
+        if (v > canopyData[idx]) canopyData[idx] = v;
+      }
+    }
+  }
+  canopyTex.needsUpdate = true;
+}
 export const skyTex = new THREE.DataTexture(skyData, 2, 1, THREE.RGBAFormat, THREE.FloatType);
 skyTex.minFilter = skyTex.magFilter = THREE.NearestFilter;
-export function setFogSky(horizon: THREE.Color, top: THREE.Color): void {
-  skyData.set([horizon.r, horizon.g, horizon.b, 1, top.r, top.g, top.b, 1]);
+export function setFogSky(horizon: THREE.Color, top: THREE.Color, time = 0, sun = 1): void {
+  // the two spare channels carry the clock and the strength of direct sun, for the dappled light
+  skyData.set([horizon.r, horizon.g, horizon.b, time % 1000, top.r, top.g, top.b, sun]);
   skyTex.needsUpdate = true;
 }
 
@@ -76,7 +119,13 @@ THREE.ShaderChunk.fog_vertex = THREE.ShaderChunk.fog_vertex.replace(
 );
 THREE.ShaderChunk.fog_pars_fragment = THREE.ShaderChunk.fog_pars_fragment.replace(
   'varying float vFogDepth;',
-  'varying float vFogDepth;\n\tvarying vec3 vFogWorld;\n\tuniform sampler2D uFogMask;\n\tuniform sampler2D uSkyTex;',
+  `varying float vFogDepth;
+	varying vec3 vFogWorld;
+	uniform sampler2D uFogMask;
+	uniform sampler2D uSkyTex;
+	uniform sampler2D uCanopy;
+	float czHash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+	float czNoise(vec2 p) { vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(czHash(i), czHash(i + vec2(1.0, 0.0)), f.x), mix(czHash(i + vec2(0.0, 1.0)), czHash(i + vec2(1.0, 1.0)), f.x), f.y); }`,
 );
 THREE.ShaderChunk.fog_fragment = THREE.ShaderChunk.fog_fragment.replace(
   'gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );',
@@ -102,6 +151,7 @@ for (const lib of Object.values(THREE.ShaderLib)) {
   if (lib.uniforms && 'fogColor' in lib.uniforms) {
     (lib.uniforms as Record<string, THREE.IUniform>).uFogMask = { value: fogMask };
     (lib.uniforms as Record<string, THREE.IUniform>).uSkyTex = { value: skyTex };
+    (lib.uniforms as Record<string, THREE.IUniform>).uCanopy = { value: canopyTex };
   }
 }
 
