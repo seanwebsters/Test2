@@ -44,6 +44,64 @@ interface Batch {
 const SECTOR = 64;
 const SECTORS = (HALF * 2) / SECTOR;
 
+/**
+ * How a leafy crown casts its shadow: leaf-shaped, and with gaps opened right
+ * through the crown so real flecks of sunlight reach the ground beneath.
+ */
+const leafShadows = new Map<THREE.Material, THREE.MeshDepthMaterial>();
+function leafShadow(lm: THREE.MeshLambertMaterial): THREE.MeshDepthMaterial {
+  let d = leafShadows.get(lm);
+  if (d) return d;
+  d = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: lm.map, alphaTest: lm.alphaTest });
+  d.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vGapPos;')
+      .replace(
+        '#include <project_vertex>',
+        /* glsl */ `#include <project_vertex>
+        vec4 gapW = vec4(transformed, 1.0);
+        #ifdef USE_INSTANCING
+          gapW = instanceMatrix * gapW;
+        #endif
+        vGapPos = (modelMatrix * gapW).xyz;`,
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        /* glsl */ `#include <common>
+        varying vec3 vGapPos;
+        float gapHash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+        float gapNoise(vec2 p) { vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(gapHash(i), gapHash(i + vec2(1.0, 0.0)), f.x), mix(gapHash(i + vec2(0.0, 1.0)), gapHash(i + vec2(1.0, 1.0)), f.x), f.y); }`,
+      )
+      .replace(
+        '#include <alphatest_fragment>',
+        /* glsl */ `#include <alphatest_fragment>
+        vec2 gp = vGapPos.xz * 1.15 + vGapPos.y * 0.37;
+        if (gapNoise(gp) * 0.65 + gapNoise(gp * 2.6 + 5.0) * 0.35 > 0.55) discard;`,
+      );
+  };
+  leafShadows.set(lm, d);
+  return d;
+}
+
+/** Moss settles on whatever faces the sky: boulders wear soft green caps with ragged edges. */
+function mossy<T extends THREE.Material>(mat: T): T {
+  mat.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <color_fragment>',
+      /* glsl */ `#include <color_fragment>
+      {
+        vec3 upN = normalize((vec4(normalize(vNormal), 0.0) * viewMatrix).xyz);
+        float ragged = sin(vFogWorld.x * 2.3 + vFogWorld.y * 1.1) * sin(vFogWorld.z * 2.7 - vFogWorld.y * 1.9) * 0.5 + sin(vFogWorld.x * 7.1 + vFogWorld.z * 5.3) * 0.18;
+        float moss = smoothstep(0.5, 0.8, upN.y + ragged * 0.34);
+        vec3 mossCol = mix(vec3(0.08, 0.15, 0.04), vec3(0.15, 0.23, 0.06), sin(vFogWorld.x * 3.1) * sin(vFogWorld.z * 3.7) * 0.5 + 0.5);
+        diffuseColor.rgb = mix(diffuseColor.rgb, mossCol, moss * 0.88);
+      }`,
+    );
+  };
+  return mat;
+}
+
 /** Lambert material with vertex colours and a gentle wind sway above `base`. */
 function foliageMaterial(sway: number, base: number, doubleSide = false, leafy = false, bloom = false, map: THREE.Texture | null = null, crownY = 0): THREE.MeshLambertMaterial {
   const mat = new THREE.MeshLambertMaterial({ vertexColors: !map, map, alphaTest: map ? 0.45 : 0, side: doubleSide ? THREE.DoubleSide : THREE.FrontSide });
@@ -157,7 +215,7 @@ export class Vegetation {
     const leafy = foliageMaterial(0.035, 0.2, true);
     const palmMat = foliageMaterial(0.014, 3, true);
     const flowerMat = foliageMaterial(0.16, 0.05, true, false, true);
-    const rockMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+    const rockMat = mossy(new THREE.MeshLambertMaterial({ vertexColors: true }));
 
     const treeKind = (make: (detail: number) => THREE.BufferGeometry): Kind => ({
       hi: make(4), lo: make(2), material: tree, shadow: true, lodDist: 30, farDist: 120, cullDist: 1e9, tint: false, receive: false,
@@ -188,7 +246,7 @@ export class Vegetation {
             const map = leaves ? seasonalLeaves(base, p.material, p.map, !!opts.blossom) : p.map;
             material = p.cutout
               ? foliageMaterial(opts.sway ?? 0.012, opts.base ?? 2.2, true, leaves && (opts.crown ?? 0) > 0, false, map, leaves ? opts.crown ?? 0 : 0)
-              : new THREE.MeshLambertMaterial({ map });
+              : /Rock/.test(name) ? mossy(new THREE.MeshLambertMaterial({ map })) : new THREE.MeshLambertMaterial({ map });
             mats.set(key, material);
           }
           return { geo: p.geo, material, shadow: opts.shadow ?? true };
@@ -548,7 +606,7 @@ export class Vegetation {
           const lm = material as THREE.MeshLambertMaterial;
           if (shadow && lm.map && lm.alphaTest > 0) {
             // leaf cards cast leaf-shaped shadows, not solid squares
-            mesh.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: lm.map, alphaTest: lm.alphaTest });
+            mesh.customDepthMaterial = leafShadow(lm);
           }
           ids.forEach((id, n) => {
             const it = data.m[id];

@@ -18,7 +18,7 @@ interface Key {
 }
 
 const NIGHT = { top: 0x070d2e, horizon: 0x1b2f6e, sun: 0x9db8ff, sunI: 0.75, hemiSky: 0x4a64b8, hemiGround: 0x25405a, hemiI: 0.55, light: 0.34, stars: 1 };
-const DAY = { top: 0x2f86ea, horizon: 0xbfe6ff, sun: 0xffecc8, sunI: 3.0, hemiSky: 0xcfe6ff, hemiGround: 0x9cc76a, hemiI: 1.55, light: 1, stars: 0 };
+const DAY = { top: 0x2f86ea, horizon: 0xbfe6ff, sun: 0xffe0b0, sunI: 3.15, hemiSky: 0xc2dcff, hemiGround: 0x9cc76a, hemiI: 1.85, light: 1, stars: 0 };
 const KEYS: Key[] = [
   { h: 0, ...NIGHT },
   { h: 5, ...NIGHT },
@@ -79,7 +79,7 @@ export class DayCycle {
       globalUniforms.uDayLight.value *= 1 - 0.22 * rain;
     }
     fog.density = 0.00105 + 0.0016 * rain;
-    setFogSky(SKY_HORIZON, SKY_TOP);
+    setFogSky(SKY_HORIZON, SKY_TOP, globalUniforms.uTime.value, day ? smoothstep(0.05, 0.3, SUN_DIR.y) * (1 - 0.8 * rain) : 0.25 * smoothstep(0.05, 0.3, SUN_DIR.y));
   }
 
   get label(): string {

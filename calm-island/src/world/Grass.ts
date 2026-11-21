@@ -82,6 +82,8 @@ export class Grass {
           uniform sampler2D uHeightTex;
           uniform sampler2D uGroundTex;
           attribute vec4 aOffset;
+          float gHash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+          float gNoise2(vec2 p) { vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(gHash(i), gHash(i + vec2(1.0, 0.0)), f.x), mix(gHash(i + vec2(0.0, 1.0)), gHash(i + vec2(1.0, 1.0)), f.x), f.y); }
           varying vec3 vGrassCol;
           varying float vBladeY;
           varying float vSheen;
@@ -99,7 +101,10 @@ export class Grass {
           grow *= smoothstep(uInner * 0.7, uInner + 0.001, distance(base, uPlayer.xz) + 0.001);
           // no stunted specks on sand and paths: a blade either grows properly or not at all
           grow *= step(0.3, grow) * step(0.25, ground.a);
-          float hgt = uBladeH * (0.55 + 0.9 * aOffset.z) * grow;
+          // the meadow rolls between cropped lawn and long, lush drifts
+          float drift = gNoise2(base * 0.035) * 0.65 + gNoise2(base * 0.11 + 9.0) * 0.35;
+          float lush = smoothstep(0.38, 0.72, drift);
+          float hgt = uBladeH * (0.55 + 0.9 * aOffset.z) * grow * mix(0.55, 1.75, lush);
           float ang = aOffset.w * 6.2831 + aOffset.z * 40.0;
           float bend = position.y * position.y;
           vec3 local = vec3(cos(ang) * position.x, position.y * hgt, sin(ang) * position.x);
@@ -117,6 +122,10 @@ export class Grass {
           vec3 transformed = vec3(base.x, groundY, base.y) + local;
           // each blade its own shade; a few go to seed and turn straw-gold
           vGrassCol = ground.rgb * (0.86 + 0.28 * aOffset.z);
+          // long grass is deeper and cooler, cropped grass a little sun-bleached
+          vGrassCol *= mix(vec3(1.08, 1.06, 0.82), vec3(0.82, 0.96, 0.9), lush);
+          // a soft pool of shade where the Calmling stands
+          vGrassCol *= 1.0 - 0.42 * (1.0 - smoothstep(0.3, 1.25, pd)) * (1.0 - smoothstep(0.4, 1.6, abs(uPlayer.y - groundY)));
           vGrassCol = mix(vGrassCol, vGrassCol * vec3(1.25, 1.12, 0.6), step(0.93, fract(aOffset.w * 17.0)) * 0.6);
           // the crest of each gust catches the light as it rolls across the meadow
           vSheen = smoothstep(0.35, 1.0, swell) * 0.6 + smoothstep(0.5, 1.0, ripple) * 0.25;

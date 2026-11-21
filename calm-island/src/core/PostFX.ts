@@ -28,7 +28,7 @@ const GradeShader = {
       float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));
       // a little more colour, with sunlit areas leaning warm and shade leaning cool
       c = mix(vec3(luma), c, 1.08);
-      c *= mix(vec3(0.96, 0.99, 1.06), vec3(1.05, 1.01, 0.95), smoothstep(0.15, 0.8, luma));
+      c *= mix(vec3(0.94, 0.98, 1.09), vec3(1.07, 1.02, 0.93), smoothstep(0.15, 0.8, luma));
       // gentle S-curve for depth without crushing anything
       c = mix(c, c * c * (3.0 - 2.0 * c), 0.28);
       // soft vignette draws the eye to the Calmling
