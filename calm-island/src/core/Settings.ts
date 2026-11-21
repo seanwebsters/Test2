@@ -1,4 +1,4 @@
-export type Quality = 'low' | 'medium' | 'high';
+export type Quality = 'low' | 'medium' | 'high' | 'ultra';
 
 export interface Settings {
   quality: Quality;
@@ -23,6 +23,8 @@ export const QUALITY_PRESETS: Record<Quality, { maxPixelRatio: number; shadowMap
   low: { maxPixelRatio: 1, shadowMap: 1024, grass: 0.35, distance: 0.6 },
   medium: { maxPixelRatio: 1.5, shadowMap: 2048, grass: 0.7, distance: 0.85 },
   high: { maxPixelRatio: 2, shadowMap: 4096, grass: 1, distance: 1 },
+  // everything on, drawn further out: for a fast desktop graphics card
+  ultra: { maxPixelRatio: 2, shadowMap: 4096, grass: 1, distance: 1.3 },
 };
 
 const KEY = 'calmlings.settings.v1';

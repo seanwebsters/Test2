@@ -59,6 +59,10 @@ and buttons for Hop, Breathe and Menu.
 Walk into deep water and the Calmling floats and swims. Your position, camera
 and the places you have discovered are saved in the browser automatically.
 
+There are four graphics presets. Lush and Ultra add depth-based ambient
+occlusion, shafts of sunlight and water reflections; Ultra also draws detail
+further out and wants a fast desktop graphics card.
+
 If the frame rate stays low for a few seconds the game steps the graphics
 preset down by itself. Choosing a preset in the menu turns that off.
 

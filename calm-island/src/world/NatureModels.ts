@@ -18,6 +18,9 @@ const WANT: Record<string, { height?: number; width?: number }> = {
   CommonTree_4: { height: 8.4 }, CommonTree_5: { height: 7.6 },
   Pine_1: { height: 10 }, Pine_2: { height: 10.5 },
   TwistedTree_1: { height: 15 },
+  TwistedTree_2: { height: 10.5 }, TwistedTree_3: { height: 9.6 }, TwistedTree_4: { height: 11 }, TwistedTree_5: { height: 9 },
+  Flower_3_Group: { width: 1.5 }, Flower_4_Group: { width: 1.6 }, Clover_1: { width: 1.3 }, Clover_2: { width: 1.5 },
+  Plant_7_Big: { width: 2.4 }, Pebble_Round_1: { width: 0.5 }, Pebble_Round_2: { width: 0.5 }, Pebble_Round_3: { width: 0.5 },
   Bush_Common: { width: 2.3 }, Bush_Common_Flowers: { width: 2.3 },
   Fern_1: { width: 2.6 }, Plant_1_Big: { width: 2.0 },
   Rock_Medium_1: { width: 2.2 }, Rock_Medium_2: { width: 2.2 }, Rock_Medium_3: { width: 2.2 },
@@ -74,13 +77,14 @@ const tex = new THREE.TextureLoader();
 const cache = new Map<string, THREE.Texture>();
 
 /** The leaf texture for this season. `blossom` trees are pink in spring and red in autumn. */
-export function seasonalLeaves(base: string, material: string, original: THREE.Texture | null, blossom: boolean): THREE.Texture | null {
+export function seasonalLeaves(base: string, material: string, original: THREE.Texture | null, blossom: boolean, force?: 'green' | 'red' | 'pink'): THREE.Texture | null {
   if (!original) return null;
   const file = { Leaves_NormalTree: 'Leaves_NormalTree_C', Leaves_TwistedTree: 'Leaves_TwistedTree_C', Leaves_Pine: 'Leaf_Pine_C' }[material];
   if (!file) return original;
   const twisted = file.startsWith('Leaves_Twisted'); // red in the pack; green here except in autumn
   const variant =
     SEASON === 'winter' ? 'winter'
+    : force && !file.startsWith('Leaf_Pine') ? (force === 'red' && twisted ? '' : force)
     : file.startsWith('Leaf_Pine') ? ''
     : SEASON === 'autumn' ? (twisted ? '' : blossom ? 'red' : 'autumn')
     : SEASON === 'spring' && blossom ? 'pink'

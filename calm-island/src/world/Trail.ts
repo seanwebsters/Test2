@@ -26,7 +26,7 @@ export function glowDot(): THREE.CanvasTexture {
  */
 export class Trail {
   readonly points: THREE.Points;
-  private mat = new THREE.PointsMaterial({ color: 0xffe9a0, map: glowDot(), size: 0.5, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+  private mat = new THREE.PointsMaterial({ color: 0xffe9a0, map: glowDot(), size: 0.26, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
   private show = 0;
   private dir = new THREE.Vector3();
 
@@ -40,7 +40,7 @@ export class Trail {
   update(dt: number, time: number, from: THREE.Vector3, target: { x: number; z: number } | null): void {
     const far = target ? Math.hypot(target.x - from.x, target.z - from.z) : 0;
     this.show += ((target && far > 5 ? 1 : 0) - this.show) * Math.min(1, dt * 2.5);
-    this.mat.opacity = this.show * 0.95;
+    this.mat.opacity = this.show * 0.7;
     this.points.visible = this.show > 0.02;
     if (!this.points.visible || !target) return;
     this.dir.set(target.x - from.x, 0, target.z - from.z).normalize();
