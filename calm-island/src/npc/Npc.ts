@@ -19,6 +19,9 @@ export class Npc {
   returning = false;
   /** tucked away because it is the wrong time of day for them */
   absent = false;
+  /** a place to go and sit for the evening (by the fire at the treehouse), and what to face there */
+  gather: THREE.Vector3 | null = null;
+  gatherFace = new THREE.Vector3();
   private target = new THREE.Vector3();
   private wait = 1;
   private speed = 0;
@@ -87,6 +90,19 @@ export class Npc {
       if (want === 0) {
         faceX = Math.sin(player.yaw);
         faceZ = Math.cos(player.yaw);
+      }
+    } else if (this.gather) {
+      const d = Math.hypot(this.gather.x - this.pos.x, this.gather.z - this.pos.z);
+      if (d > 70 && toPlayer > 70) {
+        this.pos.copy(this.gather); // nobody is watching: just be there
+      } else if (d > 0.7) {
+        want = Math.min(4.4, 1 + d * 1.5);
+        faceX = this.gather.x - this.pos.x;
+        faceZ = this.gather.z - this.pos.z;
+      } else {
+        sitting = true;
+        faceX = this.gatherFace.x - this.pos.x;
+        faceZ = this.gatherFace.z - this.pos.z;
       }
     } else if (toPlayer < 4.2 && !this.returning) {
       // stop and look at the visitor

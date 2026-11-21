@@ -229,3 +229,15 @@ body.is-touch #btn-fish { right: calc(max(18px, env(safe-area-inset-right)) + 14
 #toast.moment .toast-title { font-size: clamp(40px, 8vw, 78px); letter-spacing: -.02em; }
 #toast.moment .toast-kicker { font-size: 15px; }
 #toast.moment .toast-blurb { font-size: clamp(16px, 2.4vw, 22px); margin-top: 4px; }
+
+/* ---- fruit basket: tap a fruit (or press 1, 2, 3) to eat it ---- */
+#basket { position: absolute; left: 20px; top: 52px; display: flex; gap: 6px; pointer-events: auto; }
+#basket .fruit { display: flex; align-items: center; gap: 6px; padding: 5px 11px 5px 8px; border: 0; border-radius: 99px; font: inherit; font-size: 13px; font-weight: 800; color: var(--ink); background: rgba(255,255,255,.72); backdrop-filter: blur(8px); cursor: pointer; box-shadow: none; }
+#basket .fruit::before { content: ''; width: 13px; height: 13px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); }
+#basket .fruit.empty { opacity: .45; }
+#basket .fruit.on { background: #fff; box-shadow: 0 0 0 2px var(--c), 0 0 14px var(--c); }
+#basket .f-star { --c: #ff7ad0; }
+#basket .f-moon { --c: #6fdcf5; }
+#basket .f-sun { --c: #ffc93c; }
+body.is-touch #basket { left: max(10px, env(safe-area-inset-left)); top: calc(max(10px, env(safe-area-inset-top)) + 92px); }
+body.is-touch #basket .fruit { padding: 8px 13px 8px 10px; }

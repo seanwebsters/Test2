@@ -157,6 +157,13 @@ export class Input {
     return this.pressed.size > 0 || this.virtualHit.size > 0 || this.joyX !== 0 || this.joyY !== 0;
   }
 
+  /** Which fruit to eat this frame (0–2, keys 1–3 or the basket buttons), or -1. */
+  eatPressed(): number {
+    if (!this.enabled) return -1;
+    for (let i = 0; i < 3; i++) if (this.pressed.has(`Digit${i + 1}`) || this.virtualHit.has(`eat${i}`)) return i;
+    return -1;
+  }
+
   kitePressed(): boolean {
     return this.enabled && (this.pressed.has('KeyK') || this.virtualHit.has('kite'));
   }

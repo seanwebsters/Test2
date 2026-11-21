@@ -4,6 +4,15 @@ import type { Island } from './islandMap';
 /** Where home stands, so the forest can leave a clearing around it. */
 export const HOME_SPOT = { x: 34, z: 30 };
 
+/** The three fruits of the patch, in bed order. */
+export const FRUITS = [
+  { name: 'starberry', plural: 'starberries', effect: 'Light as air: you glide much further for a while' },
+  { name: 'moon melon', plural: 'moon melons', effect: 'You glow softly for a while. Lovely after dark' },
+  { name: 'sun pod', plural: 'sun pods', effect: 'A spring in your step: you run faster for a while' },
+];
+/** How long a picked plant takes to fruit again, in real milliseconds. */
+const REGROW = 8 * 60 * 1000;
+
 /** What each keepsake is and how it is earned, in the order they sit around the nook. */
 export const KEEPSAKES: { id: string; name: string }[] = [
   { id: 'lantern', name: 'A seed lantern' },
@@ -33,7 +42,23 @@ export class Home {
   private swing = new THREE.Group();
   private glow: THREE.MeshBasicMaterial[] = [];
   private light = new THREE.PointLight(0xffc878, 0, 16, 1.6);
-  private patchLight = new THREE.PointLight(0xa8ecff, 0, 9, 1.8);
+  /** one warm light that serves the fire outside or the lamp indoors, whichever you are at */
+  private patchLight = new THREE.PointLight(0xffb868, 0, 13, 1.6);
+  private plants: { kind: number; x: number; z: number; fruits: THREE.Group; t: number }[] = [];
+  private flames: THREE.Mesh[] = [];
+  private lanterns: { group: THREE.Group; mat: THREE.MeshBasicMaterial; c: THREE.Color }[] = [];
+  private flies!: THREE.Points;
+  private flyMat = new THREE.PointsMaterial({ color: 0xeaff9a, size: 0.17, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+  private firePos = new THREE.Vector3();
+  private lampPos = new THREE.Vector3();
+  /** the fire ring is burning (until morning) */
+  lit = false;
+  readonly fireSpot = { x: 0, z: 0 };
+  readonly ladderSpot = { x: 0, z: 0 };
+  /** places round the fire where visiting friends sit */
+  readonly gatherSpots: { x: number; z: number }[] = [];
+  /** the room indoors: where you sit, the bed, and the fixed camera */
+  readonly inside = { pos: new THREE.Vector3(), yaw: 0, bed: new THREE.Vector3(), bedYaw: 0, cam: new THREE.Vector3(), look: new THREE.Vector3() };
   private fruit: { mat: THREE.MeshBasicMaterial; r: number; g: number; b: number; phase: number }[] = [];
   /** Small solid things around the house, as [x, z, radius] in world metres. */
   readonly solids: [number, number, number][] = [];
@@ -314,6 +339,8 @@ export class Home {
       for (let k = 0; k < 4; k++) {
         const px = -1.2 + k * 0.8 + ((k * 7 + row * 3) % 5) * 0.03;
         const plant = new THREE.Group();
+        const fruits = new THREE.Group();
+        plant.add(fruits);
         plant.position.set(px, 0.3, ((k + row) % 2 ? 0.08 : -0.08));
         const size = 0.85 + ((k * 5 + row * 2) % 4) * 0.08;
         if (row === 0) {
@@ -321,7 +348,7 @@ export class Home {
           plant.add(orb(leaf, 0.36, 0, 0.26, 0, 0.8), orb(leafLight, 0.24, 0.12, 0.42, 0.06, 0.8));
           for (let b = 0; b < 6; b++) {
             const a = b * 1.05 + k;
-            plant.add(orb(b % 3 ? pink : violet, 0.075, Math.cos(a) * 0.33, 0.24 + (b % 3) * 0.13, Math.sin(a) * 0.33));
+            fruits.add(orb(b % 3 ? pink : violet, 0.075, Math.cos(a) * 0.33, 0.24 + (b % 3) * 0.13, Math.sin(a) * 0.33));
           }
         } else if (row === 1) {
           // moon melons: one big pale fruit resting in a ring of broad leaves
@@ -331,7 +358,7 @@ export class Home {
             lf.rotation.set(Math.sin(a) * 0.3, 0, -Math.cos(a) * 0.3);
             plant.add(lf);
           }
-          plant.add(orb(k % 2 ? aqua : violet, 0.25, 0, 0.24, 0, 0.88));
+          fruits.add(orb(k % 2 ? aqua : violet, 0.25, 0, 0.24, 0, 0.88));
           const curl = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.2, 5), leaf);
           curl.position.set(0.03, 0.52, 0);
           curl.rotation.z = -0.5;
@@ -343,9 +370,11 @@ export class Home {
             const lf = orb(b % 2 ? leaf : leafLight, 0.17, Math.cos(b * 1.9) * 0.14, 0.35 + b * 0.32, Math.sin(b * 1.9) * 0.14, 0.5);
             plant.add(lf);
           }
-          for (let b = 0; b < 3; b++) plant.add(orb(b === 1 ? pink : gold, 0.085, Math.cos(b * 2.2 + k) * 0.2, 0.5 + b * 0.33, Math.sin(b * 2.2 + k) * 0.2, 1.4));
+          for (let b = 0; b < 3; b++) fruits.add(orb(b === 1 ? pink : gold, 0.085, Math.cos(b * 2.2 + k) * 0.2, 0.5 + b * 0.33, Math.sin(b * 2.2 + k) * 0.2, 1.4));
         }
         plant.scale.setScalar(size);
+        const [fwx, fwz] = world(FX + px, bz);
+        this.plants.push({ kind: row, x: fwx, z: fwz, fruits, t: 0 });
         bed.add(plant);
       }
       bed.rotation.y = (row - 1) * 0.04;
@@ -420,7 +449,6 @@ export class Home {
       can.rotation.y = 0.7;
       put(can, -5.3, 5.0);
     }
-    this.patchLight.position.set(FX, ground(FX, 6) + 1.3, 6);
     this.group.add(this.patchLight);
 
     // ---- signs that someone lives here: a woodpile, a fire ring with log seats, pots by the ladder
@@ -459,7 +487,21 @@ export class Home {
       ember.scale.y = 0.4;
       ember.position.y = 0.1;
       fire.add(ember);
+      [0xffa53a, 0xffd060, 0xfff0a8].forEach((c, i) => {
+        const fl = new THREE.Mesh(new THREE.ConeGeometry(0.26 - i * 0.07, 0.85 - i * 0.2, 7), new THREE.MeshBasicMaterial({ color: c }));
+        fl.position.set((i - 1) * 0.1, 0.5 - i * 0.04, (i % 2) * 0.08);
+        fl.visible = false;
+        fire.add(fl);
+        this.flames.push(fl);
+      });
       put(fire, 7.4, 6.8);
+      for (const fl of this.flames) fl.castShadow = false;
+      [this.fireSpot.x, this.fireSpot.z] = world(7.4, 6.8);
+      this.firePos.set(7.4, ground(7.4, 6.8) + 0.9, 6.8);
+      for (const [ox, oz] of [[-1.9, 0], [-1.3, -1.45], [0.2, -1.95], [1.65, -1.2], [-1.5, 1.45]]) {
+        const [gx, gz] = world(7.4 + ox, 6.8 + oz);
+        this.gatherSpots.push({ x: gx, z: gz });
+      }
       for (const [sx, sz, ry] of [[9.0, 7.4, 0.35], [7.0, 8.6, 1.4]]) {
         const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.3, 1.5, 10), bark);
         seat.rotation.set(0, ry, Math.PI / 2);
@@ -473,6 +515,96 @@ export class Home {
         for (let b = 0; b < 4; b++) p2.add(orb(L(c), 0.07, Math.cos(b * 1.6) * 0.13, 0.46, Math.sin(b * 1.6) * 0.13));
         put(p2, px, pz);
       }
+    }
+
+
+    [this.ladderSpot.x, this.ladderSpot.z] = world(0, 6.4);
+
+    // ---- a lantern for every friend who has been given a gift, strung round the deck
+    for (let i = 0; i < 18; i++) {
+      const a = (i / 18) * Math.PI * 2 + 0.17;
+      const g = new THREE.Group();
+      const mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.42, 4).translate(0, -0.21, 0), rope));
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 8), mat);
+      body.scale.y = 1.25;
+      body.position.y = -0.6;
+      g.add(body);
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.05, 8), beam);
+      top.position.y = -0.4;
+      g.add(top);
+      g.position.set(Math.cos(a) * 4.28, DECK - 0.1, Math.sin(a) * 4.28);
+      g.visible = false;
+      this.group.add(g);
+      this.lanterns.push({ group: g, mat, c: new THREE.Color(0xffffff) });
+    }
+
+    // ---- fireflies that come out round the house after dark
+    {
+      const n = 70;
+      const pos = new Float32Array(n * 3);
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 2, 0), 30);
+      this.flies = new THREE.Points(geo, this.flyMat);
+      this.group.add(this.flies);
+    }
+
+    // ---- indoors: a bed, a rug, a shelf of fruit jars, a lamp in the rafters
+    {
+      const room = new THREE.Group();
+      room.position.y = HY;
+      const rin = (m: THREE.Mesh, x: number, yy: number, z: number, ry = 0): THREE.Mesh => {
+        m.position.set(x, yy, z);
+        m.rotation.y = ry;
+        m.receiveShadow = true;
+        room.add(m);
+        return m;
+      };
+      const rug = rin(new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 0.03, 20), L(0x6fa8c9)), -0.2, 0.02, 0.1);
+      rug.scale.z = 0.8;
+      rin(new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.035, 20), L(0xe6f1f7)), -0.2, 0.022, 0.1).scale.z = 0.8;
+      // the bed, along the back wall
+      rin(new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.26, 1.0), plankDark), -0.85, 0.16, -0.9);
+      rin(new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.2, 0.92), L(0xfff4e0)), -0.85, 0.36, -0.9);
+      rin(new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.1, 0.98), L(0x7fb7e6)), -0.5, 0.48, -0.9);
+      rin(new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 8), L(0xffffff)), -1.5, 0.52, -0.9).scale.set(1, 0.5, 1.3);
+      rin(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.7, 1.0), beam), -1.82, 0.38, -0.9);
+      // shelf with jars of fruit
+      rin(new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.06, 0.3), beam), 1.0, 1.15, -1.28);
+      [pink, aqua, gold, violet].forEach((m, i) => {
+        rin(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.24, 10), L(0xdff3ff, { transparent: true, opacity: 0.45 })), 0.5 + i * 0.34, 1.3, -1.28);
+        rin(new THREE.Mesh(ball, m), 0.5 + i * 0.34, 1.27, -1.28).scale.setScalar(0.07);
+      });
+      // a little table with a candle and a cup
+      rin(new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.3, 0.42, 12), bark), 1.35, 0.21, -0.55);
+      rin(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.16, 6), L(0xfff4e0)), 1.3, 0.5, -0.55);
+      rin(new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), warm), 1.3, 0.62, -0.55).scale.y = 1.6;
+      rin(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.09, 8), L(0x8fb7c9)), 1.5, 0.47, -0.45);
+      // bunting along the back wall
+      for (let i = 0; i < 9; i++) {
+        const flag = rin(new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.2, 3), L([0xff8fb8, 0xffd65a, 0x8fe9ff, 0xb9a0ff, 0x9fe07a][i % 5])), -1.5 + i * 0.37, 1.62 - Math.sin((i / 8) * Math.PI) * 0.12, -1.38);
+        flag.rotation.x = Math.PI;
+        flag.scale.z = 0.2;
+      }
+      // a round window of sky in the back wall, and a picture
+      rin(new THREE.Mesh(new THREE.CircleGeometry(0.3, 16), new THREE.MeshBasicMaterial({ color: 0xbfe6ff })), -0.2, 1.25, -1.42);
+      rin(new THREE.Mesh(new THREE.TorusGeometry(0.31, 0.04, 6, 18), beam), -0.2, 1.25, -1.41);
+      // the lamp hanging from the ridge
+      rin(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1.0, 4), rope), 0.2, 2.75, 0.1);
+      rin(new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), flame), 0.2, 2.2, 0.1);
+      this.group.add(room);
+      this.lampPos.set(0.2, HY + 2.0, 0.1);
+      const at3 = (lx: number, ly: number, lz: number, out: THREE.Vector3): void => {
+        const [wx, wz] = world(lx, lz);
+        out.set(wx, y + ly, wz);
+      };
+      at3(-0.35, HY + 0.04, 0.0, this.inside.pos);
+      at3(-0.6, HY + 0.5, -0.9, this.inside.bed);
+      at3(1.72, HY + 1.8, 1.3, this.inside.cam);
+      at3(-0.5, HY + 0.6, -0.55, this.inside.look);
+      this.inside.yaw = Math.atan2(2.07, 1.3) + ROT; // sits facing the camera corner
+      this.inside.bedYaw = Math.PI / 2 + ROT;
     }
 
     // keepsakes, each hidden until earned
@@ -538,8 +670,53 @@ export class Home {
     return Math.hypot(this.x - p.x, this.z - p.z) < 7.5;
   }
 
-  /** The swing drifts in the breeze and the lantern warms up as evening comes. */
-  update(time: number, night: number): void {
+  /** Index of a plant with ripe fruit within reach, or -1. */
+  fruitNear(p: THREE.Vector3, now: number): number {
+    let best = -1;
+    let bestD = 1.5;
+    this.plants.forEach((pl, i) => {
+      const d = Math.hypot(pl.x - p.x, pl.z - p.z);
+      if (d < bestD && now - pl.t >= REGROW) {
+        bestD = d;
+        best = i;
+      }
+    });
+    return best;
+  }
+
+  /** Pick plant `i`; returns which fruit it was (an index into FRUITS). */
+  pick(i: number, now: number): number {
+    this.plants[i].t = now;
+    return this.plants[i].kind;
+  }
+
+  fireNear(p: THREE.Vector3): boolean {
+    return Math.hypot(this.fireSpot.x - p.x, this.fireSpot.z - p.z) < 2.3;
+  }
+
+  ladderNear(p: THREE.Vector3): boolean {
+    return Math.hypot(this.ladderSpot.x - p.x, this.ladderSpot.z - p.z) < 1.9;
+  }
+
+  serializeFruit(): number[] {
+    return this.plants.map((pl) => pl.t);
+  }
+
+  loadFruit(times: number[] | undefined): void {
+    this.plants.forEach((pl, i) => (pl.t = typeof times?.[i] === 'number' ? times[i] : 0));
+  }
+
+  /** One lantern per friend: a colour to show it, or null to hide it. */
+  setLanterns(colors: (number | null)[]): void {
+    this.lanterns.forEach((l, i) => {
+      const c = colors[i] ?? null;
+      l.group.visible = c !== null;
+      if (c !== null) l.c.setHex(c);
+    });
+  }
+
+  /** The swing drifts, the lantern warms as evening comes, fruit regrows, the fire flickers. */
+  update(time: number, night: number, now = Date.now(), indoors = false): void {
     this.swing.rotation.x = Math.sin(time * 1.1) * 0.12;
     const k = 0.55 + 0.45 * night + Math.sin(time * 7) * 0.03;
     this.glow[0].color.setRGB(1.0 * k, 0.82 * k, 0.48 * k);
@@ -550,7 +727,43 @@ export class Home {
       const g = 0.8 + 0.1 * Math.sin(time * 1.3 + f.phase) + night * 0.75;
       f.mat.color.setRGB(f.r * g, f.g * g, f.b * g);
     }
-    this.patchLight.intensity = night * 9;
+    // picked plants swell back over a few minutes
+    for (const pl of this.plants) {
+      const ripe = Math.min(1, (now - pl.t) / REGROW);
+      pl.fruits.visible = ripe > 0.35;
+      pl.fruits.scale.setScalar(ripe >= 1 ? 1 : 0.3 + ripe * 0.55);
+    }
+    for (const l of this.lanterns) {
+      if (!l.group.visible) continue;
+      const g = 0.75 + night * 0.7;
+      l.mat.color.setRGB(l.c.r * g, l.c.g * g, l.c.b * g);
+    }
+    this.flames.forEach((fl, i) => {
+      fl.visible = this.lit;
+      const f = 1 + Math.sin(time * (9 + i * 3.7) + i) * 0.16 + Math.sin(time * 23 + i * 2) * 0.07;
+      fl.scale.set(1 + (f - 1) * 0.5, f, 1 + (f - 1) * 0.5);
+      fl.rotation.z = Math.sin(time * 6 + i * 2) * 0.1;
+    });
+    if (indoors) {
+      this.patchLight.position.copy(this.lampPos);
+      this.patchLight.intensity = 2.6;
+    } else {
+      this.patchLight.position.copy(this.firePos);
+      this.patchLight.intensity = this.lit ? 30 + Math.sin(time * 11) * 5 + Math.sin(time * 27) * 3 : 0;
+    }
+    // fireflies: slow looping drifts, blinking, only after dark
+    this.flyMat.opacity = Math.max(0, night - 0.25) * 1.2;
+    this.flies.visible = night > 0.26;
+    if (this.flies.visible) {
+      const pos = this.flies.geometry.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < pos.count; i++) {
+        const a = i * 2.399 + time * (0.05 + (i % 5) * 0.012) * (i % 2 ? 1 : -1);
+        const r = 5 + ((i * 37) % 13) + Math.sin(time * 0.3 + i) * 1.2;
+        const blink = Math.sin(time * (1.1 + (i % 7) * 0.23) + i * 1.3) > -0.2 ? 0 : -50; // blinked-out ones drop out of sight
+        pos.setXYZ(i, Math.cos(a) * r, 1.0 + ((i * 13) % 9) * 0.32 + Math.sin(time * 0.7 + i * 0.9) * 0.4 + blink, Math.sin(a) * r);
+      }
+      pos.needsUpdate = true;
+    }
   }
 
   show(earned: Set<string>): void {

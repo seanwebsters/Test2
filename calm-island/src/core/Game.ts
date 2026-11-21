@@ -10,7 +10,8 @@ import { Garden } from '../world/Garden';
 import { Seeds } from '../world/Seeds';
 import { Skimming } from '../world/Skimming';
 import { Fishing } from '../world/Fishing';
-import { Home, KEEPSAKES } from '../world/Home';
+import { FRUITS, Home, KEEPSAKES } from '../world/Home';
+import { Springs } from '../world/Springs';
 import { SEASON, currentSeason, setSeason } from '../world/season';
 import { Cairns, Kite, Viewpoints } from '../world/Places';
 import { CELL, GRID, HALF, WORLD_SIZE } from '../world/islandMap';
@@ -109,6 +110,19 @@ export class Game {
   /** circles of fog still rolling back: x, z, final radius, seconds elapsed */
   private lifting: number[][] = [];
   private hummed = new Set<string>();
+  /** fruit carried, seconds left of each fruit's effect, and who has had a gift */
+  private basket = [0, 0, 0];
+  private effects = [0, 0, 0];
+  private gifted = new Set<string>();
+  private inside = false;
+  private homePrompt = false;
+  private springs!: Springs;
+  private springHinted = new Set<number>();
+  private glow = new THREE.PointLight(0xa8ecff, 0, 12, 1.5);
+  private ducked = false;
+  private gatherCheck = 0;
+  private gatherTold = false;
+  private guests = 0;
   private momentUntil = 0;
   private momentYaw = 0;
   private arrivingIntro = false;
@@ -169,7 +183,22 @@ export class Game {
       onPhotoSave: () => this.savePhoto(),
       onLogClose: () => this.play(),
       onResume: () => this.play(),
+      onArrive: () => {
+        if (this.inside) this.leaveHome();
+        this.player.dropFromSky(0, 6, 170);
+        this.arrivingIntro = true;
+        this.rig.yaw = 0.6;
+        this.rig.pitch = 0.62;
+        this.rig.dist = 9;
+        this.rig.snap(this.player);
+        this.play();
+      },
+      onEat: (kind) => {
+        this.input.press(`eat${kind}`);
+        this.input.release(`eat${kind}`);
+      },
       onHome: () => {
+        if (this.inside) this.leaveHome();
         this.player.teleport(SPAWN.x, SPAWN.z, 0.5);
         this.rig.yaw = 0;
         this.rig.snap(this.player);
@@ -177,6 +206,15 @@ export class Game {
       },
       onReset: () => {
         clearSave();
+        if (this.inside) this.leaveHome();
+        this.basket = [0, 0, 0];
+        this.effects = [0, 0, 0];
+        this.gifted.clear();
+        this.home.loadFruit([]);
+        this.home.setLanterns([]);
+        this.home.lit = false;
+        this.springs.load([]);
+        this.springHinted.clear();
         this.discovered.clear();
         this.currentRegion = null;
         this.playTime = 0;
@@ -294,6 +332,8 @@ export class Game {
     this.home = new Home(this.island);
     this.vegetation.colliders.add(this.home.x, this.home.z, 3.7);
     for (const [sx, sz, sr] of this.home.solids) this.vegetation.colliders.add(sx, sz, sr);
+    this.springs = new Springs(this.island, this.vegetation.colliders);
+    this.scene.add(this.springs.group, this.glow);
     this.scene.add(this.fishing.group, this.home.group);
     this.viewpoints = new Viewpoints(this.island);
     this.cairns = new Cairns(this.island);
@@ -347,6 +387,10 @@ export class Game {
       for (const id of save.viewpoints ?? []) this.rested.add(id);
       for (const f of save.flags ?? []) this.flags.add(f);
       this.cairns.load(save.cairns);
+      if (Array.isArray(save.basket)) this.basket = [0, 1, 2].map((i) => Math.max(0, Math.floor(Number(save.basket![i]) || 0)));
+      this.home.loadFruit(save.fruit);
+      for (const id of save.gifted ?? []) this.gifted.add(id);
+      this.springs.load(save.springs);
       const friend = this.npcs.find((n) => n.who.id === save.companion);
       if (friend) {
         this.setCompanion(friend);
@@ -365,6 +409,7 @@ export class Game {
       this.rig.snap(this.player);
     }
     this.paintFog();
+    this.hangLanterns();
     this.updateKeepsakes();
     this.applySettings();
     this.resize();
@@ -388,6 +433,7 @@ export class Game {
     if (!this.opts.test) void this.music.start();
     if (!this.opts.test || this.opts.sound) this.ambience.start();
     this.music.duck(false);
+    this.ducked = false;
     this.ambience.duck(false);
     this.ui.showGame();
     if (!this.dailyAnnounced && this.dailyDone !== this.daily.key) {
@@ -460,7 +506,11 @@ export class Game {
       this.updateBreathing(dt);
       this.player.update(dt, this.input, this.rig.yaw);
       const now = globalUniforms.uTime.value;
-      this.rig.update(dt, this.input, this.player, this.settings, this.breathing.active ? this.player.yaw : now < this.momentUntil ? this.momentYaw : null);
+      if (this.inside) {
+        // indoors the camera sits in one corner of the room
+        this.camera.position.copy(this.home.inside.cam);
+        this.camera.lookAt(this.home.inside.look);
+      } else this.rig.update(dt, this.input, this.player, this.settings, this.breathing.active ? this.player.yaw : now < this.momentUntil ? this.momentYaw : null);
       this.updateFog(dt);
       this.updateHums();
       if (this.arrivingIntro && !this.player.arriving) {
@@ -475,7 +525,9 @@ export class Game {
       this.updateFootsteps(dt);
       this.updateFishing(dt);
       this.updateSleep(dt);
-      if (this.input.kitePressed()) {
+      this.updateFruit(dt);
+      this.updateEvening(dt);
+      if (this.input.kitePressed() && !this.inside) {
         this.kite.flying = !this.kite.flying;
         if (this.kite.flying) this.flags.add('kite');
       }
@@ -531,6 +583,14 @@ export class Game {
       }
     }
     if (this.breathing.active || this.practice) best = null;
+    if (this.inside) {
+      this.nearby = null;
+      this.gardenPlot = -1;
+      this.ui.prompt2(null);
+      this.ui.prompt(this.sleeping || this.breathing.active ? null : 'Step outside');
+      if (!this.sleeping && !this.breathing.active && this.input.interactPressed()) this.leaveHome();
+      return;
+    }
     // garden plots share the E key when no Calmling is in reach
     this.gardenPlot = best || this.practice ? -1 : this.garden.near(p);
     if (this.gardenPlot >= 0) {
@@ -545,23 +605,14 @@ export class Game {
       }
       return;
     }
-    if (!best && !this.practice && this.home.near(p)) {
-      this.nearby = null;
-      this.ui.prompt2(null);
-      if (!this.flags.has('home')) {
-        // the first time you reach the light in the fog
-        this.flags.add('home');
-        this.reveal(this.home.x, this.home.z, 78);
-        this.ambience.chime();
-        this.ui.moment('You found', 'Home', 'A little house in an old tree. The fog is lifting.');
-        this.save();
-      }
-      this.ui.prompt(this.player.sitting ? null : 'Rest at home');
-      if (this.input.interactPressed() && this.player.sit()) {
-        const n = this.keepsakes.size;
-        this.ui.toast('Your nook', 'Home', n ? `${n} of ${KEEPSAKES.length} keepsakes gathered` : 'Bare for now. It fills with the things you do');
-      }
+    if (!best && !this.practice && this.updateHome(p)) {
+      this.homePrompt = true;
       return;
+    }
+    if (this.homePrompt) {
+      // walked away from the treehouse: its prompt goes too
+      this.homePrompt = false;
+      this.ui.prompt(null);
     }
     // resting logs and pebble towers, when nothing else is in reach
     const view = best || this.practice ? null : this.viewpoints.near(p);
@@ -592,8 +643,16 @@ export class Game {
       }
       return;
     }
-    const canLearn = best && this.met.has(best.who.id) && !this.practice;
-    this.ui.prompt2(canLearn ? `${this.learned.has(best!.who.id) ? 'Practise again' : 'Learn'}: ${best!.who.practice.title}` : null);
+    const like = best ? this.npcs.indexOf(best) % 3 : 0;
+    const canGive = !!best && this.met.has(best.who.id) && !this.gifted.has(best.who.id) && this.basket[like] > 0 && !this.practice;
+    const canLearn = best && this.met.has(best.who.id) && !this.practice && !canGive;
+    if (canGive) {
+      this.ui.prompt2(`Give ${best!.who.name} a ${FRUITS[like].name}`);
+      if (this.input.practisePressed()) {
+        this.giveGift(best!, like);
+        return;
+      }
+    } else this.ui.prompt2(canLearn ? `${this.learned.has(best!.who.id) ? 'Practise again' : 'Learn'}: ${best!.who.practice.title}` : null);
     if (canLearn && this.input.practisePressed()) {
       this.startPractice(best!);
       return;
@@ -619,6 +678,183 @@ export class Game {
       this.ui.toast('Walking with you', best.who.name, `“${best.who.hello}”`);
     }
     this.save();
+  }
+
+  /** Everything E does around the treehouse. Returns true when it has taken over the prompt. */
+  private updateHome(p: THREE.Vector3): boolean {
+    const home = this.home;
+    const close = home.near(p);
+    if (Math.hypot(home.x - p.x, home.z - p.z) > 16) return false;
+    if (close && !this.flags.has('home')) {
+      // the first time you reach the light in the fog
+      this.flags.add('home');
+      this.reveal(home.x, home.z, 78);
+      this.ambience.chime();
+      this.ui.moment('You found', 'Home', 'A little house in an old tree, with fruit growing beside it.');
+      this.save();
+    }
+    const now = Date.now();
+    const plant = home.fruitNear(p, now);
+    const evening = this.day.hour >= 17 || this.day.hour < 6;
+    let text: string | null = null;
+    let act: (() => void) | null = null;
+    if (plant >= 0) {
+      text = 'Pick the fruit';
+      act = () => {
+        const kind = home.pick(plant, now);
+        this.basket[kind]++;
+        this.ambience.plip(0.5);
+        const first = !this.flags.has('pick');
+        this.flags.add('pick');
+        this.ui.toast(first ? 'Into your basket' : '', `A ${FRUITS[kind].name}`, first ? `Press ${kind + 1} (or tap it) to eat it, or take it to a friend who loves them` : `${this.basket[kind]} in your basket. It will grow back in a few minutes`);
+        this.save();
+      };
+    } else if (home.fireNear(p)) {
+      if (!home.lit && evening) {
+        text = 'Light the fire';
+        act = () => {
+          home.lit = true;
+          this.flags.add('fire');
+          this.ui.toast('', 'The fire is lit', this.met.size ? 'Friends you have made may come and sit a while' : 'It will burn until morning');
+        };
+      } else if (!this.player.sitting) {
+        text = home.lit ? 'Sit by the fire' : 'Sit a while';
+        act = () => {
+          if (this.player.sit() && !home.lit) this.ui.toast('', 'The fire ring', 'Come back in the evening to light it');
+        };
+      }
+    } else if (home.ladderNear(p)) {
+      text = 'Climb up and go inside';
+      act = () => this.enterHome();
+    } else if (close && !this.player.sitting) {
+      text = 'Rest at home';
+      act = () => {
+        const n = this.keepsakes.size;
+        if (this.player.sit()) this.ui.toast('Your nook', 'Home', n ? `${n} of ${KEEPSAKES.length} keepsakes gathered` : 'Bare for now. It fills with the things you do');
+      };
+    } else if (!close) return false;
+    this.nearby = null;
+    this.ui.prompt2(null);
+    this.ui.prompt(text);
+    if (act && this.input.interactPressed()) act();
+    return true;
+  }
+
+  /** Up the ladder and through the door: you sit on the rug in your own small room. */
+  private enterHome(): void {
+    if (this.inside || !this.player.grounded) return;
+    this.inside = true;
+    this.kite.flying = false;
+    this.player.hold = this.home.inside.pos;
+    this.player.pos.copy(this.home.inside.pos);
+    this.player.yaw = this.home.inside.yaw;
+    this.player.sitting = true;
+    this.camera.fov = 74;
+    this.camera.updateProjectionMatrix();
+    const first = !this.flags.has('inside');
+    this.flags.add('inside');
+    this.ui.toast(first ? 'Your own room' : '', 'Home', 'Warm and quiet. Press Z to sleep in your bed, B to breathe');
+    this.save();
+  }
+
+  private leaveHome(): void {
+    if (!this.inside) return;
+    if (this.sleeping) this.wake(false);
+    this.inside = false;
+    this.ui.prompt(null);
+    this.player.hold = null;
+    const l = this.home.ladderSpot;
+    this.player.teleport(l.x + (l.x - this.home.x) * 0.25, l.z + (l.z - this.home.z) * 0.25, Math.atan2(l.x - this.home.x, l.z - this.home.z));
+    this.camera.fov = 50;
+    this.camera.updateProjectionMatrix();
+    this.rig.yaw = this.player.yaw + Math.PI;
+    this.rig.snap(this.player);
+  }
+
+  /** A friend is given the fruit they love: their lantern goes up at the treehouse. */
+  private giveGift(npc: Npc, kind: number): void {
+    this.basket[kind]--;
+    this.gifted.add(npc.who.id);
+    this.bonds.set(npc.who.id, (this.bonds.get(npc.who.id) ?? 0) + 60);
+    this.hangLanterns();
+    this.ambience.chime();
+    this.ui.moment(`${npc.who.name} loves ${FRUITS[kind].plural}`, 'A gift, gladly taken', `${npc.who.name} has hung a lantern at your treehouse · ${this.gifted.size} of ${this.npcs.length}`);
+    this.save();
+  }
+
+  private hangLanterns(): void {
+    this.home.setLanterns(this.npcs.map((n) => (this.gifted.has(n.who.id) ? n.who.look.fur : null)));
+  }
+
+  /** Eating fruit (keys 1–3 or the basket buttons) and the effects it leaves for a while. */
+  private updateFruit(dt: number): void {
+    const k = this.input.eatPressed();
+    if (k >= 0 && !this.sleeping) {
+      if (this.basket[k] > 0) {
+        this.basket[k]--;
+        this.effects[k] = 120;
+        this.flags.add('eat');
+        this.ambience.plip(0.7);
+        this.ui.toast('', `You eat a ${FRUITS[k].name}`, FRUITS[k].effect);
+        this.save();
+      } else this.ui.toast('', `No ${FRUITS[k].plural} in your basket`, 'They grow in the patch beside your treehouse');
+    }
+    for (let i = 0; i < 3; i++) this.effects[i] = Math.max(0, this.effects[i] - dt);
+    this.player.glideBoost = this.effects[0] > 0;
+    this.player.speedBoost = this.effects[2] > 0 ? 1.3 : 1;
+    this.glow.intensity = this.effects[1] > 0 ? (5 + 22 * this.day.night) * Math.min(1, this.effects[1] / 4) : 0;
+    this.glow.position.copy(this.player.pos);
+    this.glow.position.y += 1.1;
+    this.ui.basket(this.basket, this.effects);
+  }
+
+  /** Evening at the treehouse: friends come to sit by the fire, which crackles; springs give a hint. */
+  private updateEvening(dt: number): void {
+    const p = this.player.pos;
+    const home = this.home;
+    const fireD = Math.hypot(home.fireSpot.x - p.x, home.fireSpot.z - p.z);
+    if (home.lit && fireD < 20 && Math.random() < dt * 5) this.ambience.crackle(Math.min(1, 5 / (fireD + 2)));
+    this.gatherCheck -= dt;
+    if (this.gatherCheck > 0) return;
+    this.gatherCheck = 1.5;
+    const h = this.day.hour;
+    const evening = h >= 17.5 || h < 5.5;
+    if (h > 8 && h < 16.5) {
+      home.lit = false;
+      this.gatherTold = false;
+    }
+    const guests = evening
+      ? this.npcs
+          .filter((n) => this.met.has(n.who.id) && n !== this.companion && !n.absent)
+          .sort((a, b) => (this.bonds.get(b.who.id) ?? 0) - (this.bonds.get(a.who.id) ?? 0))
+          .slice(0, home.gatherSpots.length)
+      : [];
+    this.guests = guests.length;
+    let arrived = 0;
+    for (const npc of this.npcs) {
+      const i = guests.indexOf(npc);
+      if (i >= 0) {
+        const spot = home.gatherSpots[i];
+        npc.gather ??= new THREE.Vector3();
+        npc.gather.set(spot.x, this.island.heightAt(spot.x, spot.z), spot.z);
+        npc.gatherFace.set(home.fireSpot.x, 0, home.fireSpot.z);
+        npc.returning = false;
+        if (Math.hypot(npc.pos.x - spot.x, npc.pos.z - spot.z) < 3) arrived++;
+      } else if (npc.gather) {
+        npc.gather = null;
+        npc.returning = true;
+      }
+    }
+    if (arrived && !this.gatherTold && fireD < 20 && !this.inside) {
+      this.gatherTold = true;
+      this.flags.add('gathering');
+      this.ui.toast('Evening at home', arrived === 1 ? `${guests[0].who.name} has come by` : `${arrived} friends have come by`, home.lit ? 'The fire is warm. Sit with them a while' : 'Light the fire and sit with them a while');
+    }
+    const s = this.springs.near(p);
+    if (s >= 0 && !this.springs.isAwake(s) && !this.springHinted.has(s)) {
+      this.springHinted.add(s);
+      this.ui.toast('A sleeping spring', this.springs.spots[s].name, 'Sit beside it and take three deep breaths to wake it');
+    }
   }
 
   /** Walking together slowly fills three hearts; the second one earns a story. */
@@ -812,7 +1048,7 @@ export class Game {
 
   /** At night, or at home, lie down and let the hours pass until morning. */
   private updateSleep(dt: number): void {
-    const can = !this.sleeping && this.player.grounded && !this.practice && !this.breathing.active && !this.fishing.active && (this.day.night > 0.5 || this.home.near(this.player.pos));
+    const can = !this.sleeping && this.player.grounded && !this.practice && !this.breathing.active && !this.fishing.active && (this.day.night > 0.5 || this.inside || this.home.near(this.player.pos));
     this.ui.sleepButton(can);
     if (!this.sleeping) {
       if (!this.input.sleepPressed()) return;
@@ -827,7 +1063,10 @@ export class Game {
       this.ui.prompt(null);
       this.ui.prompt2(null);
       this.ui.sleeping(true);
-      this.music.duck(true);
+      if (this.inside) {
+        this.player.hold = this.home.inside.bed;
+        this.player.yaw = this.home.inside.bedYaw;
+      }
       return;
     }
     this.sleptFor += dt;
@@ -841,7 +1080,11 @@ export class Game {
     this.sleeping = false;
     this.player.sleeping = false;
     this.ui.sleeping(false);
-    this.music.duck(false);
+    if (this.inside) {
+      this.player.hold = this.home.inside.pos;
+      this.player.yaw = this.home.inside.yaw;
+      this.player.sitting = true;
+    }
     if (morning) {
       this.flags.add('sleep');
       this.ui.toast('', 'Good morning', 'A whole night, slept through');
@@ -1045,6 +1288,9 @@ export class Game {
       ctx.fillText(npc.who.name, cx, cy - 12);
     }
     dot(this.home.x, this.home.z, 6, '#fff', '#8a5a36');
+    this.springs.spots.forEach((sp, i) => {
+      if (this.springs.isAwake(i)) dot(sp.x, sp.z, 5, '#8fe9ff', '#ffffff');
+    });
     if (this.dailyDone !== this.daily.key) {
       const [dx, dy] = at(this.daily.npc.home.x, this.daily.npc.home.z);
       ctx.beginPath();
@@ -1126,6 +1372,13 @@ export class Game {
       { title: 'Catch a fish, and let it go', hint: 'Press R beside water, then wait', done: this.flags.has('fish') },
       { title: 'Sleep through a night', hint: 'Press Z after dark', done: this.flags.has('sleep') },
       { title: 'Fill your nook', hint: `${this.keepsakes.size} of ${KEEPSAKES.length} keepsakes. Home is just south-east of the garden`, done: this.keepsakes.size >= KEEPSAKES.length },
+      { title: 'Pick fruit from your patch', hint: 'Beside the treehouse. It grows back in a few minutes', done: this.flags.has('pick') },
+      { title: 'Eat a magical fruit', hint: 'Press 1, 2 or 3. Each one does something different', done: this.flags.has('eat') },
+      { title: 'Bring a friend the fruit they love', hint: `${this.gifted.size} of ${this.npcs.length} lanterns hung. The log says who loves what`, done: this.gifted.size > 0 },
+      { title: 'Go inside your treehouse', hint: 'Press E at the foot of the ladder', done: this.flags.has('inside') },
+      { title: 'Light the fire', hint: 'At the fire ring by the treehouse, once evening comes', done: this.flags.has('fire') },
+      { title: 'Spend an evening with friends', hint: 'Friends you have met come to the fire after dark', done: this.flags.has('gathering') },
+      { title: 'Wake a calm spring', hint: `${this.springs.awakeCount} of ${this.springs.spots.length} awake. Breathe beside the ring of stones in each place`, done: this.springs.awakeCount > 0 },
       { title: 'Watch night fall', hint: 'Stay sitting and the day drifts by', done: this.flags.has('night') },
       { title: 'Take a photo', hint: 'Press P, frame it, press Enter', done: this.flags.has('photo') },
       { title: 'Visit every corner of the island', hint: 'Eight places to discover', done: this.discovered.size >= this.island.regions.length },
@@ -1155,6 +1408,8 @@ export class Game {
         hearts: this.hearts(npc.who.id),
         story: this.hearts(npc.who.id) >= 2 ? npc.who.story : null,
         practice: this.learned.has(npc.who.id) ? npc.who.practice.title : null,
+        likes: FRUITS[this.npcs.indexOf(npc) % 3].plural,
+        gifted: this.gifted.has(npc.who.id),
         portrait: this.portraits.get(npc.who.id) ?? null,
       };
     });
@@ -1177,8 +1432,15 @@ export class Game {
       this.reveal(this.player.pos.x, this.player.pos.z, 62); // three breaths push the fog back around you
       this.ambience.chime();
       this.ui.breath(null);
+      const spring = this.springs.near(this.player.pos);
       if (this.practice?.npc.who.practice.type === 'breathe') this.completePractice();
-      else this.ui.toast('', 'Three deep breaths', 'Carry that calm with you');
+      else if (spring >= 0 && this.springs.wake(spring)) {
+        const sp = this.springs.spots[spring];
+        const n = this.springs.awakeCount;
+        this.reveal(sp.x, sp.z, 150);
+        this.ui.moment(`A calm spring wakes · ${n} of ${this.springs.spots.length}`, sp.name, n === this.springs.spots.length ? 'Every spring is awake. The whole island is calm.' : 'Its light can be seen from far away');
+        this.save();
+      } else this.ui.toast('', 'Three deep breaths', 'Carry that calm with you');
       return;
     }
     const label = b.phase === 'in' ? 'Breathe in' : b.phase === 'hold' ? 'Hold' : 'Breathe out';
@@ -1322,7 +1584,14 @@ export class Game {
     const drift = this.sleeping ? 40 : this.playing && this.player?.sitting && !this.breathing.active && !this.practice && !this.fishing.active ? 10 : 1;
     this.day.update(dt * drift, this.sun, this.hemi, this.scene.fog as THREE.FogExp2, this.weather.rain);
     this.garden.update(Date.now(), globalUniforms.uTime.value);
-    this.home.update(globalUniforms.uTime.value, this.day.night);
+    this.home.update(globalUniforms.uTime.value, this.day.night, Date.now(), this.inside);
+    this.springs.update(globalUniforms.uTime.value, this.day.night);
+    // the music hushes for sleep, and beside a lit fire
+    const hush = this.sleeping || (this.home.lit && !!this.player && Math.hypot(this.home.fireSpot.x - p.x, this.home.fireSpot.z - p.z) < 14);
+    if (this.playing && hush !== this.ducked) {
+      this.ducked = hush;
+      this.music.duck(hush);
+    }
     if (this.player) {
       this.hand.copy(this.player.pos);
       this.hand.y += 1.1;
@@ -1390,6 +1659,10 @@ export class Game {
       flags: [...this.flags],
       dailyDone: this.dailyDone,
       keepsakes: [...this.keepsakes],
+      basket: this.basket,
+      fruit: this.home.serializeFruit(),
+      gifted: [...this.gifted],
+      springs: this.springs.serialize(),
     });
   }
 
@@ -1398,6 +1671,8 @@ export class Game {
     const p = this.player.pos;
     const info = this.renderer.info.render;
     return {
+      basket: [...this.basket], effects: this.effects.map((e) => Math.round(e)), gifted: [...this.gifted], inside: this.inside,
+      fireLit: this.home.lit, guests: this.guests, springs: this.springs.spots.length, springsAwake: this.springs.awakeCount,
       pos: [p.x, p.y, p.z],
       ground: this.island.heightAt(p.x, p.z),
       grounded: this.player.grounded,

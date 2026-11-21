@@ -33,7 +33,10 @@ Open http://localhost:5173 and press **Begin wandering**.
 | `K` | Fly a kite |
 | `R` | Beside water: cast a line, wait for a nibble, press again to reel in |
 | `Z` | Sleep until morning (after dark, or any time at your nook) |
-| `E` at your nook | Rest at home. Keepsakes appear there as you do things on the island |
+| `E` at your treehouse | Rest at home, pick fruit from the patch, light the fire in the evening, or climb the ladder to go inside |
+| `1` `2` `3` | Eat a starberry (longer glide), moon melon (you glow) or sun pod (faster run) |
+| `Q` beside a friend | Give them the fruit they love, if you are carrying it. Their lantern goes up at your treehouse |
+| `B` beside a ring of stones | Wake the calm spring of that region with three breaths |
 | `J` | Journal: a gentle list of things to try, ticked off as you do them |
 | `E` at a mossy log or a pebble stack | Rest at a viewpoint, or balance another pebble |
 | `M` | Map. Mist covers what you have not explored; discovering places and breathing clears it |

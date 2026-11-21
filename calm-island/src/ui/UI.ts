@@ -15,6 +15,9 @@ export interface LogEntry {
   story: string | null;
   /** the practice they taught you, once completed */
   practice: string | null;
+  /** the fruit they love, and whether you have brought them one */
+  likes: string;
+  gifted: boolean;
 }
 
 export interface JournalItem {
@@ -35,6 +38,8 @@ export interface UIHandlers {
   onPlay(): void;
   onResume(): void;
   onHome(): void;
+  onArrive(): void;
+  onEat(kind: number): void;
   onReset(): void;
   onSettings(s: Settings): void;
 }
@@ -63,6 +68,11 @@ export class UI {
     $('btn-photo').addEventListener('click', () => handlers.onPhoto());
     $('btn-map').addEventListener('click', () => handlers.onMap());
     $('home').addEventListener('click', () => handlers.onHome());
+    $('arrive').addEventListener('click', () => handlers.onArrive());
+    for (let i = 0; i < 3; i++) $(`eat${i}`).addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      handlers.onEat(i);
+    });
     $('reset').addEventListener('click', () => {
       if (confirm('Forget your discoveries and start again in the garden?')) handlers.onReset();
     });
@@ -200,6 +210,10 @@ export class UI {
         const q = document.createElement('p');
         q.textContent = e.story ? `“${e.story}”` : `“${e.hello}” Walk together to hear more.`;
         item.append(hearts, q);
+        const likes = document.createElement('p');
+        likes.textContent = e.gifted ? `✓ Loved the ${e.likes} you brought. Their lantern hangs at your treehouse` : `Loves ${e.likes}. Bring one from your fruit patch`;
+        likes.style.cssText = e.gifted ? 'color:#2f8a5a;font-weight:700' : 'color:#b0668f;font-weight:700';
+        item.append(likes);
         if (e.practice) {
           const pr = document.createElement('p');
           pr.textContent = `✓ Practice learned: ${e.practice}`;
@@ -256,6 +270,22 @@ export class UI {
     }
     $('journal').classList.remove('hidden');
     $('journal-close').focus();
+  }
+
+  private basketKey = '';
+
+  /** Fruit carried, and seconds left of each fruit's effect. */
+  basket(counts: number[], effects: number[]): void {
+    const key = counts.join() + '|' + effects.map((e) => Math.ceil(e)).join();
+    if (key === this.basketKey) return;
+    this.basketKey = key;
+    $('basket').classList.toggle('hidden', counts.every((c) => c === 0) && effects.every((e) => e <= 0));
+    for (let i = 0; i < 3; i++) {
+      const el = $(`eat${i}`);
+      el.textContent = effects[i] > 0 ? `${counts[i]} · ${Math.ceil(effects[i])}s` : this.touch ? `${counts[i]}` : `${counts[i]}  [${i + 1}]`;
+      el.classList.toggle('empty', counts[i] === 0 && effects[i] <= 0);
+      el.classList.toggle('on', effects[i] > 0);
+    }
   }
 
   seeds(found: number, total: number): void {

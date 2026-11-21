@@ -223,6 +223,14 @@ export class Ambience {
     this.burst(now + 0.02, 'bandpass', 2600, 0.7, 0.2, 0.07 * force, 1);
   }
 
+  /** One snap from a wood fire. */
+  crackle(volume: number): void {
+    if (!this.ctx || !this.master || !this.noise) return;
+    const now = this.ctx.currentTime;
+    this.burst(now, 'bandpass', 1500 + Math.random() * 3200, 2.5, 0.03 + Math.random() * 0.05, 0.09 * volume, 0.8 + Math.random() * 0.8);
+    if (Math.random() < 0.3) this.burst(now + 0.01, 'lowpass', 420, 0.7, 0.3, 0.05 * volume, 0.5);
+  }
+
   /** A few rising bell notes, for the moment fog lifts. */
   chime(): void {
     const ctx = this.ctx;
