@@ -13,6 +13,7 @@ import { Fishing } from '../world/Fishing';
 import { FRUITS, Home, KEEPSAKES } from '../world/Home';
 import { Springs } from '../world/Springs';
 import { Trail } from '../world/Trail';
+import { Backdrop } from '../world/Backdrop';
 import { SHOP_ITEMS, Shop } from '../world/Shop';
 import { WildFruit } from '../world/WildFruit';
 import { SEASON, currentSeason, setSeason } from '../world/season';
@@ -424,6 +425,7 @@ export class Game {
         cz = this.springs.spots[i].z;
       }
     }
+    this.scene.add(new Backdrop().group);
     this.trail = new Trail(this.island);
     this.scene.add(this.trail.points);
     this.scene.add(this.fishing.group, this.home.group);
@@ -606,7 +608,12 @@ export class Game {
     }
     this.music.setVolume(s.musicVolume);
     this.ambience.setVolume(s.soundVolume);
-    if (this.post) this.post.enabled = s.quality !== 'low';
+    if (this.post) {
+      this.post.enabled = s.quality !== 'low';
+      // contact shade and sun shafts come in with the better presets
+      this.post.ao = s.quality === 'ultra' ? 1 : s.quality === 'high' ? 0.85 : 0;
+      this.post.rays = s.quality === 'ultra' ? 0.5 : s.quality === 'high' ? 0.42 : s.quality === 'medium' ? 0.3 : 0;
+    }
     this.grassNear?.setDensity(preset.grass * s.grassDensity);
     this.grassFar?.setDensity(preset.grass * s.grassDensity);
     this.ui.syncSettings();
@@ -689,6 +696,7 @@ export class Game {
     this.updateWorld(dt);
     this.renderer.info.reset();
     this.drawReflection();
+    this.post.setSun(SUN_DIR, this.sun.color, this.inside ? 0 : this.day.night > 0.5 ? 0.25 : Math.min(1, this.sun.intensity / 3));
     this.post.render();
 
     this.frames++;
@@ -2108,7 +2116,7 @@ export class Game {
 
   /** Mirror the scene for the water. Only on the best preset: it costs a second, lighter draw. */
   private drawReflection(): void {
-    if (this.settings.quality !== 'high') {
+    if (this.settings.quality !== 'high' && this.settings.quality !== 'ultra') {
       this.water.disableReflection();
       return;
     }
@@ -2128,7 +2136,8 @@ export class Game {
     this.slowFor = this.fps < 42 ? this.slowFor + 1 : 0;
     if (this.slowFor < 8) return; // four seconds below target
     this.slowFor = 0;
-    if (this.settings.quality === 'high') this.settings.quality = 'medium';
+    if (this.settings.quality === 'ultra') this.settings.quality = 'high';
+    else if (this.settings.quality === 'high') this.settings.quality = 'medium';
     else if (this.settings.quality === 'medium') this.settings.quality = 'low';
     else return;
     saveSettings(this.settings);

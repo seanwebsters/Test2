@@ -232,18 +232,22 @@ export class Vegetation {
     const tropical: Kind = { hi: plants.tropicalPlant(), material: leafy, shadow: true, lodDist: 1e9, cullDist: 260, tint: false };
     const rock = [0, 1, 2].map((v): Kind => ({ hi: plants.rock(v), material: rockMat, shadow: true, lodDist: 1e9, cullDist: 1e9, tint: false }));
     let mushroom: Kind | null = null;
+    let flowerModels: Kind[] = [];
+    let cloverModels: Kind[] = [];
+    let pebbleModels: Kind[] = [];
+    let bigLeaf: Kind | null = null;
     const pebble: Kind = { hi: rock[1].hi, material: rockMat, shadow: false, lodDist: 1e9, cullDist: 110, tint: false };
     if (models) {
       // Swap the hand-built plants for the imported models, keeping the old
       // blob trees only as the far-away low-detail stand-ins.
       const mats = new Map<string, THREE.Material>();
-      const use = (name: string, opts: { blossom?: boolean; sway?: number; base?: number; crown?: number; shadow?: boolean } = {}): Kind['parts'] =>
+      const use = (name: string, opts: { blossom?: boolean; sway?: number; base?: number; crown?: number; shadow?: boolean; leaf?: 'green' | 'red' | 'pink' } = {}): Kind['parts'] =>
         models.get(name)!.map((p) => {
           const leaves = p.cutout && /Leav|Leaf/.test(p.material);
-          const key = `${p.material}|${opts.blossom ? 1 : 0}|${opts.crown ?? 0}|${opts.sway ?? 0}`;
+          const key = `${p.material}|${opts.blossom ? 1 : 0}|${opts.crown ?? 0}|${opts.sway ?? 0}|${opts.leaf ?? ''}`;
           let material = mats.get(key);
           if (!material) {
-            const map = leaves ? seasonalLeaves(base, p.material, p.map, !!opts.blossom) : p.map;
+            const map = leaves ? seasonalLeaves(base, p.material, p.map, !!opts.blossom, opts.leaf) : p.map;
             material = p.cutout
               ? foliageMaterial(opts.sway ?? 0.012, opts.base ?? 2.2, true, leaves && (opts.crown ?? 0) > 0, false, map, leaves ? opts.crown ?? 0 : 0)
               : /Rock/.test(name) ? mossy(new THREE.MeshLambertMaterial({ map })) : new THREE.MeshLambertMaterial({ map });
@@ -269,6 +273,26 @@ export class Vegetation {
       pebble.material = rock[1].material;
       mushroom = { hi: plants.rock(0), material: rockMat, shadow: true, lodDist: 1e9, cullDist: 160, tint: false };
       model(mushroom, use('Mushroom_Common'));
+      // Twisting, flat-crowned trees in three colours join the woods: green among the broadleaves,
+      // pink and red among the blossom trees, so every valley has drifts of colour.
+      const twisted = (name: string, leaf: 'green' | 'red' | 'pink', v: number): Kind => {
+        const k = treeKind((d) => (leaf === 'green' ? plants.broadleafTree(v % 3, d) : plants.cherryTree(v % 2, d)));
+        k.far = plants.farTree(leaf === 'green' ? 'leaf' : 'blossom', v % 2);
+        k.lodDist = 32; // detailed only close by: these are the heaviest trees on the island
+        model(k, use(name, { crown: 6.4, leaf }));
+        return k;
+      };
+      broad.push(twisted('TwistedTree_2', 'green', 0), twisted('TwistedTree_4', 'green', 1), twisted('TwistedTree_3', 'green', 2));
+      cherry.push(twisted('TwistedTree_3', 'pink', 0), twisted('TwistedTree_5', 'pink', 1), twisted('TwistedTree_2', 'red', 0), twisted('TwistedTree_4', 'red', 1), twisted('TwistedTree_5', 'red', 0));
+      const small2 = (name: string, cull: number, sway = 0.03): Kind => {
+        const k: Kind = { hi: plants.rock(0), material: rockMat, shadow: false, lodDist: 1e9, cullDist: cull, tint: false };
+        model(k, use(name, { sway, base: 0.15, shadow: false }));
+        return k;
+      };
+      flowerModels = [small2('Flower_3_Group', 130), small2('Flower_4_Group', 130)];
+      cloverModels = [small2('Clover_1', 80, 0.015), small2('Clover_2', 80, 0.015)];
+      bigLeaf = small2('Plant_7_Big', 200, 0.035);
+      pebbleModels = ['Pebble_Round_1', 'Pebble_Round_2', 'Pebble_Round_3'].map((n) => small2(n, 90, 0));
       greatTree = { hi: plants.rock(0), material: rockMat, shadow: true, lodDist: 1e9, cullDist: 1e9, tint: false, receive: false };
       model(greatTree, use('TwistedTree_1', { crown: 11 }));
     }
@@ -513,6 +537,50 @@ export class Vegetation {
         if (h < I.waterLevelAt(x, z) + 0.2) continue;
         const ps = 0.1 + Math.pow(rnd(), 2) * 0.34;
         this.put(pebble, x, h - ps * 0.2, z, rnd() * 6.3, ps, ps * (0.6 + rnd() * 0.5));
+      }
+    }
+    // The paths are dressed like a garden walk: mossy boulders set back from the edge,
+    // rounded pebbles at their feet, and clumps of flowers, clover and broad leaves between.
+    if (flowerModels.length && bigLeaf) {
+      for (const pth of I.paths) {
+        for (let s = 5; s < pth.length; s += 2.2 + rnd() * 2.6) {
+          const q = polylineAt(pth, s);
+          const side = rnd() < 0.5 ? -1 : 1;
+          const off = 2.6 + rnd() * 4.5;
+          const x = q.x - q.tz * off * side;
+          const z = q.z + q.tx * off * side;
+          const h = I.heightAt(x, z);
+          if (h < I.waterLevelAt(x, z) + 0.4 || at(I.path, x, z) > 0.08 || at(I.sand, x, z) > 0.2 || I.gradientAt(x, z, grad) > 0.5) continue;
+          if (Math.hypot(x, z) < 20 || Math.hypot(x - HOME_SPOT.x, z - HOME_SPOT.z) < 17) continue;
+          const r = rnd();
+          if (r < 0.16) {
+            const bs = 0.7 + rnd() * 1.0;
+            if (!this.claim(x, z, 3.2)) continue;
+            this.put(pick(rock), x, h - 0.28 * bs, z, rnd() * 6.3, bs, bs * (0.75 + rnd() * 0.3));
+            this.colliders.add(x, z, bs * 0.85);
+            this.shade.push(x, z, 1.5 * bs);
+            for (let k = 0; k < 3; k++) {
+              const a = rnd() * 6.3;
+              const px = x + Math.cos(a) * (bs * 1.1 + 0.4);
+              const pz = z + Math.sin(a) * (bs * 1.1 + 0.4);
+              this.put(pick(pebbleModels), px, I.heightAt(px, pz) - 0.04, pz, rnd() * 6.3, 0.7 + rnd() * 0.9);
+            }
+          } else if (r < 0.5) this.put(pick(flowerModels), x, h - 0.03, z, rnd() * 6.3, 0.8 + rnd() * 0.6);
+          else if (r < 0.74) this.put(pick(cloverModels), x, h - 0.02, z, rnd() * 6.3, 0.8 + rnd() * 0.7);
+          else if (r < 0.9) this.put(bigLeaf, x, h - 0.05, z, rnd() * 6.3, 0.7 + rnd() * 0.7);
+          else this.put(pick(pebbleModels), x, h - 0.04, z, rnd() * 6.3, 0.8 + rnd() * 1.2);
+        }
+      }
+      // and the same flowers and clover carry on in loose drifts through the open meadows
+      for (let i = 0; i < 9000; i++) {
+        const x = (rnd() - 0.5) * 860;
+        const z = (rnd() - 0.5) * 860;
+        if (nz.simplex(x * 0.013 + 9, z * 0.013 - 4) < 0.18) continue;
+        const h = I.heightAt(x, z);
+        if (h < 3.4 || h > 75 || at(I.sand, x, z) > 0.1 || at(I.path, x, z) > 0.1 || !this.dry(x, z, 0.9)) continue;
+        if (I.gradientAt(x, z, grad) > 0.5 || Math.hypot(x, z) < 22) continue;
+        const r = rnd();
+        this.put(r < 0.5 ? pick(flowerModels) : r < 0.85 ? pick(cloverModels) : bigLeaf, x, h - 0.03, z, rnd() * 6.3, 0.75 + rnd() * 0.7);
       }
     }
     // three great old trees you can steer by

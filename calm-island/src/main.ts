@@ -17,7 +17,7 @@ const game = new Game(document.getElementById('game') as HTMLCanvasElement, {
   intro: params.has('intro'),
   season: params.get('season'),
   plainPlants: params.has('plain'),
-  quality: quality === 'low' || quality === 'medium' || quality === 'high' ? (quality as Quality) : undefined,
+  quality: quality === 'low' || quality === 'medium' || quality === 'high' || quality === 'ultra' ? (quality as Quality) : undefined,
 });
 window.__calm = game;
 (window as unknown as { __calmFog: typeof fogClearAt }).__calmFog = fogClearAt;
