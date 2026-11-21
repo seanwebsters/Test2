@@ -22,7 +22,7 @@ import { Terrain, bakeGroundTexture } from '../world/Terrain';
 import { loadNatureModels } from '../world/NatureModels';
 import { Vegetation } from '../world/Vegetation';
 import { Water } from '../world/Water';
-import { SUN_DIR, globalUniforms, makeHeightTexture } from '../world/shared';
+import { SUN_DIR, clearFog, fogClearAt, globalUniforms, makeHeightTexture, resetFog } from '../world/shared';
 import { Ambience } from './Ambience';
 import { BREATHS, Breathing } from './Breathing';
 import { Input } from './Input';
@@ -37,6 +37,8 @@ const nextFrame = (): Promise<void> => new Promise((r) => requestAnimationFrame(
 export interface GameOptions {
   /** automated runs: no pointer lock, no persistence */
   test: boolean;
+  /** play the fall-from-the-sky opening even in test mode */
+  intro?: boolean;
   /** allow ambient sound even in test mode */
   sound?: boolean;
   quality?: Quality;
@@ -100,7 +102,13 @@ export class Game {
   private bestSkips = 0;
   private waterNear = 0;
   private waterCheck = 0;
-  private reveals: number[][] = [[0, 0, 80]];
+  private reveals: number[][] = [[0, 6, 34]];
+  /** circles of fog still rolling back: x, z, final radius, seconds elapsed */
+  private lifting: number[][] = [];
+  private hummed = new Set<string>();
+  private momentUntil = 0;
+  private momentYaw = 0;
+  private arrivingIntro = false;
   private mapBase: HTMLCanvasElement | null = null;
   private groundTex!: THREE.DataTexture;
   private photo = false;
@@ -183,7 +191,10 @@ export class Game {
         this.cairns.load([]);
         this.kite.flying = false;
         this.bestSkips = 0;
-        this.reveals = [[0, 0, 80]];
+        this.reveals = [[0, 6, 34]];
+        this.lifting = [];
+        this.hummed.clear();
+        this.paintFog();
         this.ui.seeds(0, this.seeds.spots.length);
         this.endPractice();
         this.day.hour = 9;
@@ -278,6 +289,7 @@ export class Game {
     this.skimming = new Skimming(this.island);
     this.fishing = new Fishing(this.island);
     this.home = new Home(this.island);
+    this.vegetation.colliders.add(this.home.x, this.home.z, 3.1);
     this.scene.add(this.fishing.group, this.home.group);
     this.viewpoints = new Viewpoints(this.island);
     this.cairns = new Cairns(this.island);
@@ -340,6 +352,15 @@ export class Game {
     }
     this.rig.snap(this.player);
     this.ui.seeds(this.seeds.foundIds.length, this.seeds.spots.length);
+    if ((!save && !this.opts.test) || this.opts.intro) {
+      this.player.dropFromSky(0, 6, 170);
+      this.arrivingIntro = true;
+      this.rig.yaw = 0.6;
+      this.rig.pitch = 0.62;
+      this.rig.dist = 9;
+      this.rig.snap(this.player);
+    }
+    this.paintFog();
     this.updateKeepsakes();
     this.applySettings();
     this.resize();
@@ -434,7 +455,15 @@ export class Game {
     if (this.playing) {
       this.updateBreathing(dt);
       this.player.update(dt, this.input, this.rig.yaw);
-      this.rig.update(dt, this.input, this.player, this.settings, this.breathing.active ? this.player.yaw : null);
+      const now = globalUniforms.uTime.value;
+      this.rig.update(dt, this.input, this.player, this.settings, this.breathing.active ? this.player.yaw : now < this.momentUntil ? this.momentYaw : null);
+      this.updateFog(dt);
+      this.updateHums();
+      if (this.arrivingIntro && !this.player.arriving) {
+        this.arrivingIntro = false;
+        this.ui.moment('Welcome to', 'Calm Island', 'It is lost in fog. Somewhere close, a warm light is glowing.');
+        this.ambience.chime();
+      }
       this.updateMeetings();
       this.updateFriendship(dt);
       this.updatePractice(dt);
@@ -514,6 +543,14 @@ export class Game {
     if (!best && !this.practice && this.home.near(p)) {
       this.nearby = null;
       this.ui.prompt2(null);
+      if (!this.flags.has('home')) {
+        // the first time you reach the light in the fog
+        this.flags.add('home');
+        this.reveal(this.home.x, this.home.z, 78);
+        this.ambience.chime();
+        this.ui.moment('You found', 'Home', 'A little house in an old tree. The fog is lifting.');
+        this.save();
+      }
       this.ui.prompt(this.player.sitting ? null : 'Rest at home');
       if (this.input.interactPressed() && this.player.sit()) {
         const n = this.keepsakes.size;
@@ -536,7 +573,7 @@ export class Game {
           this.rig.yaw = view.yaw;
           this.rig.pitch = 0.26;
           this.rig.dist = 13;
-          if (fresh) this.reveal(view.x, view.z, 190);
+          if (fresh) this.reveal(view.x, view.z, 130);
           this.ui.toast(fresh ? `Viewpoint · ${this.rested.size} of ${this.viewpoints.spots.length}` : 'Viewpoint', view.name, 'Stay as long as you like');
           this.save();
         }
@@ -568,9 +605,7 @@ export class Game {
     }
     if (!best || !this.input.interactPressed()) return;
     if (!this.met.has(best.who.id)) {
-      this.met.add(best.who.id);
-      this.ui.toast(`You met · ${this.met.size} of ${this.npcs.length}`, best.who.name, best.who.meaning);
-      this.portraits.set(best.who.id, this.snapPortrait(best));
+      this.meetMoment(best);
     } else if (best === this.companion) {
       this.setCompanion(null);
       this.ui.toast('', `Goodbye, ${best.who.name}`, 'They are heading home');
@@ -597,6 +632,33 @@ export class Game {
     if (now === 2) this.ui.toast('A story for the log', c.who.name, `“${c.who.story}”`);
     else this.ui.toast('', now === 3 ? 'Best of friends' : 'Friendship grew', `${c.who.name} ${'♥'.repeat(now)}`);
     this.save();
+  }
+
+  /** Finding a Calmling: the fog rolls back around them, bells ring, and their name fills the sky. */
+  private meetMoment(npc: Npc): void {
+    this.met.add(npc.who.id);
+    this.reveal(npc.pos.x, npc.pos.z, 96);
+    this.ambience.chime();
+    this.ui.moment(`You found a friend · ${this.met.size} of ${this.npcs.length}`, npc.who.name, npc.who.meaning);
+    // swing the camera round so they are framed beyond the player
+    this.momentYaw = Math.atan2(this.player.pos.x - npc.pos.x, this.player.pos.z - npc.pos.z);
+    this.momentUntil = globalUniforms.uTime.value + 4.5;
+    // take their picture once the air has cleared
+    window.setTimeout(() => this.portraits.set(npc.who.id, this.snapPortrait(npc)), 4800);
+  }
+
+  /** A hint that someone is close by in the fog. */
+  private updateHums(): void {
+    const p = this.player.pos;
+    for (const npc of this.npcs) {
+      if (npc.absent || this.met.has(npc.who.id) || this.hummed.has(npc.who.id)) continue;
+      const d = Math.hypot(npc.pos.x - p.x, npc.pos.z - p.z);
+      if (d > 34 || d < 6 || fogClearAt(npc.pos.x, npc.pos.z) > 0.5) continue;
+      this.hummed.add(npc.who.id);
+      this.ui.toast('', 'Someone is humming nearby', 'Follow the sound through the fog');
+      this.ambience.chime();
+      break;
+    }
   }
 
   /** Only one friend walks with you; the previous one wanders home. */
@@ -841,9 +903,26 @@ export class Game {
     );
   }
 
+  /** Lift the fog from a circle of the island. It rolls back over a few seconds. */
   private reveal(x: number, z: number, r: number): void {
     this.reveals.push([Math.round(x), Math.round(z), Math.round(r)]);
-    if (this.reveals.length > 80) this.reveals.splice(1, 1);
+    if (this.reveals.length > 140) this.reveals.splice(1, 1);
+    this.lifting.push([x, z, r, 0]);
+  }
+
+  /** Rebuild the fog from scratch: open sea is clear, land is hidden until revealed. */
+  private paintFog(): void {
+    resetFog((x, z) => this.island.heightAt(x, z) < -2.5);
+    for (const [x, z, r] of this.reveals) clearFog(x, z, r);
+  }
+
+  private updateFog(dt: number): void {
+    for (const c of this.lifting) {
+      c[3] += dt;
+      const t = Math.min(1, c[3] / 4.5);
+      clearFog(c[0], c[1], c[2] * (1 - (1 - t) * (1 - t)));
+    }
+    this.lifting = this.lifting.filter((c) => c[3] < 4.5);
   }
 
   /** The island from above; mist covers what you have not yet explored. */
@@ -1062,7 +1141,8 @@ export class Game {
     this.player.breath = b.fill;
     if (finished) {
       this.breathsDone++;
-      this.reveal(this.player.pos.x, this.player.pos.z, 120); // breathing clears the mist from the map
+      this.reveal(this.player.pos.x, this.player.pos.z, 62); // three breaths push the fog back around you
+      this.ambience.chime();
       this.ui.breath(null);
       if (this.practice?.npc.who.practice.type === 'breathe') this.completePractice();
       else this.ui.toast('', 'Three deep breaths', 'Carry that calm with you');
@@ -1151,6 +1231,7 @@ export class Game {
     const first = !this.learned.has(pr.npc.who.id);
     this.learned.add(pr.npc.who.id);
     this.bonds.set(pr.npc.who.id, (this.bonds.get(pr.npc.who.id) ?? 0) + 60); // practising together brings you closer
+    this.reveal(this.player.pos.x, this.player.pos.z, 55);
     this.ui.toast(first ? `Practice learned · ${this.learned.size} of ${this.npcs.length}` : 'Practice complete', pr.npc.who.practice.title, `With ${pr.npc.who.name}`);
     this.endPractice();
     this.save();
@@ -1208,6 +1289,7 @@ export class Game {
     const drift = this.sleeping ? 40 : this.playing && this.player?.sitting && !this.breathing.active && !this.practice && !this.fishing.active ? 10 : 1;
     this.day.update(dt * drift, this.sun, this.hemi, this.scene.fog as THREE.FogExp2, this.weather.rain);
     this.garden.update(Date.now(), globalUniforms.uTime.value);
+    this.home.update(globalUniforms.uTime.value, this.day.night);
     if (this.player) {
       this.hand.copy(this.player.pos);
       this.hand.y += 1.1;
@@ -1238,10 +1320,10 @@ export class Game {
         break;
       }
     }
+    if (found && fogClearAt(p.x, p.z) < 0.5) found = null; // still lost in the fog here
     if (found && found !== this.currentRegion) {
       const fresh = !this.discovered.has(found.id);
       this.discovered.add(found.id);
-      if (fresh) this.reveal(found.x, found.z, found.r + 55);
       this.ui.toast(fresh ? 'Discovered' : '', found.name, found.blurb);
     }
     if (found || !this.currentRegion || Math.hypot(p.x - this.currentRegion.x, p.z - this.currentRegion.z) > this.currentRegion.r + 12) {
@@ -1308,6 +1390,9 @@ export class Game {
       photosSaved: this.photosSaved,
       waterNear: this.waterNear,
       season: SEASON,
+      fogHere: fogClearAt(p.x, p.z),
+      arriving: this.player.arriving,
+      reveals2: this.reveals.length,
       fishing: this.fishing.state,
       sleeping: this.sleeping,
       keepsakes: [...this.keepsakes],

@@ -29,6 +29,8 @@ export class Player {
   /** floating down under a leaf: hold jump while falling */
   gliding = false;
   sleeping = false;
+  /** drifting down from the sky at the very start: the leaf opens by itself */
+  arriving = false;
   /** 0..1 lung fill while breathing, read by the model */
   breath = 0;
   private moveTime = 0;
@@ -59,6 +61,16 @@ export class Player {
     this.grounded = true;
     this.swimming = false;
     this.sitting = false;
+    this.sync();
+  }
+
+  /** Begin high above a point and float down to it. */
+  dropFromSky(x: number, z: number, height: number): void {
+    this.teleport(x, z, 0.5);
+    this.pos.y += height;
+    this.grounded = false;
+    this.vel.set(0, -2, 0);
+    this.arriving = true;
     this.sync();
   }
 
@@ -182,8 +194,10 @@ export class Player {
     }
     if (!this.grounded && !this.swimming) {
       // under the leaf the fall eases to a gentle drift instead of accelerating
-      this.gliding = input.jumpHeld() && this.vel.y < -0.8;
-      if (this.gliding) this.vel.y = damp(this.vel.y, -1.5, 6, dt);
+      this.gliding = (this.arriving || input.jumpHeld()) && this.vel.y < -0.8;
+      // arriving: a long fall through the cloud, slowing to a float for the last stretch
+      const sink = this.arriving ? (this.pos.y - ground > 26 ? -13 : -2.6) : -1.5;
+      if (this.gliding) this.vel.y = damp(this.vel.y, sink, this.arriving ? 2.2 : 6, dt);
       else this.vel.y -= GRAVITY * dt;
       this.pos.y += this.vel.y * dt;
       if (deep && this.pos.y <= floatY) {
@@ -217,7 +231,10 @@ export class Player {
     this.pose.verticalSpeed = this.vel.y;
     this.pose.turnRate = this.turnRate;
     this.pose.yaw = this.yaw;
-    if (this.grounded || this.swimming) this.gliding = false;
+    if (this.grounded || this.swimming) {
+      this.gliding = false;
+      this.arriving = false;
+    }
     this.pose.gliding = this.gliding;
     if (!this.sitting) this.sleeping = false;
     this.pose.sleeping = this.sleeping;

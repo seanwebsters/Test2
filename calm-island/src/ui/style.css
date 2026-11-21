@@ -223,3 +223,9 @@ body.is-touch #btn-fish { right: calc(max(18px, env(safe-area-inset-right)) + 14
 #sleep small { opacity: .65; font-size: 14px; }
 .sleep-moon { width: 84px; height: 84px; border-radius: 50%; background: radial-gradient(circle at 38% 36%, #fff, #c9d8ff 70%); box-shadow: 0 0 60px rgba(170,200,255,.55); animation: moon 7s ease-in-out infinite; }
 @keyframes moon { 0%, 100% { transform: scale(.9); opacity: .75; } 45% { transform: scale(1.08); opacity: 1; } }
+
+/* ---- the big moments: finding a friend, the fog lifting ---- */
+#toast.moment { top: 16%; }
+#toast.moment .toast-title { font-size: clamp(40px, 8vw, 78px); letter-spacing: -.02em; }
+#toast.moment .toast-kicker { font-size: 15px; }
+#toast.moment .toast-blurb { font-size: clamp(16px, 2.4vw, 22px); margin-top: 4px; }
