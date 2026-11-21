@@ -34,6 +34,8 @@ export interface SaveData {
   gifted?: string[];
   /** ids of the regions whose calm spring is awake */
   springs?: string[];
+  /** when each wild fruit bush was last picked */
+  wild?: number[];
   /** things bought from the market, and which rug, quilt and lamp are in use ('' = the plain one) */
   owned?: string[];
   decor?: { rug: string; quilt: string; lamp: string };
