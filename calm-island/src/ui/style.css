@@ -324,3 +324,28 @@ body #touch #btn-menu::before, body #touch #btn-log::before, body #touch #btn-ma
 .card { max-height: calc(100dvh - 40px); overflow-y: auto; }
 .rows label { padding: 7px 0; }
 body #touch #btn-menu::before, body #touch #btn-log::before, body #touch #btn-map::before, body #touch #btn-journal::before, body #touch #btn-photo::before, body #touch #btn-kite::before { width: 27px; height: 27px; }
+
+/* ---- phones held upright (landscape keeps the layout above) ---- */
+@media (orientation: portrait) {
+  /* the small buttons run down the right edge, under Menu, leaving the top clear for the logo */
+  body.is-touch #btn-menu, body.is-touch #btn-log, body.is-touch #btn-map, body.is-touch #btn-journal, body.is-touch #btn-photo, body.is-touch #btn-kite { left: auto; right: max(12px, env(safe-area-inset-right)); width: 48px; height: 48px; }
+  body.is-touch #btn-menu { top: max(12px, env(safe-area-inset-top)); }
+  body.is-touch #btn-log { top: calc(max(12px, env(safe-area-inset-top)) + 62px); }
+  body.is-touch #btn-map { top: calc(max(12px, env(safe-area-inset-top)) + 124px); }
+  body.is-touch #btn-journal { top: calc(max(12px, env(safe-area-inset-top)) + 186px); }
+  body.is-touch #btn-photo { top: calc(max(12px, env(safe-area-inset-top)) + 248px); }
+  body.is-touch #btn-kite { top: calc(max(12px, env(safe-area-inset-top)) + 310px); }
+  body.is-touch #hud-logo { width: 96px; top: max(14px, env(safe-area-inset-top)); }
+  body.is-touch #seeds { top: calc(max(12px, env(safe-area-inset-top)) + 46px); left: max(12px, env(safe-area-inset-left)); }
+  body.is-touch #basket { top: calc(max(12px, env(safe-area-inset-top)) + 88px); left: max(12px, env(safe-area-inset-left)); }
+  body.is-touch #toast { top: calc(max(12px, env(safe-area-inset-top)) + 140px); width: calc(100vw - 150px); }
+  body.is-touch #breath { top: 30%; }
+  /* thumbs: stick bottom left, Hop bottom right with Breathe above it */
+  body.is-touch #joy { bottom: max(34px, env(safe-area-inset-bottom)); }
+  body.is-touch #btn-hop { bottom: max(40px, env(safe-area-inset-bottom)); width: 88px; height: 88px; }
+  body.is-touch #btn-breathe { right: max(26px, env(safe-area-inset-right)); bottom: calc(max(40px, env(safe-area-inset-bottom)) + 104px); width: 70px; height: 70px; }
+  body.is-touch #btn-skim { right: calc(max(18px, env(safe-area-inset-right)) + 100px); bottom: calc(max(40px, env(safe-area-inset-bottom)) + 62px); }
+  body.is-touch #btn-fish { right: calc(max(18px, env(safe-area-inset-right)) + 100px); bottom: calc(max(40px, env(safe-area-inset-bottom)) + 126px); }
+  body.is-touch #btn-hello { bottom: calc(max(40px, env(safe-area-inset-bottom)) + 196px); max-width: calc(100vw - 130px); }
+  body.is-touch #btn-practise { bottom: calc(max(40px, env(safe-area-inset-bottom)) + 254px); max-width: calc(100vw - 130px); }
+}

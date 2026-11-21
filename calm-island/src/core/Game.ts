@@ -116,6 +116,7 @@ export class Game {
   private gifted = new Set<string>();
   private inside = false;
   private homePrompt = false;
+  private baseFov = 50;
   private springs!: Springs;
   private springHinted = new Set<number>();
   private glow = new THREE.PointLight(0xa8ecff, 0, 12, 1.5);
@@ -492,6 +493,9 @@ export class Game {
     this.renderer.setSize(w, h, false);
     this.post?.setSize(w, h, this.renderer.getPixelRatio());
     this.camera.aspect = w / h;
+    // held upright, a phone shows a tall slice of the world: widen the lens so the sides are not lost
+    this.baseFov = w < h ? Math.min(72, (2 * Math.atan(Math.tan((50 * Math.PI) / 360) / Math.max(0.4, (w / h) * 1.25)) * 180) / Math.PI) : 50;
+    this.camera.fov = this.inside ? Math.min(86, this.baseFov + 24) : this.baseFov;
     this.camera.updateProjectionMatrix();
     const px = h * this.renderer.getPixelRatio();
     this.water?.setViewport(px);
@@ -750,7 +754,7 @@ export class Game {
     this.player.pos.copy(this.home.inside.pos);
     this.player.yaw = this.home.inside.yaw;
     this.player.sitting = true;
-    this.camera.fov = 74;
+    this.camera.fov = Math.min(86, this.baseFov + 24);
     this.camera.updateProjectionMatrix();
     const first = !this.flags.has('inside');
     this.flags.add('inside');
@@ -766,7 +770,7 @@ export class Game {
     this.player.hold = null;
     const l = this.home.ladderSpot;
     this.player.teleport(l.x + (l.x - this.home.x) * 0.25, l.z + (l.z - this.home.z) * 0.25, Math.atan2(l.x - this.home.x, l.z - this.home.z));
-    this.camera.fov = 50;
+    this.camera.fov = this.baseFov;
     this.camera.updateProjectionMatrix();
     this.rig.yaw = this.player.yaw + Math.PI;
     this.rig.snap(this.player);
