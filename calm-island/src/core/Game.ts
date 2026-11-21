@@ -423,6 +423,7 @@ export class Game {
     this.camera.updateProjectionMatrix();
     const px = h * this.renderer.getPixelRatio();
     this.water?.setViewport(px);
+    this.water?.setResolution(w * this.renderer.getPixelRatio(), px);
     this.ambient?.setViewport(px);
   }
 
@@ -465,6 +466,7 @@ export class Game {
     this.input.endFrame();
     this.updateWorld(dt);
     this.renderer.info.reset();
+    this.drawReflection();
     this.post.render();
 
     this.frames++;
@@ -1166,6 +1168,22 @@ export class Game {
     this.breathing.cancel();
     this.player.breath = 0;
     this.ui.breath(null);
+  }
+
+  /** Mirror the scene for the water. Only on the best preset: it costs a second, lighter draw. */
+  private drawReflection(): void {
+    if (this.settings.quality !== 'high') {
+      this.water.disableReflection();
+      return;
+    }
+    const dist = QUALITY_PRESETS[this.settings.quality].distance;
+    this.water.renderReflection(this.renderer, this.scene, this.camera, this.player.pos, (on) => {
+      // the mirror image needs no grass, particles or fine plants, and trees can be stand-ins
+      this.grassNear.mesh.visible = this.grassFar.mesh.visible = !on;
+      this.ambient.group.visible = !on;
+      this.weather.mesh.visible = !on && this.weather.rain > 0.02;
+      this.vegetation.update(this.camera.position, on ? 0.02 : dist);
+    });
   }
 
   /** Step the graphics down once if the machine is clearly struggling. */

@@ -3,6 +3,7 @@ import { clamp, lerp, smoothstep } from '../core/math';
 import { CELL, GRID, HALF, WORLD_SIZE, type Island } from './islandMap';
 import { Noise2D } from './noise';
 import { SEASON } from './season';
+import { globalUniforms } from './shared';
 
 type RGB = [number, number, number];
 const hex = (h: number): RGB => [((h >> 16) & 255) / 255, ((h >> 8) & 255) / 255, (h & 255) / 255];
@@ -258,6 +259,7 @@ export class Terrain {
     this.material = new THREE.MeshLambertMaterial({ map: groundTex });
     this.material.onBeforeCompile = (shader) => {
       shader.uniforms.uDetail = { value: detail };
+      shader.uniforms.uTime = globalUniforms.uTime;
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nvarying vec3 vWNormal;')
         .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = position;\nvWNormal = normal;');
@@ -266,6 +268,7 @@ export class Terrain {
           '#include <map_pars_fragment>',
           /* glsl */ `#include <map_pars_fragment>
           uniform sampler2D uDetail;
+          uniform float uTime;
           varying vec3 vWPos;
           varying vec3 vWNormal;
           float gHash(vec2 p) {
@@ -299,6 +302,12 @@ export class Terrain {
           float glint = fract(sin(dot(floor(vWPos.xz * 23.0), vec2(127.1, 311.7))) * 43758.5453);
           diffuseColor.rgb += bare * step(0.985, glint) * 0.16 * smoothstep(8.0, 2.0, vWPos.y);
           diffuseColor.rgb *= mix(0.74, 1.0, smoothstep(-0.3, 0.7, vWPos.y + (fine - 0.5) * 0.4));
+          // sunlight focused by the waves dances over the shallow sea bed
+          float shallows = (1.0 - smoothstep(-0.5, 0.15, vWPos.y)) * smoothstep(-6.0, -1.2, vWPos.y);
+          float c1 = gNoise(vWPos.xz * 0.8 + vec2(uTime * 0.3, uTime * 0.21));
+          float c2 = gNoise(vWPos.xz * 1.3 - vec2(uTime * 0.24, uTime * 0.33) + 5.0);
+          float caustic = pow(1.0 - abs(c1 - c2), 7.0);
+          diffuseColor.rgb += vec3(0.75, 0.9, 0.7) * caustic * 0.5 * shallows;
           diffuseColor.a = 1.0;
           // Cliffs are too steep for the top-down ground texture, so their
           // rock is drawn here in world space: warped strata with fine grain.

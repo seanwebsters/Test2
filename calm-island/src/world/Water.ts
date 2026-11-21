@@ -29,6 +29,11 @@ uniform vec3 uShallow;
 uniform vec3 uDeep;
 uniform vec3 uSky;
 uniform vec3 uSkyTop;
+uniform sampler2D uRefl;
+uniform float uReflLevel;
+uniform float uReflOn;
+uniform vec2 uResolution;
+uniform vec2 uFallBase;
 uniform float uDepthK;
 uniform float uFlow;
 uniform float uSurf;
@@ -65,7 +70,13 @@ void main() {
   // the surface mirrors the sky: pale at the horizon, deep blue overhead
   vec3 Rv = reflect(-V, N);
   vec3 skyRefl = mix(uSky, uSkyTop, pow(clamp(Rv.y, 0.0, 1.0), 0.6));
-  col = mix(col, skyRefl, clamp(fres * 0.85 + 0.06, 0.0, 1.0));
+  // On the water body nearest the camera the scene itself is mirrored:
+  // cliffs, trees and clouds, wobbling with the ripples.
+  vec2 suv = gl_FragCoord.xy / uResolution;
+  vec2 ruv = clamp(vec2(suv.x, 1.0 - suv.y) + N.xz * 0.04, 0.002, 0.998);
+  float useRefl = uReflOn * (1.0 - smoothstep(0.15, 0.45, abs(vWorld.y - uReflLevel)));
+  skyRefl = mix(skyRefl, texture2D(uRefl, ruv).rgb, useRefl * 0.92);
+  col = mix(col, skyRefl, clamp(fres * 0.85 + 0.06 + useRefl * 0.12, 0.0, 1.0));
 
   vec3 R = reflect(-uSunDir, N);
   float spec = pow(max(dot(R, V), 0.0), 220.0);
@@ -83,10 +94,14 @@ void main() {
   // white streaks where the river runs
   float streak = smoothstep(0.62, 0.8, vnoise(vec2(vUv.x * 9.0, vUv.y * 0.35 - uTime * 1.1)));
   foam += streak * 0.3 * uFlow;
+  // churned white water where the falls land
+  float plunge = 1.0 - smoothstep(2.0, 11.0, distance(vWorld.xz, uFallBase));
+  foam += plunge * smoothstep(0.3, 0.65, fbm2(vWorld.xz * 0.9 - uTime * vec2(0.0, 0.6))) * step(abs(vWorld.y - 9.2), 0.6);
   foam = clamp(foam, 0.0, 1.0);
   col = mix(col, vec3(1.0), foam * 0.92);
 
-  float alpha = mix(0.5, 0.97, dk);
+  // clear in the shallows so the bed shows through, solid in deep water
+  float alpha = mix(0.2, 0.97, dk);
   alpha = max(alpha, foam * 0.95);
   alpha = mix(alpha, 1.0, fres * 0.6) * edge;
 
@@ -136,7 +151,7 @@ void main() {
   p.y += life * (3.0 + aSeed.w * 6.0);
   vAlpha = sin(life * 3.14159) * 0.32;
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
-  gl_PointSize = uScale * (2.5 + life * 5.0) / -mv.z;
+  gl_PointSize = uScale * (3.2 + life * 7.0) / -mv.z;
   gl_Position = projectionMatrix * mv;
 }
 `;
@@ -163,6 +178,16 @@ interface WaterOptions {
 export class Water {
   readonly group = new THREE.Group();
   private mist: THREE.ShaderMaterial;
+  /** the mirrored view of the scene, drawn each frame for the nearest water */
+  readonly reflTarget = new THREE.WebGLRenderTarget(512, 512, { type: THREE.HalfFloatType });
+  private reflCam = new THREE.PerspectiveCamera();
+  private reflPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  private reflUniforms = {
+    uRefl: { value: this.reflTarget.texture },
+    uReflLevel: { value: -999 },
+    uReflOn: { value: 0 },
+    uResolution: { value: new THREE.Vector2(1280, 720) },
+  };
 
   constructor(private island: Island, private heightTex: THREE.Texture, skyColor: THREE.Color) {
     const sea = new THREE.Mesh(
@@ -206,7 +231,7 @@ export class Water {
       transparent: true,
       depthWrite: false,
     });
-    const count = 90;
+    const count = 170;
     const pos = new Float32Array(count * 3);
     const seed = new Float32Array(count * 4);
     for (let i = 0; i < count; i++) {
@@ -222,6 +247,69 @@ export class Water {
     const mistPoints = new THREE.Points(mg, this.mist);
     mistPoints.renderOrder = 5;
     this.group.add(mistPoints);
+  }
+
+  /** The water level whose reflection matters most from here. */
+  private nearestLevel(p: THREE.Vector3): number {
+    let level = SEA_LEVEL;
+    let best = Infinity;
+    for (const l of this.island.lakes) {
+      const d = Math.hypot(l.x - p.x, l.z - p.z) - l.r;
+      if (d < 70 && d < best) {
+        best = d;
+        level = l.level + 0.02;
+      }
+    }
+    return level;
+  }
+
+  /**
+   * Draws the scene upside down into `reflTarget` for the water to sample.
+   * `prepare(true)` should hide grass and swap trees to their cheap stand-ins;
+   * `prepare(false)` puts everything back.
+   */
+  renderReflection(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera, focus: THREE.Vector3, prepare: (on: boolean) => void): void {
+    const level = this.nearestLevel(focus);
+    if (camera.position.y < level + 0.2) {
+      this.reflUniforms.uReflOn.value = 0;
+      return;
+    }
+    const c = this.reflCam;
+    c.fov = camera.fov;
+    c.aspect = camera.aspect;
+    c.near = camera.near;
+    c.far = camera.far;
+    c.updateProjectionMatrix();
+    const dir = camera.getWorldDirection(new THREE.Vector3());
+    c.position.set(camera.position.x, 2 * level - camera.position.y, camera.position.z);
+    c.up.set(0, 1, 0);
+    c.lookAt(c.position.x + dir.x, c.position.y - dir.y, c.position.z + dir.z);
+    this.reflPlane.constant = -(level - 0.05); // keep only what stands above the water
+    const oldPlanes = renderer.clippingPlanes;
+    const oldShadows = renderer.shadowMap.autoUpdate;
+    this.group.visible = false;
+    prepare(true);
+    renderer.clippingPlanes = [this.reflPlane];
+    renderer.shadowMap.autoUpdate = false;
+    renderer.setRenderTarget(this.reflTarget);
+    renderer.clear();
+    renderer.render(scene, c);
+    renderer.setRenderTarget(null);
+    renderer.clippingPlanes = oldPlanes;
+    renderer.shadowMap.autoUpdate = oldShadows;
+    prepare(false);
+    this.group.visible = true;
+    this.reflUniforms.uReflLevel.value = level;
+    this.reflUniforms.uReflOn.value = 1;
+  }
+
+  disableReflection(): void {
+    this.reflUniforms.uReflOn.value = 0;
+  }
+
+  setResolution(widthPx: number, heightPx: number): void {
+    this.reflUniforms.uResolution.value.set(widthPx, heightPx);
+    this.reflTarget.setSize(Math.max(64, Math.min(1024, Math.round(widthPx / 2))), Math.max(64, Math.min(640, Math.round(heightPx / 2))));
   }
 
   setViewport(heightPx: number): void {
@@ -243,6 +331,11 @@ export class Water {
         uDeep: { value: new THREE.Color(o.deep) },
         uSky: { value: sky },
         uSkyTop: { value: SKY_TOP },
+        uRefl: this.reflUniforms.uRefl,
+        uReflLevel: this.reflUniforms.uReflLevel,
+        uReflOn: this.reflUniforms.uReflOn,
+        uResolution: this.reflUniforms.uResolution,
+        uFallBase: { value: new THREE.Vector2(this.island.falls.base.x, this.island.falls.base.z) },
         uDepthK: { value: o.depthK },
         uFlow: { value: o.flow ? 1 : 0 },
         uSurf: { value: o.surf ?? 0 },
