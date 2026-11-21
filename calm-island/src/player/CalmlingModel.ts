@@ -165,7 +165,8 @@ export class CalmlingModel {
             float taper = 1.0 - vShell / strand;
             if (length(fract(fq) - 0.5) > 0.22 + 0.62 * taper) discard;
           }
-          diffuseColor.rgb *= mix(0.86, 1.08, smoothstep(0.0, 0.9, vShell)) * (0.94 + 0.12 * frnd);`,
+          // roots sit in each other's shade; only the outer coat is fully lit
+          diffuseColor.rgb *= mix(0.66, 1.1, smoothstep(0.0, 0.85, vShell)) * (0.94 + 0.12 * frnd);`,
         )
         .replace(
           '#include <opaque_fragment>',
@@ -212,7 +213,9 @@ export class CalmlingModel {
           /* glsl */ `#include <color_fragment>
           // fine hair lines running the length of each tuft
           float hair = sin(vTuft.y * 46.0) * 0.5 + 0.5;
-          diffuseColor.rgb *= 0.95 + 0.09 * hair * hair;`,
+          diffuseColor.rgb *= 0.95 + 0.09 * hair * hair;
+          // each tuft is darker where it tucks under the ones above, brightest at its free end
+          diffuseColor.rgb *= mix(0.68, 1.06, smoothstep(0.0, 0.7, vTuft.x));`,
         )
         .replace(
           '#include <opaque_fragment>',
@@ -241,8 +244,29 @@ export class CalmlingModel {
 
     // ---- face ------------------------------------------------------------
     const white = new THREE.MeshStandardMaterial({ color: 0xf2f4ff, roughness: 0.16, emissive: 0x8c92a8 });
+    // Wet, rounded eyes: the sky mirrors round their edge, and the brow lays a soft shadow across the top.
+    const glossy = (mat: THREE.MeshStandardMaterial, lid: number): void => {
+      mat.onBeforeCompile = (shader) => {
+        shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying float vEyeY;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvEyeY = normalize(position).y;');
+        shader.fragmentShader = shader.fragmentShader
+          .replace('#include <common>', '#include <common>\nvarying float vEyeY;')
+          .replace(
+            '#include <opaque_fragment>',
+            /* glsl */ `{
+              float edge = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 2.6);
+              vec3 skyUp = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
+              float up = clamp(dot(normal, skyUp) * 0.5 + 0.5, 0.0, 1.0);
+              outgoingLight += mix(vec3(0.30, 0.42, 0.22), vec3(0.55, 0.78, 1.0), up) * edge * 0.55;
+              outgoingLight *= 1.0 - smoothstep(0.35, 0.95, vEyeY) * ${lid.toFixed(2)};
+            }
+            #include <opaque_fragment>`,
+          );
+      };
+    };
+    glossy(white, 0.3);
     const iris = new THREE.MeshStandardMaterial({ color: look.iris ?? 0x4a9cf0, roughness: 0.1, emissive: new THREE.Color(look.iris ?? 0x4a9cf0).multiplyScalar(0.35) });
     const pupil = new THREE.MeshStandardMaterial({ color: 0x0a1638, roughness: 0.06 });
+    glossy(iris, 0.42);
     const shine = this.shine;
     for (const side of [-1, 1]) {
       const eye = new THREE.Group();
@@ -616,7 +640,7 @@ function furBase(SHELLS: number, hero: boolean): FurBase {
  * out and slightly down on the sides, and leave the face clear.
  */
 const TUFT_STYLES = {
-  spiky: { count: 190, len: [0.24, 0.38], width: [0.12, 0.17], side: -0.42, crown: 0.45 },
+  spiky: { count: 236, len: [0.24, 0.38], width: [0.12, 0.17], side: -0.42, crown: 0.45 },
   shaggy: { count: 210, len: [0.3, 0.46], width: [0.11, 0.15], side: -0.85, crown: 0.05 },
   fluffy: { count: 270, len: [0.14, 0.22], width: [0.15, 0.2], side: -0.2, crown: 0.3 },
   smooth: { count: 140, len: [0.09, 0.14], width: [0.15, 0.19], side: -0.3, crown: 0.2 },

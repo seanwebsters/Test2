@@ -243,7 +243,7 @@ export class Game {
       },
       onArrive: () => {
         if (this.inside) this.leaveHome();
-        this.player.dropFromSky(0, 6, 170);
+        this.player.dropFromSky(0, 6, 120);
         this.arrivingIntro = true;
         this.rig.yaw = -2.19; // facing the treehouse and its light
         this.rig.pitch = 0.36;
@@ -312,7 +312,7 @@ export class Game {
         this.home.setVine(0);
         this.tut = 0;
         this.ui.introRunning(true);
-        this.player.dropFromSky(0, 6, 170);
+        this.player.dropFromSky(0, 6, 120);
         this.arrivingIntro = true;
         this.rig.yaw = -2.19; // facing the treehouse and its light
         this.rig.pitch = 0.36;
@@ -539,7 +539,7 @@ export class Game {
     this.applyDecor();
     this.ui.introRunning(this.tut < 99);
     if ((!save && !this.opts.test) || this.opts.intro) {
-      this.player.dropFromSky(0, 6, 170);
+      this.player.dropFromSky(0, 6, 120);
       this.arrivingIntro = true;
       this.rig.yaw = -2.19; // facing the treehouse and its light
       this.rig.pitch = 0.36;
@@ -653,6 +653,14 @@ export class Game {
       this.updateBreathing(dt);
       this.player.update(dt, this.input, this.inside ? this.insideYaw : this.rig.yaw);
       const now = globalUniforms.uTime.value;
+      if (this.player.arriving) {
+        // falling in: the view is held on the island and the treehouse, whatever the mouse does
+        // looking down at the treehouse and garden from on high, levelling out as the ground comes up
+        const up = this.player.pos.y - this.island.heightAt(this.player.pos.x, this.player.pos.z);
+        this.rig.yaw = -2.19;
+        this.rig.pitch = Math.min(1.12, Math.max(0.3, Math.atan2(up, 62)));
+        this.rig.dist = 12;
+      }
       if (this.inside) {
         // indoors the camera sits in one corner of the room
         // (it turns a little to keep the Calmling in view as he potters about)
@@ -2175,6 +2183,7 @@ export class Game {
     this.garden.update(Date.now(), globalUniforms.uTime.value);
     this.home.update(globalUniforms.uTime.value, this.day.night, Date.now(), this.inside);
     this.shop.update(dt, this.day.night, this.day.hour);
+    this.water.update();
     const falling = this.started && !!this.player?.arriving;
     this.arrivalClouds.update(dt, falling, this.player.pos, this.island.heightAt(this.player.pos.x, this.player.pos.z), globalUniforms.uDayLight.value);
     this.ui.arriving(falling);

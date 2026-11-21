@@ -18,9 +18,9 @@ export class Backdrop {
     let n = 0;
     for (let i = 0; i < 22; i++) {
       const a = (i / 22) * Math.PI * 2 + rnd(n++) * 0.2;
-      const dist = 1500 + rnd(n++) * 900;
-      const h = 220 + rnd(n++) * 380;
-      const w = h * (1.5 + rnd(n++) * 1.4);
+      const dist = 1750 + rnd(n++) * 800;
+      const h = 110 + rnd(n++) * 210; // a low, far range: a line on the horizon, never a wall
+      const w = h * (1.6 + rnd(n++) * 1.5);
       const geo = new THREE.ConeGeometry(w, h, 9, 5);
       const p = geo.attributes.position;
       for (let v = 0; v < p.count; v++) {

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { glowDot } from './Trail';
 import { HIGH_SHORE, LOW_SHORE, RIVER_HALF_WIDTH, SEA_LEVEL, WATER_DROP, polylineAt, type Island } from './islandMap';
 import { SKY_TOP } from './Sky';
 import { NOISE_GLSL, WORLD_UV_GLSL, fogMask, globalUniforms, skyTex, canopyTex } from './shared';
@@ -126,8 +127,12 @@ void main() {
   float a = vnoise(vec2(vUv.x * 16.0, fall * 9.0 - t * 3.2));
   float b = vnoise(vec2(vUv.x * 44.0 + 3.0, fall * 22.0 - t * 5.0));
   float streak = a * 0.65 + b * 0.35;
-  vec3 col = mix(vec3(0.36, 0.78, 0.93), vec3(1.0), smoothstep(0.3, 0.72, streak));
-  col = mix(col, vec3(1.0), smoothstep(0.8, 1.0, vUv.y) * 0.85);
+  // glassy turquoise where the sheet is smooth, white where it breaks into ropes of foam
+  float c2 = vnoise(vec2(vUv.x * 7.0 - 2.0, fall * 4.0 - t * 2.1));
+  vec3 col = mix(vec3(0.20, 0.72, 0.86), vec3(0.62, 0.93, 0.98), c2);
+  col = mix(col, vec3(1.0), smoothstep(0.34, 0.7, streak) * 0.92);
+  col = mix(col, vec3(0.75, 0.96, 1.0), smoothstep(0.0, 0.1, vUv.y) * (1.0 - smoothstep(0.1, 0.22, vUv.y)) * 0.6); // the bright lip where it tips over
+  col = mix(col, vec3(1.0), smoothstep(0.72, 1.0, vUv.y) * 0.9);
   float side = smoothstep(0.0, 0.14, vUv.x) * smoothstep(1.0, 0.86, vUv.x);
   float ragged = smoothstep(0.0, 0.25, side + (a - 0.5) * 0.3);
   float alpha = ragged * mix(0.82, 1.0, streak);
@@ -178,6 +183,7 @@ interface WaterOptions {
 export class Water {
   readonly group = new THREE.Group();
   private mist: THREE.ShaderMaterial;
+  private veil: { sp: THREE.Sprite; mat: THREE.SpriteMaterial; phase: number; x: number; y: number; z: number }[] = [];
   /** the mirrored view of the scene, drawn each frame for the nearest water */
   readonly reflTarget = new THREE.WebGLRenderTarget(512, 512, { type: THREE.HalfFloatType });
   private reflCam = new THREE.PerspectiveCamera();
@@ -231,7 +237,7 @@ export class Water {
       transparent: true,
       depthWrite: false,
     });
-    const count = 170;
+    const count = 320;
     const pos = new Float32Array(count * 3);
     const seed = new Float32Array(count * 4);
     for (let i = 0; i < count; i++) {
@@ -247,6 +253,14 @@ export class Water {
     const mistPoints = new THREE.Points(mg, this.mist);
     mistPoints.renderOrder = 5;
     this.group.add(mistPoints);
+    // a soft standing cloud of spray round the foot of the falls, drifting and thinning as it rises
+    for (let i = 0; i < 9; i++) {
+      const mat = new THREE.SpriteMaterial({ map: glowDot(), color: 0xffffff, transparent: true, opacity: 0.3, depthWrite: false });
+      const sp = new THREE.Sprite(mat);
+      sp.renderOrder = 6;
+      this.group.add(sp);
+      this.veil.push({ sp, mat, phase: i * 0.7, x: falls.base.x, y: falls.base.y, z: falls.base.z });
+    }
   }
 
   /** The water level whose reflection matters most from here. */
@@ -301,6 +315,18 @@ export class Water {
     this.group.visible = true;
     this.reflUniforms.uReflLevel.value = level;
     this.reflUniforms.uReflOn.value = 1;
+  }
+
+  /** The spray at the foot of the falls rises, spreads and thins. */
+  update(): void {
+    for (const v of this.veil) {
+      const t = (globalUniforms.uTime.value * 0.11 + v.phase) % 1;
+      const a = v.phase * 2.4;
+      v.sp.position.set(v.x + Math.cos(a) * (2 + t * 6), v.y + 1 + t * 9, v.z + Math.sin(a) * (2 + t * 6));
+      const s = 7 + t * 12;
+      v.sp.scale.set(s, s * 0.8, 1);
+      v.mat.opacity = Math.sin(t * Math.PI) * 0.34 * (0.35 + 0.65 * globalUniforms.uDayLight.value);
+    }
   }
 
   disableReflection(): void {

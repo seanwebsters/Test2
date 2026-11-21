@@ -16,13 +16,14 @@ export class ArrivalClouds {
       const v = Math.sin(i * 53.3 + 7.1) * 43758.5453;
       return v - Math.floor(v);
     };
-    for (let i = 0; i < 46; i++) {
+    for (let i = 0; i < 24; i++) {
       const mat = new THREE.SpriteMaterial({ map: glowDot(), color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, fog: false });
       const sprite = new THREE.Sprite(mat);
       const a = rnd(i) * Math.PI * 2;
-      const r = 16 + rnd(i + 100) * 95;
-      const y = 55 + rnd(i + 200) * 125;
-      const s = 34 + rnd(i + 300) * 46;
+      // a wide ring well out from the drop, so the island below is in clear view from the first moment
+      const r = 85 + rnd(i + 100) * 120;
+      const y = 30 + rnd(i + 200) * 110;
+      const s = 30 + rnd(i + 300) * 40;
       sprite.position.set(Math.cos(a) * r, y, Math.sin(a) * r);
       sprite.scale.set(s * 1.6, s, 1);
       this.group.add(sprite);
@@ -42,7 +43,7 @@ export class ArrivalClouds {
       // full while below you, thinning as you pass, gone once it is overhead
       const rel = h - p.y;
       const o = 1 - Math.min(1, Math.max(0, (20 - rel) / 45));
-      p.mat.opacity = this.show * o * 0.46;
+      p.mat.opacity = this.show * o * 0.4;
       p.mat.color.setScalar(0.6 + 0.4 * daylight);
     }
   }
