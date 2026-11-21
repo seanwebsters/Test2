@@ -20,7 +20,7 @@ THREE.ShaderChunk.fog_fragment = THREE.ShaderChunk.fog_fragment.replace(
 	}
 	// Aerial perspective: each line of hills sits bluer and paler than the one in front,
 	// while the first hundred metres or so stay clear.
-	float hazeAmt = (1.0 - exp(-vFogDepth * 0.0024)) * 0.46;
+	float hazeAmt = (1.0 - exp(-vFogDepth * 0.0024)) * 0.46 * (1.0 - 0.6 * smoothstep(25.0, 90.0, cameraPosition.y - vFogWorld.y));
 	gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor * vec3(0.78, 0.88, 1.16), hazeAmt);
 	gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );`,
 );
@@ -136,6 +136,8 @@ THREE.ShaderChunk.fog_fragment = THREE.ShaderChunk.fog_fragment.replace(
 	float lowAir = 1.0 - smoothstep(50.0, 96.0, vFogWorld.y);
 	// kept very sheer: a light haze that hints at what is undiscovered without hiding it
 	float murk = (1.0 - islandClear) * lowAir * (1.0 - exp(-vFogDepth * 0.02)) * 0.3;
+	// seen from high above (falling in, or from the summit) the island lies clear below
+	murk *= 1.0 - smoothstep(25.0, 90.0, cameraPosition.y - vFogWorld.y);
 	// Close by, fog is a pale veil. Further in, it takes exactly the colour of the
 	// sky behind, so trees dissolve into the air instead of standing out as white shapes.
 	vec3 fogDir = normalize(vFogWorld - cameraPosition);

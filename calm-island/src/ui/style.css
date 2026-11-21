@@ -380,3 +380,43 @@ body.is-touch #toast { top: calc(max(8px, env(safe-area-inset-top)) + 82px); }
 .fruit-dot.f-star { --c: #ff7ad0; } .fruit-dot.f-moon { --c: #6fdcf5; } .fruit-dot.f-sun { --c: #ffc93c; }
 .c-item button { padding: 9px 16px 10px; font-size: 14.5px; margin: 0 0 4px; }
 button:disabled { filter: saturate(.35) brightness(1.08); opacity: .6; cursor: default; transform: none; }
+
+/* ---- title screen: the island itself, with the menu down one side ---- */
+.title { position: fixed; inset: 0; z-index: 4; animation: fade .8s ease both; background: linear-gradient(90deg, rgba(8,28,58,.55) 0%, rgba(8,28,58,.28) 26%, rgba(8,28,58,0) 52%), linear-gradient(0deg, rgba(8,28,58,.35), rgba(8,28,58,0) 22%); }
+.title-side { position: absolute; left: clamp(22px, 6vw, 96px); top: clamp(20px, 11vh, 110px); display: grid; justify-items: start; }
+.title-logo { width: clamp(210px, 30vw, 430px); height: auto; filter: drop-shadow(0 4px 0 rgba(20,40,80,.35)) drop-shadow(0 10px 26px rgba(10,30,70,.5)); }
+.title-sub { margin: 2px 0 clamp(18px, 5vh, 46px) 6px; color: #fff; font-weight: 800; letter-spacing: .34em; text-transform: uppercase; font-size: clamp(13px, 1.5vw, 19px); text-shadow: 0 2px 10px rgba(10,30,70,.7); }
+.title-menu { display: grid; gap: clamp(2px, 1vh, 10px); justify-items: start; }
+button.title-item { position: relative; margin: 0; padding: 6px 14px 6px 46px; background: none; box-shadow: none; border-radius: 12px; color: #fff; font-weight: 800; font-size: clamp(24px, 3.3vw, 40px); letter-spacing: .01em; text-shadow: 0 3px 0 rgba(20,40,80,.4), 0 6px 20px rgba(10,30,70,.6); transition: transform .15s ease, color .15s; }
+button.title-item::before { content: ''; position: absolute; left: 8px; top: 50%; width: 26px; height: 26px; transform: translateY(-50%) scale(0) rotate(-40deg); border-radius: 60% 6% 60% 6%; background: linear-gradient(135deg, #b8ee7a, #5fb84a); box-shadow: 0 2px 0 rgba(20,60,20,.4); transition: transform .18s ease; }
+button.title-item:hover, button.title-item:focus-visible { background: none; transform: translateX(8px); color: #fff6d8; outline: none; box-shadow: none; }
+button.title-item:hover::before, button.title-item:focus-visible::before { transform: translateY(-50%) scale(1) rotate(-12deg); }
+button.title-item:active { transform: translateX(8px) scale(.98); box-shadow: none; }
+.title-times { position: absolute; left: clamp(22px, 6vw, 96px); bottom: clamp(18px, 5vh, 46px); display: flex; gap: 10px; }
+button.title-time { width: 46px; height: 46px; padding: 0; margin: 0; border-radius: 50%; font-size: 21px; line-height: 1; }
+.title-foot { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); color: rgba(255,255,255,.82); font-size: 13px; font-weight: 600; white-space: nowrap; text-shadow: 0 1px 6px rgba(10,30,70,.7); }
+.title-keys { position: absolute; right: clamp(18px, 4vw, 60px); bottom: clamp(18px, 5vh, 46px); color: #fff; font-weight: 700; font-size: 14px; text-shadow: 0 1px 6px rgba(10,30,70,.7); }
+.title-keys kbd { margin: 0 3px; }
+body.is-touch .title-keys { display: none; }
+#menu.from-title .buttons button:not(#resume) { display: none; }
+.credits-body p { margin: 0 0 14px; color: var(--soft); line-height: 1.45; }
+.credits-body b { color: var(--ink); }
+#how, #credits, #menu.from-title { z-index: 6; }
+@media (max-width: 700px) { .title-foot { display: none; } }
+@media (orientation: portrait) and (max-width: 700px) {
+  .title { background: linear-gradient(180deg, rgba(8,28,58,.6) 0%, rgba(8,28,58,.2) 46%, rgba(8,28,58,0) 62%), linear-gradient(0deg, rgba(8,28,58,.35), rgba(8,28,58,0) 18%); }
+  .title-side { left: 24px; top: max(34px, env(safe-area-inset-top)); }
+  .title-logo { width: min(74vw, 320px); }
+  button.title-item { font-size: 30px; padding: 9px 14px 9px 46px; }
+}
+@media (max-height: 520px) {
+  .title-side { top: 14px; }
+  .title-logo { width: clamp(150px, 26vw, 260px); }
+  .title-sub { margin-bottom: 8px; font-size: 12px; }
+  button.title-item { font-size: 23px; padding: 3px 12px 3px 42px; }
+  .title-times { left: auto; right: 22px; top: 16px; bottom: auto; }
+}
+
+/* falling in from the sky: nothing on screen but the view (and the logo) */
+#hud.arriving #hints, #hud.arriving #basket, #hud.arriving #seeds, #hud.arriving #next, #hud.arriving #prompt, #hud.arriving #prompt2, #hud.arriving #touch, #hud.arriving #toast { opacity: 0; pointer-events: none; }
+#hints, #basket, #seeds, #touch { transition: opacity 1s ease; }
