@@ -85,7 +85,8 @@ THREE.ShaderChunk.fog_fragment = THREE.ShaderChunk.fog_fragment.replace(
 	// thinning with height so the mountain and the sky stand above it
 	float islandClear = texture2D(uFogMask, vFogWorld.xz / ${WORLD_SIZE.toFixed(1)} + 0.5).r;
 	float lowAir = 1.0 - smoothstep(50.0, 96.0, vFogWorld.y);
-	float murk = (1.0 - islandClear) * lowAir * (1.0 - exp(-vFogDepth * 0.055));
+	// kept very sheer: a light haze that hints at what is undiscovered without hiding it
+	float murk = (1.0 - islandClear) * lowAir * (1.0 - exp(-vFogDepth * 0.02)) * 0.3;
 	// Close by, fog is a pale veil. Further in, it takes exactly the colour of the
 	// sky behind, so trees dissolve into the air instead of standing out as white shapes.
 	vec3 fogDir = normalize(vFogWorld - cameraPosition);
