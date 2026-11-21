@@ -65,13 +65,29 @@
       </div>
     </div>
 
-    <div id="start" class="screen hidden">
-      <div class="card">
-        <div class="logo-mark" role="img" aria-label="Calmlings"></div>
-        <h1>Calm Island</h1>
-        <p class="lead">No goals. No clock. Just an island to wander.</p>
-        <button id="play" class="primary">Begin wandering</button>
-        <div class="controls">
+    <div id="start" class="title hidden">
+      <div class="title-side">
+        <img class="title-logo" src="./brand/calmlings-logo.png" alt="Calmlings" />
+        <div class="title-sub">Calm Island</div>
+        <nav class="title-menu">
+          <button id="play" class="title-item">Begin wandering</button>
+          <button id="title-how" class="title-item">How to play</button>
+          <button id="title-settings" class="title-item">Settings</button>
+          <button id="title-credits" class="title-item">Credits</button>
+        </nav>
+      </div>
+      <div class="title-times" role="group" aria-label="Time of day">
+        <button id="time-dawn" class="title-time" aria-label="Sunrise" title="Sunrise">◐</button>
+        <button id="time-day" class="title-time" aria-label="Day" title="Day">☀</button>
+        <button id="time-night" class="title-time" aria-label="Night" title="Night">☾</button>
+      </div>
+      <div class="title-foot">Calmlings: Calm Island · no goals, no clock, just an island to wander</div>
+      <div class="title-keys"><kbd>↑</kbd><kbd>↓</kbd> move <kbd>Enter</kbd> select</div>
+    </div>
+    <div id="how" class="screen hidden">
+      <div class="card wide">
+        <h2>How to play</h2>
+        <div class="controls" style="justify-content:flex-start;margin:10px 0 18px">
           <span class="desk"><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> wander</span>
           <span class="desk"><kbd>Shift</kbd>+<kbd>arrows</kbd> or mouse: camera</span>
           <span class="desk"><kbd>Space</kbd> hop; keep holding in the air to glide</span>
@@ -91,7 +107,21 @@
           <span class="touch">Drag the view to look around</span>
           <span class="touch">Buttons to hop (hold to glide), sit and breathe, and say hello</span>
         </div>
+        <button id="how-close" class="primary">Back</button>
       </div>
+    </div>
+    <div id="credits" class="screen hidden">
+      <div class="card wide">
+        <h2>Credits</h2>
+        <div class="credits-body">
+          <p><b>Calmlings: Calm Island</b><br />A calm little world from Calmlings.</p>
+          <p><b>Trees, plants, furniture and market stalls</b><br />Stylized Nature, Medieval Village and Fantasy Props MegaKits by Quaternius, shared under CC0.</p>
+          <p><b>Music</b><br />“Woodland Walk”.</p>
+          <p><b>Made with</b><br />Three.js, TypeScript and Vite.</p>
+        </div>
+        <button id="credits-close" class="primary">Back</button>
+      </div>
+    </div>
     </div>
 
     <div id="menu" class="screen hidden">

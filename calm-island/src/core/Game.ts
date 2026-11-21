@@ -14,6 +14,7 @@ import { FRUITS, Home, KEEPSAKES } from '../world/Home';
 import { Springs } from '../world/Springs';
 import { Trail } from '../world/Trail';
 import { Backdrop } from '../world/Backdrop';
+import { ArrivalClouds } from '../world/Arrival';
 import { SHOP_ITEMS, Shop } from '../world/Shop';
 import { WildFruit } from '../world/WildFruit';
 import { SEASON, currentSeason, setSeason } from '../world/season';
@@ -135,6 +136,10 @@ export class Game {
   private gifted = new Set<string>();
   private inside = false;
   private homePrompt = false;
+  /** false while the title screen is up: the camera drifts round the treehouse instead of following the Calmling */
+  private started = false;
+  private titleFocus = new THREE.Vector3();
+  private arrivalClouds = new ArrivalClouds();
   /** the guided introduction: 0 falling … 10 heading home, 99 finished */
   private tut = 99;
   private tutTimer = 0;
@@ -226,6 +231,9 @@ export class Game {
       onPhotoSave: () => this.savePhoto(),
       onLogClose: () => this.play(),
       onResume: () => this.play(),
+      onTitleTime: (hour) => {
+        this.day.hour = hour;
+      },
       onSkipIntro: () => {
         this.tut = 99;
         this.ui.introRunning(false);
@@ -237,8 +245,8 @@ export class Game {
         if (this.inside) this.leaveHome();
         this.player.dropFromSky(0, 6, 170);
         this.arrivingIntro = true;
-        this.rig.yaw = 0.6;
-        this.rig.pitch = 0.62;
+        this.rig.yaw = -2.19; // facing the treehouse and its light
+        this.rig.pitch = 0.36;
         this.rig.dist = 9;
         this.rig.snap(this.player);
         this.play();
@@ -306,8 +314,8 @@ export class Game {
         this.ui.introRunning(true);
         this.player.dropFromSky(0, 6, 170);
         this.arrivingIntro = true;
-        this.rig.yaw = 0.6;
-        this.rig.pitch = 0.62;
+        this.rig.yaw = -2.19; // facing the treehouse and its light
+        this.rig.pitch = 0.36;
         this.rig.dist = 9;
         this.rig.snap(this.player);
         this.play();
@@ -425,7 +433,7 @@ export class Game {
         cz = this.springs.spots[i].z;
       }
     }
-    this.scene.add(new Backdrop().group);
+    this.scene.add(new Backdrop().group, this.arrivalClouds.group);
     this.trail = new Trail(this.island);
     this.scene.add(this.trail.points);
     this.scene.add(this.fishing.group, this.home.group);
@@ -533,8 +541,8 @@ export class Game {
     if ((!save && !this.opts.test) || this.opts.intro) {
       this.player.dropFromSky(0, 6, 170);
       this.arrivingIntro = true;
-      this.rig.yaw = 0.6;
-      this.rig.pitch = 0.62;
+      this.rig.yaw = -2.19; // facing the treehouse and its light
+      this.rig.pitch = 0.36;
       this.rig.dist = 9;
       this.rig.snap(this.player);
     }
@@ -556,6 +564,7 @@ export class Game {
   }
 
   play(): void {
+    this.started = true;
     this.playing = true;
     this.photo = false;
     this.input.cameraOnly = false;
@@ -691,6 +700,16 @@ export class Game {
         this.saveIn = 5;
         this.save();
       }
+    }
+    if (!this.started) {
+      // the title screen: a slow drift round the treehouse and its fruit patch
+      const t = globalUniforms.uTime.value;
+      const a = Math.atan2(-0.746, -0.666) + 0.55 + Math.sin(t * 0.05) * 0.4;
+      const cx = this.home.x + Math.sin(a) * 19;
+      const cz = this.home.z + Math.cos(a) * 19;
+      this.camera.position.set(cx, Math.max(this.island.heightAt(cx, cz) + 2.2, this.island.heightAt(this.home.x, this.home.z) + 4.6 + Math.sin(t * 0.07) * 0.8), cz);
+      this.titleFocus.set(this.home.x + 3, this.island.heightAt(this.home.x, this.home.z) + 4.3, this.home.z - 2);
+      this.camera.lookAt(this.titleFocus);
     }
     this.input.endFrame();
     this.updateWorld(dt);
@@ -993,7 +1012,7 @@ export class Game {
   /** Eating fruit (keys 1–3 or the basket buttons) and the effects it leaves for a while. */
   private updateFruit(dt: number): void {
     const k = this.input.eatPressed();
-    if (k >= 0 && !this.sleeping) {
+    if (k >= 0 && !this.sleeping && !this.player.arriving) {
       if (this.basket[k] > 0) {
         this.basket[k]--;
         this.effects[k] = 120;
@@ -2147,7 +2166,8 @@ export class Game {
   /** Everything that keeps moving even while the menu is open. */
   private updateWorld(dt: number): void {
     globalUniforms.uTime.value += dt;
-    const p = this.player.pos;
+    // (on the title screen the world is drawn round the treehouse, where the camera is looking)
+    const p = this.started ? this.player.pos : this.titleFocus;
     this.weather.update(dt, this.camera.position);
     // stay sitting after your breaths and the day drifts by ten times faster
     const drift = this.sleeping ? 40 : this.playing && this.player?.sitting && !this.breathing.active && !this.practice && !this.fishing.active ? 10 : 1;
@@ -2155,6 +2175,9 @@ export class Game {
     this.garden.update(Date.now(), globalUniforms.uTime.value);
     this.home.update(globalUniforms.uTime.value, this.day.night, Date.now(), this.inside);
     this.shop.update(dt, this.day.night, this.day.hour);
+    const falling = this.started && !!this.player?.arriving;
+    this.arrivalClouds.update(dt, falling, this.player.pos, this.island.heightAt(this.player.pos.x, this.player.pos.z), globalUniforms.uDayLight.value);
+    this.ui.arriving(falling);
     this.wild.update(globalUniforms.uTime.value, this.day.night, Date.now());
     this.springs.update(globalUniforms.uTime.value, this.day.night);
     // the music hushes for sleep, and beside a lit fire

@@ -53,6 +53,8 @@ export interface UIHandlers {
   onArrive(): void;
   onEat(kind: number): void;
   onSkipIntro(): void;
+  /** the title screen's time-of-day buttons */
+  onTitleTime(hour: number): void;
   onReset(): void;
   onSettings(s: Settings): void;
 }
@@ -63,10 +65,48 @@ export class UI {
   private hintsTimer = 0;
   /** set on phones and tablets: shows the on-screen controls */
   touch = false;
+  private fromTitle = false;
 
   constructor(private settings: Settings, private handlers: UIHandlers) {
     $('play').addEventListener('click', () => handlers.onPlay());
-    $('resume').addEventListener('click', () => handlers.onResume());
+    // the title screen: a short list, walked with the arrow keys
+    const items = ['play', 'title-how', 'title-settings', 'title-credits'].map((id) => $(id));
+    $('start').addEventListener('keydown', (e) => {
+      const i = items.indexOf(document.activeElement as HTMLElement);
+      if (e.code === 'ArrowDown') items[(i + 1) % items.length].focus();
+      else if (e.code === 'ArrowUp') items[(i + items.length - 1) % items.length].focus();
+      else return;
+      e.preventDefault();
+    });
+    const sub = (open: string, card: string, close: string): void => {
+      $(open).addEventListener('click', () => $(card).classList.remove('hidden'));
+      $(close).addEventListener('click', () => {
+        $(card).classList.add('hidden');
+        $(open).focus();
+      });
+    };
+    sub('title-how', 'how', 'how-close');
+    sub('title-credits', 'credits', 'credits-close');
+    $('title-settings').addEventListener('click', () => {
+      this.fromTitle = true;
+      $('menu').classList.add('from-title');
+      $('menu-stats').textContent = 'These can be changed at any time from the menu.';
+      $('menu').classList.remove('hidden');
+      $('resume').textContent = 'Back';
+    });
+    for (const [id, hour] of [['time-dawn', 6.6], ['time-day', 13], ['time-night', 22]] as [string, number][]) $(id).addEventListener('click', () => handlers.onTitleTime(hour));
+    $('resume').addEventListener('click', () => {
+      if (this.fromTitle) {
+        // opened from the title screen: Back returns there instead of starting the game
+        this.fromTitle = false;
+        $('menu').classList.remove('from-title');
+        $('menu').classList.add('hidden');
+        $('resume').textContent = 'Keep wandering';
+        $('title-settings').focus();
+        return;
+      }
+      handlers.onResume();
+    });
     $('open-log').addEventListener('click', () => handlers.onLog());
     $('btn-log').addEventListener('click', () => handlers.onLog());
     $('log-close').addEventListener('click', () => handlers.onLogClose());
@@ -163,7 +203,7 @@ export class UI {
   }
 
   showGame(): void {
-    for (const id of ['loading', 'start', 'menu', 'log', 'map', 'photo-bar', 'journal', 'letter', 'choices']) $(id).classList.add('hidden');
+    for (const id of ['loading', 'start', 'menu', 'log', 'map', 'photo-bar', 'journal', 'letter', 'choices', 'how', 'credits']) $(id).classList.add('hidden');
     $('hud').classList.remove('hidden');
     $('touch').classList.toggle('hidden', !this.touch);
     $('hints').classList.remove('faded');
@@ -345,6 +385,11 @@ export class UI {
       list.append(row);
     }
     $('choices').classList.remove('hidden');
+  }
+
+  /** While falling in from the sky there is nothing to press: the controls and counters stay out of the way. */
+  arriving(on: boolean): void {
+    $('hud').classList.toggle('arriving', on);
   }
 
   /** A handwritten letter, shown as its own card. */
