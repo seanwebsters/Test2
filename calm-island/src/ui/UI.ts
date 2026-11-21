@@ -74,9 +74,10 @@ export class UI {
       });
     };
     const season = $<HTMLSelectElement>('set-season');
-    season.value = this.settings.season;
+    season.value = this.settings.tropical ? 'tropical' : this.settings.season;
     season.addEventListener('change', () => {
-      this.settings.season = season.value as Settings['season'];
+      this.settings.tropical = season.value === 'tropical';
+      if (!this.settings.tropical) this.settings.season = season.value as Settings['season'];
       handlers.onSettings(this.settings);
       handlers.onSeason();
     });

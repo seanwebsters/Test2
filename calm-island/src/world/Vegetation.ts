@@ -5,6 +5,7 @@ import { GARDEN_HEIGHT, HALF, polylineAt, type Island } from './islandMap';
 import { Noise2D } from './noise';
 import { SEASON } from './season';
 import * as plants from './plantGeometry';
+import { seasonalLeaves, type NatureModels } from './NatureModels';
 import { globalUniforms } from './shared';
 
 interface Kind {
@@ -19,22 +20,32 @@ interface Kind {
   tint: boolean;
   /** rounded foliage looks cleaner without self-shadowing */
   receive?: boolean;
+  /** extra pieces drawn with the main one (imported models have bark and leaves) */
+  parts?: { geo: THREE.BufferGeometry; material: THREE.Material; shadow: boolean }[];
+  /** material for the far-away stand-in, when the near model uses textures */
+  loMaterial?: THREE.Material;
+  /** the cheapest stand-in, for the far distance */
+  far?: THREE.BufferGeometry;
+  farDist?: number;
 }
 
 interface Batch {
   hi: THREE.InstancedMesh;
+  extra: THREE.InstancedMesh[];
+  far: THREE.InstancedMesh | null;
   lo: THREE.InstancedMesh | null;
   cx: number;
   cz: number;
   kind: Kind;
 }
 
-const SECTOR = 128;
+// Small sectors keep the detailed tree models to a tight ring around the camera.
+const SECTOR = 64;
 const SECTORS = (HALF * 2) / SECTOR;
 
 /** Lambert material with vertex colours and a gentle wind sway above `base`. */
-function foliageMaterial(sway: number, base: number, doubleSide = false, leafy = false, bloom = false): THREE.MeshLambertMaterial {
-  const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: doubleSide ? THREE.DoubleSide : THREE.FrontSide });
+function foliageMaterial(sway: number, base: number, doubleSide = false, leafy = false, bloom = false, map: THREE.Texture | null = null, crownY = 0): THREE.MeshLambertMaterial {
+  const mat = new THREE.MeshLambertMaterial({ vertexColors: !map, map, alphaTest: map ? 0.45 : 0, side: doubleSide ? THREE.DoubleSide : THREE.FrontSide });
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = globalUniforms.uTime;
     shader.uniforms.uPlayer = globalUniforms.uPlayer;
@@ -52,6 +63,7 @@ function foliageMaterial(sway: number, base: number, doubleSide = false, leafy =
         float swayAmt = ${sway.toFixed(4)} * max(position.y - ${base.toFixed(2)}, 0.0);
         transformed.x += (sin(uTime * 1.3 + swayPhase) + 0.5 * sin(uTime * 2.9 + swayPhase * 1.7 + position.y)) * swayAmt;
         transformed.z += cos(uTime * 1.1 + swayPhase * 1.3) * swayAmt * 0.7;
+
         ${bloom ? `
         #ifdef USE_INSTANCING
           // flowers wait half-closed and open up as the Calmling comes near
@@ -65,6 +77,21 @@ function foliageMaterial(sway: number, base: number, doubleSide = false, leafy =
           vLeafPos = position;
         #endif` : ''}`,
       );
+    if (map && crownY <= 0) {
+      shader.vertexShader = shader.vertexShader.replace('#include <beginnormal_vertex>', 'vec3 objectNormal = normalize(normal * 0.25 + vec3(0.0, 1.0, 0.0));');
+      shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', 'vec3 normal = normalize(vNormal);\nvec3 nonPerturbedNormal = normal;');
+    }
+    if (map && crownY > 0) {
+      // Leaf cards face every which way; lighting them as one rounded crown keeps the shading soft.
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <beginnormal_vertex>',
+        `vec3 objectNormal = normalize(mix(normal, normalize(position - vec3(0.0, ${crownY.toFixed(2)}, 0.0)) + vec3(0.0, 0.35, 0.0), 0.88));`,
+      );
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <normal_fragment_begin>',
+        'vec3 normal = normalize(vNormal);\nvec3 nonPerturbedNormal = normal;',
+      );
+    }
     if (leafy) {
       // Dappled clumps of lighter and darker leaves, so crowns read as foliage
       // rather than smooth balloons.
@@ -118,9 +145,10 @@ export class Vegetation {
   private occupied = new Map<number, number[]>();
   counts: Record<string, number> = {};
 
-  constructor(private island: Island) {
+  constructor(private island: Island, models: NatureModels | null = null, base = './') {
     const rnd = mulberry32(2024);
     const nz = new Noise2D(606);
+    let greatTree: Kind | null = null;
     const tree = foliageMaterial(0.012, 2.2, false, true);
     const small = foliageMaterial(0.05, 0.1, false, true);
     const leafy = foliageMaterial(0.035, 0.2, true);
@@ -129,16 +157,57 @@ export class Vegetation {
     const rockMat = new THREE.MeshLambertMaterial({ vertexColors: true });
 
     const treeKind = (make: (detail: number) => THREE.BufferGeometry): Kind => ({
-      hi: make(4), lo: make(2), material: tree, shadow: true, lodDist: 70, cullDist: 1e9, tint: false, receive: false,
+      hi: make(4), lo: make(2), material: tree, shadow: true, lodDist: 30, farDist: 120, cullDist: 1e9, tint: false, receive: false,
     });
     const broad = [0, 1, 2].map((v) => treeKind((d) => plants.broadleafTree(v, d)));
     const cherry = [0, 1].map((v) => treeKind((d) => plants.cherryTree(v, d)));
     const pine = [0, 1].map((v) => treeKind((d) => plants.pineTree(v, d)));
-    const palm = [0, 1, 2].map((v): Kind => ({ hi: plants.palmTree(v), material: palmMat, shadow: true, lodDist: 1e9, cullDist: 1e9, tint: false }));
-    const bush = [0, 1].map((v): Kind => ({ hi: plants.bush(v), material: small, shadow: true, lodDist: 1e9, cullDist: 420, tint: false, receive: false }));
+    const palm = [0, 1, 2].map((v): Kind => ({ hi: plants.palmTree(v), lo: plants.palmTree(v, true), material: palmMat, shadow: true, lodDist: 60, cullDist: 1e9, tint: false }));
+    broad.forEach((k, v) => (k.far = plants.farTree('leaf', v)));
+    cherry.forEach((k, v) => (k.far = plants.farTree('blossom', v)));
+    pine.forEach((k, v) => (k.far = plants.farTree('pine', v)));
+    const bush = [0, 1].map((v): Kind => ({ hi: plants.bush(v), material: small, shadow: true, lodDist: 1e9, cullDist: 230, tint: false, receive: false }));
     const fern = [0, 1].map((v): Kind => ({ hi: plants.fern(v), material: leafy, shadow: false, lodDist: 1e9, cullDist: 230, tint: false }));
     const tropical: Kind = { hi: plants.tropicalPlant(), material: leafy, shadow: true, lodDist: 1e9, cullDist: 260, tint: false };
     const rock = [0, 1, 2].map((v): Kind => ({ hi: plants.rock(v), material: rockMat, shadow: true, lodDist: 1e9, cullDist: 1e9, tint: false }));
+    let mushroom: Kind | null = null;
+    if (models) {
+      // Swap the hand-built plants for the imported models, keeping the old
+      // blob trees only as the far-away low-detail stand-ins.
+      const mats = new Map<string, THREE.Material>();
+      const use = (name: string, opts: { blossom?: boolean; sway?: number; base?: number; crown?: number; shadow?: boolean } = {}): Kind['parts'] =>
+        models.get(name)!.map((p) => {
+          const leaves = p.cutout && /Leav|Leaf/.test(p.material);
+          const key = `${p.material}|${opts.blossom ? 1 : 0}|${opts.crown ?? 0}|${opts.sway ?? 0}`;
+          let material = mats.get(key);
+          if (!material) {
+            const map = leaves ? seasonalLeaves(base, p.material, p.map, !!opts.blossom) : p.map;
+            material = p.cutout
+              ? foliageMaterial(opts.sway ?? 0.012, opts.base ?? 2.2, true, leaves && (opts.crown ?? 0) > 0, false, map, leaves ? opts.crown ?? 0 : 0)
+              : new THREE.MeshLambertMaterial({ map });
+            mats.set(key, material);
+          }
+          return { geo: p.geo, material, shadow: opts.shadow ?? true };
+        });
+      const model = (kind: Kind, parts: Kind['parts']): void => {
+        kind.hi = parts![0].geo;
+        kind.loMaterial = kind.material;
+        kind.material = parts![0].material;
+        kind.parts = parts!.slice(1);
+      };
+      ['CommonTree_1', 'CommonTree_2', 'CommonTree_3'].forEach((n, i) => model(broad[i], use(n, { crown: 6.2 })));
+      ['CommonTree_4', 'CommonTree_5'].forEach((n, i) => model(cherry[i], use(n, { blossom: true, crown: 5.6 })));
+      ['Pine_1', 'Pine_2'].forEach((n, i) => model(pine[i], use(n, { crown: 5.5 })));
+      ['Bush_Common', 'Bush_Common_Flowers'].forEach((n, i) => model(bush[i], use(n, { sway: 0.04, base: 0.2, crown: 0.7 })));
+      model(fern[0], use('Fern_1', { sway: 0.035, base: 0.2, shadow: false }));
+      model(fern[1], use('Fern_1', { sway: 0.035, base: 0.2, shadow: false }));
+      model(tropical, use('Plant_1_Big', { sway: 0.03, base: 0.3 }));
+      ['Rock_Medium_1', 'Rock_Medium_2', 'Rock_Medium_3'].forEach((n, i) => model(rock[i], use(n)));
+      mushroom = { hi: plants.rock(0), material: rockMat, shadow: true, lodDist: 1e9, cullDist: 160, tint: false };
+      model(mushroom, use('Mushroom_Common'));
+      greatTree = { hi: plants.rock(0), material: rockMat, shadow: true, lodDist: 1e9, cullDist: 1e9, tint: false, receive: false };
+      model(greatTree, use('TwistedTree_1', { crown: 11 }));
+    }
     const flower = (g: THREE.BufferGeometry, cull = 200): Kind => ({ hi: g, material: flowerMat, shadow: false, lodDist: 1e9, cullDist: cull, tint: true });
     const daisy = flower(plants.daisy());
     const hibiscus = flower(plants.hibiscus());
@@ -164,7 +233,12 @@ export class Vegetation {
     };
 
     // ---- the Calm Garden, composed by hand -------------------------------
-    tree1(broad[0], -11, -13, 2.3, 0.42, 6);
+    if (greatTree) {
+      // the old tree at the heart of the garden
+      this.put(greatTree, -11, GARDEN_HEIGHT - 0.2, -13, 2.2, 1.25);
+      this.colliders.add(-11, -13, 1.1);
+      this.shade.push(-11, -13, 9);
+    } else tree1(broad[0], -11, -13, 2.3, 0.42, 6);
     const ringR = 27;
     for (let i = 0; i < 12; i++) {
       const a = (i / 12) * Math.PI * 2 + 0.26;
@@ -243,12 +317,12 @@ export class Vegetation {
     }
 
     // ---- forests, groves and lone trees ----------------------------------
-    for (let i = 0; i < 14000; i++) {
+    for (let i = 0; i < 24000; i++) {
       const x = (rnd() - 0.5) * 900;
       const z = (rnd() - 0.5) * 900;
       const f = at(I.forest, x, z);
-      const lone = rnd() < 0.012;
-      if (f < rnd() * 0.85 + 0.12 && !lone) continue;
+      const lone = rnd() < 0.02;
+      if (f < rnd() * 0.8 + 0.08 && !lone) continue;
       const h = I.heightAt(x, z);
       if (h < 3.6 || h > 92 || at(I.sand, x, z) > 0.1 || at(I.path, x, z) > 0.02 || !this.dry(x, z, 0.5)) continue;
       if (Math.hypot(x, z) < 33) continue;
@@ -256,20 +330,23 @@ export class Vegetation {
       let kind: Kind;
       const r = rnd();
       if (high) kind = r < (h > 60 ? 0.95 : 0.62) ? pick(pine) : r < 0.9 ? pick(broad) : pick(cherry);
-      else if (lone) kind = r < 0.45 ? pick(cherry) : pick(broad);
-      else kind = r < 0.07 ? pick(cherry) : r < 0.16 ? pick(pine) : pick(broad);
-      tree1(kind, x, z, 0.85 + rnd() * 0.75, 0.34, lone ? 9 : 4.6);
+      else if (lone) kind = r < 0.3 ? pick(cherry) : r < 0.65 ? pick(palm) : pick(broad);
+      else kind = r < 0.06 ? pick(cherry) : h < 30 && r < 0.3 ? pick(palm) : pick(broad);
+      // a jungle: most trees tall, and now and then a giant that towers over the rest
+      const giant = !high && rnd() < 0.05;
+      const isPalm = palm.includes(kind);
+      tree1(kind, x, z, isPalm ? 1.1 + rnd() * 0.8 : giant ? 1.8 + rnd() * 0.5 : 1.0 + rnd() * 0.8, giant ? 0.45 : 0.34, lone ? 8 : giant ? 7 : 4.0);
     }
 
     // ---- palms along the beaches -----------------------------------------
-    for (let i = 0; i < 9000; i++) {
+    for (let i = 0; i < 16000; i++) {
       const x = (rnd() - 0.5) * 940;
       const z = (rnd() - 0.5) * 940;
       const sd = at(I.sand, x, z);
       if (sd < 0.25 || sd > 0.97) continue;
       const h = I.heightAt(x, z);
-      if (h < 1.5 || h > 4.5 || rnd() > 0.3) continue;
-      tree1(pick(palm), x, z, 0.85 + rnd() * 0.5, 0.26, 6.5);
+      if (h < 1.3 || h > 5.5 || rnd() > 0.7) continue;
+      tree1(pick(palm), x, z, 0.9 + rnd() * 0.8, 0.26, 4.2);
     }
 
     // ---- undergrowth ------------------------------------------------------
@@ -287,7 +364,19 @@ export class Vegetation {
         const s = 0.8 + rnd() * 0.9;
         this.put(pick(bush), x, h - 0.1, z, rnd() * 6.3, s);
         this.shade.push(x, z, 1.3 * s);
-      } else if (p > 0.985 - f * 0.02) this.put(tropical, x, h, z, rnd() * 6.3, 0.9 + rnd() * 0.8);
+      } else if (p > 0.93 - f * 0.1) this.put(tropical, x, h, z, rnd() * 6.3, 0.9 + rnd() * 1.3);
+    }
+
+    // ---- mushrooms under the trees (imported models only) ----------------
+    if (mushroom) {
+      for (let i = 0; i < 9000; i++) {
+        const x = (rnd() - 0.5) * 900;
+        const z = (rnd() - 0.5) * 900;
+        if (at(I.forest, x, z) < 0.55 || rnd() > 0.2 || at(I.path, x, z) > 0.1 || !this.dry(x, z, 0.6)) continue;
+        const h = I.heightAt(x, z);
+        if (h < 3.4 || h > 70 || I.gradientAt(x, z, grad) > 0.5) continue;
+        this.put(mushroom, x, h, z, rnd() * 6.3, 0.8 + rnd() * 1.4);
+      }
     }
 
     // ---- rocks: scree on slopes, boulders in meadows, stones in the river --
@@ -381,8 +470,13 @@ export class Vegetation {
         l.push(i);
       });
       for (const [key, ids] of sectors) {
-        const make = (geo: THREE.BufferGeometry, shadow: boolean): THREE.InstancedMesh => {
-          const mesh = new THREE.InstancedMesh(geo, kind.material, ids.length);
+        const make = (geo: THREE.BufferGeometry, shadow: boolean, material: THREE.Material = kind.material): THREE.InstancedMesh => {
+          const mesh = new THREE.InstancedMesh(geo, material, ids.length);
+          const lm = material as THREE.MeshLambertMaterial;
+          if (shadow && lm.map && lm.alphaTest > 0) {
+            // leaf cards cast leaf-shaped shadows, not solid squares
+            mesh.customDepthMaterial = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: lm.map, alphaTest: lm.alphaTest });
+          }
           ids.forEach((id, n) => {
             const it = data.m[id];
             pos.set(it[0], it[1], it[2]);
@@ -400,9 +494,11 @@ export class Vegetation {
           return mesh;
         };
         const hi = make(kind.hi, kind.shadow);
-        const lo = kind.lo ? make(kind.lo, false) : null;
+        const extra = (kind.parts ?? []).map((p) => make(p.geo, p.shadow, p.material));
+        const lo = kind.lo ? make(kind.lo, false, kind.loMaterial ?? kind.material) : null;
+        const far = kind.far ? make(kind.far, false, kind.loMaterial ?? kind.material) : null;
         this.batches.push({
-          hi, lo, kind,
+          hi, lo, kind, extra, far,
           cx: ((key % SECTORS) + 0.5) * SECTOR - HALF,
           cz: (Math.floor(key / SECTORS) + 0.5) * SECTOR - HALF,
         });
@@ -421,7 +517,10 @@ export class Vegetation {
       const visible = d < b.kind.cullDist * distanceScale;
       const near = d < b.kind.lodDist * distanceScale;
       b.hi.visible = visible && (near || !b.lo);
-      if (b.lo) b.lo.visible = visible && !near;
+      for (const e of b.extra) e.visible = b.hi.visible;
+      const distant = !!b.far && d >= (b.kind.farDist ?? 1e9) * distanceScale;
+      if (b.lo) b.lo.visible = visible && !near && !distant;
+      if (b.far) b.far.visible = visible && distant;
     }
   }
 }

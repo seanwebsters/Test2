@@ -6,7 +6,7 @@ import { GRID, WORLD_SIZE, type Island } from './islandMap';
 // so each line of hills and trees sits a little paler than the one in front.
 THREE.ShaderChunk.fog_fragment = THREE.ShaderChunk.fog_fragment.replace(
   'gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );',
-  `float hazeAmt = (1.0 - exp(-vFogDepth * 0.0035)) * 0.34;
+  `float hazeAmt = (1.0 - exp(-vFogDepth * 0.003)) * 0.24;
 	gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor * vec3(0.86, 0.95, 1.1), hazeAmt);
 	gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );`,
 );

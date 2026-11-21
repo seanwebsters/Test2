@@ -13,10 +13,10 @@ const mix3 = (a: RGB, b: RGB, t: number, out: RGB): RGB => {
   return out;
 };
 
-const GRASS_A = hex(0x7ccb3a);
-const GRASS_B = hex(0x4fae35);
-const GRASS_SUN = hex(0xa9d94a);
-const GRASS_FOREST = hex(0x3d8f38);
+const GRASS_A = hex(0x6fa845);
+const GRASS_B = hex(0x4a8a3d);
+const GRASS_SUN = hex(0x9dbd5a);
+const GRASS_FOREST = hex(0x336b35);
 const ALPINE = hex(0x8fa878);
 const SAND = hex(0xf3e2b3);
 const SAND_WET = hex(0xd9c493);
@@ -28,6 +28,7 @@ const ROCK_A = hex(0x9c9284);
 const ROCK_B = hex(0x7b7468);
 const ROCK_WARM = hex(0xb39c7c);
 const SNOW = hex(0xf6f9ff);
+const DRY = hex(0x9a9a55);
 const AUTUMN_GRASS = hex(0xc9a83a);
 
 /**
@@ -111,7 +112,9 @@ export function bakeGroundTexture(island: Island, res: number, shadeSpots: numbe
       // grass
       mix3(GRASS_A, GRASS_B, smoothstep(0.25, 0.75, big), c);
       mix3(c, GRASS_SUN, smoothstep(0.55, 0.9, mid) * 0.5, c);
-      mix3(c, GRASS_FOREST, fr * 0.6, c);
+      mix3(c, GRASS_FOREST, fr * 0.72, c);
+      // broad drifts of drier, olive ground break up the meadows
+      mix3(c, DRY, smoothstep(0.62, 0.9, n2.simplex(x * 0.006 + 40, z * 0.006) * 0.5 + 0.5) * 0.45 * (1 - fr), c);
       const alpine = smoothstep(58, 98, h + big * 8);
       mix3(c, ALPINE, alpine, c);
       const shade = 0.95 + 0.07 * fine + 0.05 * (mid - 0.5);

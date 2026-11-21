@@ -298,11 +298,21 @@ const PALM_TIP = C(0x9bd94c);
 const PALM_BARK_A = C(0x8a6f4c);
 const PALM_BARK_B = C(0xb89a6c);
 
-export function palmTree(variant: number): THREE.BufferGeometry {
+/** A tree reduced to one soft crown on a stick, for the far distance. */
+export function farTree(type: 'leaf' | 'blossom' | 'pine', variant: number): THREE.BufferGeometry {
+  const pal = type === 'blossom' ? blossomPal(variant) : type === 'pine' ? { dark: PINE_DARK, mid: PINE_MID, light: SEASON === 'winter' ? SNOWY : PINE_LIGHT } : leafPal(variant);
+  const crown = type === 'pine' ? [{ x: 0, y: 5.6, z: 0, r: 2.4 }] : [{ x: 0, y: 6.2, z: 0, r: 3.3 }];
+  const g = canopy(crown, 2, pal, 90 + variant);
+  if (type === 'pine') g.scale(1, 1.7, 1).translate(0, -3.2, 0);
+  const stick = paint(new THREE.CylinderGeometry(0.2, 0.3, 4.4, 5, 1, true).translate(0, 2.2, 0), (_p, _n, c) => c.copy(BARK_DARK).lerp(BARK_LIGHT, 0.4));
+  return merge([stick, g]);
+}
+
+export function palmTree(variant: number, simple = false): THREE.BufferGeometry {
   const rnd = mulberry32(1300 + variant * 7);
-  const h = 6.5 + rnd() * 2.5;
-  const bend = 1.4 + rnd() * 1.6;
-  const g = new THREE.CylinderGeometry(0.15, 0.27, h, 8, 12, true).translate(0, h / 2, 0);
+  const h = 8 + rnd() * 3.5;
+  const bend = 1.6 + rnd() * 2.2;
+  const g = new THREE.CylinderGeometry(0.15, 0.27, h, simple ? 5 : 8, simple ? 4 : 12, true).translate(0, h / 2, 0);
   const pos = g.attributes.position;
   for (let i = 0; i < pos.count; i++) {
     v.fromBufferAttribute(pos, i);
@@ -312,9 +322,15 @@ export function palmTree(variant: number): THREE.BufferGeometry {
   }
   g.computeVertexNormals();
   const parts = [paint(g, (p, _n, c) => c.copy(PALM_BARK_A).lerp(PALM_BARK_B, 0.5 + 0.5 * Math.sin((p.y / h) * 60)))];
-  const crown = frondCrown(10, (_i, r) => frond(3.4 + r() * 1.0, 1.25, 1.5, 2.6 + r() * 1.2, PALM_BASE, PALM_TIP, 9), 1400 + variant, 0.05, 0.5);
+  // two rings of fronds: long arching ones outside, shorter upright ones in the heart
+  const crown = simple
+    ? frondCrown(7, (_i, r) => frond(4.6 + r() * 1.2, 1.9, 1.7, 3.4 + r() * 1.4, PALM_BASE, PALM_TIP, 4), 1400 + variant, 0.0, 0.5)
+    : [
+    ...frondCrown(11, (_i, r) => frond(4.4 + r() * 1.4, 1.5, 1.7, 3.4 + r() * 1.6, PALM_BASE, PALM_TIP, 11), 1400 + variant, 0.0, 0.42),
+    ...frondCrown(6, (_i, r) => frond(2.8 + r() * 0.8, 1.1, 1.3, 0.9 + r() * 0.6, PALM_BASE, PALM_TIP, 8), 1500 + variant, 0.55, 1.05),
+  ];
   for (const f of crown) parts.push(f.translate(bend, h - 0.05, 0));
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < (simple ? 0 : 3); i++) {
     const a = i * 2.1 + variant;
     parts.push(paint(new THREE.SphereGeometry(0.2, 8, 6).translate(bend + Math.cos(a) * 0.25, h - 0.3, Math.sin(a) * 0.25), (_p, _n, c) => c.set(0x7a5a36)));
   }

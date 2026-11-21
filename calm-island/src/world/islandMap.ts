@@ -396,7 +396,7 @@ function buildIsland(): Island {
 
       const nz = nA.fbm(x * 0.0055 + 40, z * 0.0055 - 17, 3) * 0.5 + 0.5;
       const west = smoothstep(-40, -170, x);
-      let f = smoothstep(0.5, 0.66, nz * 0.7 + west * 0.34 + p * 0.06);
+      let f = smoothstep(0.42, 0.6, nz * 0.72 + west * 0.36 + p * 0.06);
       f *= smoothstep(36, 74, Math.hypot(x, z));
       f *= d > 0 ? smoothstep(beachW, beachW + 25, d) : 0;
       f *= 1 - smoothstep(60, 85, h);
