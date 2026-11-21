@@ -26,6 +26,9 @@ export class Ambience {
   private volume = 0.6;
   private ducked = false;
   private nextChirp = 0;
+  private noise: AudioBuffer | null = null;
+  /** footsteps played so far (for tests) */
+  steps = 0;
   /** how many bird or cricket calls have been scheduled (for tests) */
   calls = 0;
 
@@ -50,6 +53,7 @@ export class Ambience {
         last = last * 0.6 + (Math.random() * 2 - 1) * 0.4;
         d[i] = last;
       }
+      this.noise = buf;
       const layer = (type: BiquadFilterType, freq: number, q: number, rate: number): GainNode => {
         const src = ctx.createBufferSource();
         src.buffer = buf;
@@ -161,6 +165,62 @@ export class Ambience {
       o.start(t);
       o.stop(t + 0.04);
     }
+  }
+
+  /** One short burst of shaped noise: the raw material of every footstep. */
+  private burst(at: number, type: BiquadFilterType, freq: number, q: number, dur: number, gain: number, rate: number): void {
+    const ctx = this.ctx!;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise;
+    src.playbackRate.value = rate;
+    const f = ctx.createBiquadFilter();
+    f.type = type;
+    f.frequency.value = freq;
+    f.Q.value = q;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.linearRampToValueAtTime(gain, at + dur * 0.18);
+    g.gain.exponentialRampToValueAtTime(0.0004, at + dur);
+    src.connect(f).connect(g).connect(this.master!);
+    src.start(at, Math.random() * 3.5, dur + 0.05);
+  }
+
+  /**
+   * A footstep on the ground underfoot. Every step is varied a little in
+   * pitch, length and loudness so a walk never sounds like a loop.
+   */
+  step(surface: 'grass' | 'sand' | 'path' | 'rock' | 'water', effort: number): void {
+    if (!this.ctx || !this.master || !this.noise) return;
+    this.steps++;
+    const now = this.ctx.currentTime;
+    const v = (0.7 + Math.random() * 0.5) * (0.55 + 0.45 * effort);
+    const r = 0.85 + Math.random() * 0.4;
+    if (surface === 'grass') {
+      // a soft swish, then the blades springing back
+      this.burst(now, 'bandpass', 2400 * r, 0.7, 0.13, 0.085 * v, r);
+      this.burst(now + 0.045, 'highpass', 3600, 0.5, 0.11, 0.035 * v, r * 1.2);
+    } else if (surface === 'sand') {
+      // a low, dry crunch
+      this.burst(now, 'lowpass', 950 * r, 0.6, 0.17, 0.13 * v, r * 0.8);
+      this.burst(now + 0.03, 'bandpass', 3000, 1.2, 0.07, 0.03 * v, r);
+    } else if (surface === 'path') {
+      this.burst(now, 'bandpass', 1500 * r, 1.3, 0.08, 0.1 * v, r);
+      this.burst(now + 0.02, 'lowpass', 500, 0.7, 0.09, 0.07 * v, r * 0.7);
+    } else if (surface === 'rock') {
+      this.burst(now, 'bandpass', 2100 * r, 3.0, 0.045, 0.12 * v, r * 1.1);
+    } else {
+      // wading: a slosh and a drip
+      this.burst(now, 'bandpass', 800 * r, 0.8, 0.22, 0.12 * v, r * 0.7);
+      this.plip(0.25 + Math.random() * 0.3);
+    }
+  }
+
+  /** Landing from a hop or a glide: a soft thump and a rustle. */
+  land(force: number): void {
+    if (!this.ctx || !this.master || !this.noise) return;
+    const now = this.ctx.currentTime;
+    this.burst(now, 'lowpass', 260, 0.7, 0.2, 0.2 * force, 0.6);
+    this.burst(now + 0.02, 'bandpass', 2600, 0.7, 0.2, 0.07 * force, 1);
   }
 
   /** A few rising bell notes, for the moment fog lifts. */

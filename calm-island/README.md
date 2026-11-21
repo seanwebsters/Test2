@@ -51,6 +51,13 @@ and the places you have discovered are saved in the browser automatically.
 If the frame rate stays low for a few seconds the game steps the graphics
 preset down by itself. Choosing a preset in the menu turns that off.
 
+## Sound
+
+The music is one supplied track. Wind, water, birds, crickets, rain and the
+footsteps (grass, sand, path, rock, wading) are synthesised in code with Web
+Audio; no recordings are bundled. `src/core/Ambience.ts` is the place to swap
+real recordings in.
+
 ## Status
 
 Phase 1 of four is done: the island, the playable Calmling, the camera and

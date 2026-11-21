@@ -9,6 +9,7 @@ export class Music {
   private started = false;
   private volume = 0.6;
   private ducked = false;
+  private resting = false;
 
   constructor(private url: string) {}
 
@@ -53,9 +54,16 @@ export class Music {
     this.apply(0.8);
   }
 
+  /** Let the music fall silent for a while, or bring it back, over several seconds. */
+  rest(on: boolean): void {
+    if (this.resting === on) return;
+    this.resting = on;
+    this.apply(7);
+  }
+
   private apply(seconds: number): void {
     if (!this.ctx || !this.gain) return;
-    const target = this.volume * this.volume * (this.ducked ? 0.35 : 1);
+    const target = this.volume * this.volume * (this.ducked ? 0.35 : 1) * (this.resting ? 0 : 1);
     this.gain.gain.cancelScheduledValues(this.ctx.currentTime);
     this.gain.gain.setTargetAtTime(target, this.ctx.currentTime, seconds / 3);
   }

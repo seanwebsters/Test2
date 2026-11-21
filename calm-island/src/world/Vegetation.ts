@@ -68,6 +68,7 @@ function foliageMaterial(sway: number, base: number, doubleSide = false, leafy =
         ${bloom ? `
         #ifdef USE_INSTANCING
           // flowers wait half-closed and open up as the Calmling comes near
+          // (petals are also kept just under the glow threshold, so white flowers do not flare)
           float near = 1.0 - smoothstep(2.5, 8.0, distance(instanceMatrix[3].xyz, uPlayer));
           transformed *= mix(0.6, 1.12, near * near * (3.0 - 2.0 * near));
         #endif` : ''}
@@ -93,6 +94,7 @@ function foliageMaterial(sway: number, base: number, doubleSide = false, leafy =
         'vec3 normal = normalize(vNormal);\nvec3 nonPerturbedNormal = normal;',
       );
     }
+    if (bloom) shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= 0.84;');
     if (leafy) {
       // Dappled clumps of lighter and darker leaves, so crowns read as foliage
       // rather than smooth balloons.
