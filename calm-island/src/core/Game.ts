@@ -12,6 +12,7 @@ import { Skimming } from '../world/Skimming';
 import { Fishing } from '../world/Fishing';
 import { FRUITS, Home, KEEPSAKES } from '../world/Home';
 import { Springs } from '../world/Springs';
+import { Trail } from '../world/Trail';
 import { SEASON, currentSeason, setSeason } from '../world/season';
 import { Cairns, Kite, Viewpoints } from '../world/Places';
 import { CELL, GRID, HALF, WORLD_SIZE } from '../world/islandMap';
@@ -48,6 +49,20 @@ export interface GameOptions {
   /** skip the imported nature models and use the built-in plants */
   plainPlants?: boolean;
 }
+
+/** Small things to mean to do today. Three are offered each day; keeping any one counts the day. */
+const INTENTS: Record<string, string> = {
+  breathe: 'Take three slow breaths',
+  water: 'Sit beside the water for a moment',
+  fruit: 'Pick a fruit from your patch',
+  friend: 'Walk a little way with a friend',
+  fire: 'Light the fire this evening',
+  view: 'Rest at a viewpoint',
+  skim: 'Skim a stone',
+  fish: 'Cast a line and wait',
+  sleep: 'Lie down for a sleep',
+  tend: 'Tend the garden',
+};
 
 export class Game {
   readonly renderer: THREE.WebGLRenderer;
@@ -116,6 +131,20 @@ export class Game {
   private gifted = new Set<string>();
   private inside = false;
   private homePrompt = false;
+  /** the guided introduction: 0 falling … 10 heading home, 99 finished */
+  private tut = 99;
+  private tutTimer = 0;
+  private tutSpring = -1;
+  private guide!: Npc;
+  private trail!: Trail;
+  private trailTarget: { x: number; z: number } | null = null;
+  private nextCheck = 0;
+  private days = 0;
+  private streak = 0;
+  private lastDay = '';
+  private restWeek = -1;
+  private intents: { key: string; ids: string[]; done: boolean[] } = { key: '', ids: [], done: [] };
+  private introduced = new Set<string>();
   private baseFov = 50;
   private springs!: Springs;
   private springHinted = new Set<number>();
@@ -184,6 +213,13 @@ export class Game {
       onPhotoSave: () => this.savePhoto(),
       onLogClose: () => this.play(),
       onResume: () => this.play(),
+      onSkipIntro: () => {
+        this.tut = 99;
+        this.ui.introRunning(false);
+        this.pickIntents();
+        this.save();
+        this.play();
+      },
       onArrive: () => {
         if (this.inside) this.leaveHome();
         this.player.dropFromSky(0, 6, 170);
@@ -241,8 +277,21 @@ export class Game {
         this.endPractice();
         this.day.hour = 9;
         this.setCompanion(null);
-        this.player.teleport(SPAWN.x, SPAWN.z, 0.5);
-        this.rig.yaw = 0;
+        // a fresh start begins as the very first one did: down from the sky, with the introduction
+        this.days = 0;
+        this.streak = 0;
+        this.lastDay = '';
+        this.restWeek = -1;
+        this.introduced.clear();
+        this.intents = { key: '', ids: [], done: [] };
+        this.home.setVine(0);
+        this.tut = 0;
+        this.ui.introRunning(true);
+        this.player.dropFromSky(0, 6, 170);
+        this.arrivingIntro = true;
+        this.rig.yaw = 0.6;
+        this.rig.pitch = 0.62;
+        this.rig.dist = 9;
         this.rig.snap(this.player);
         this.play();
       },
@@ -336,6 +385,8 @@ export class Game {
     for (const [sx, sz, sr] of this.home.solids) this.vegetation.colliders.add(sx, sz, sr);
     this.springs = new Springs(this.island, this.vegetation.colliders);
     this.scene.add(this.springs.group, this.glow);
+    this.trail = new Trail(this.island);
+    this.scene.add(this.trail.points);
     this.scene.add(this.fishing.group, this.home.group);
     this.viewpoints = new Viewpoints(this.island);
     this.cairns = new Cairns(this.island);
@@ -367,6 +418,27 @@ export class Game {
       this.scene.add(npc.model.root);
     });
     this.pickDaily();
+    // one friend lives close by, down the earth path by the river: the first you are sent to find
+    {
+      this.guide = [...this.npcs].filter((n) => !n.who.hours).sort((a, b) => Math.hypot(a.home.x - 62, a.home.z - 14) - Math.hypot(b.home.x - 62, b.home.z - 14))[0];
+      const grad = { x: 0, z: 0 };
+      for (let i = 0; i < 80; i++) {
+        const x = 62 + Math.cos(i * 2.4) * i * 0.5;
+        const z = 15 + Math.sin(i * 2.4) * i * 0.5;
+        if (this.island.heightAt(x, z) > this.island.waterLevelAt(x, z) + 0.8 && this.island.gradientAt(x, z, grad) < 0.3) {
+          this.guide.moveHome(x, z);
+          break;
+        }
+      }
+      let best = 1e9;
+      this.springs.spots.forEach((sp, i) => {
+        const d = Math.hypot(sp.x - this.home.x, sp.z - this.home.z);
+        if (d < best && d < 160) {
+          best = d;
+          this.tutSpring = i;
+        }
+      });
+    }
 
     const save = this.opts.test ? null : loadSave();
     if (save) {
@@ -393,6 +465,13 @@ export class Game {
       this.home.loadFruit(save.fruit);
       for (const id of save.gifted ?? []) this.gifted.add(id);
       this.springs.load(save.springs);
+      this.tut = save.tut ?? 99;
+      this.days = save.days ?? 0;
+      this.streak = save.streak ?? 0;
+      this.lastDay = save.lastDay ?? '';
+      this.restWeek = save.restWeek ?? -1;
+      if (save.intents && Array.isArray(save.intents.ids)) this.intents = save.intents;
+      for (const id of save.introduced ?? []) this.introduced.add(id);
       const friend = this.npcs.find((n) => n.who.id === save.companion);
       if (friend) {
         this.setCompanion(friend);
@@ -402,6 +481,10 @@ export class Game {
     }
     this.rig.snap(this.player);
     this.ui.seeds(this.seeds.foundIds.length, this.seeds.spots.length);
+    if (!save && !this.opts.test) this.tut = 0;
+    if (this.tut >= 9) this.pickIntents();
+    this.home.setVine(this.days);
+    this.ui.introRunning(this.tut < 99);
     if ((!save && !this.opts.test) || this.opts.intro) {
       this.player.dropFromSky(0, 6, 170);
       this.arrivingIntro = true;
@@ -520,7 +603,7 @@ export class Game {
       this.updateHums();
       if (this.arrivingIntro && !this.player.arriving) {
         this.arrivingIntro = false;
-        this.ui.moment('Welcome to', 'Calm Island', 'It is lost in fog. Somewhere close, a warm light is glowing.');
+        this.ui.moment('Welcome to', 'Calm Island', 'A quiet place, all your own. Somewhere close, a warm light is glowing.');
         this.ambience.chime();
       }
       this.updateMeetings();
@@ -532,6 +615,7 @@ export class Game {
       this.updateSleep(dt);
       this.updateFruit(dt);
       this.updateEvening(dt);
+      this.updateGuide(dt);
       if (this.input.kitePressed() && !this.inside) {
         this.kite.flying = !this.kite.flying;
         if (this.kite.flying) this.flags.add('kite');
@@ -606,7 +690,10 @@ export class Game {
         const did = this.garden.tend(this.gardenPlot, Date.now());
         if (did === 'planted') this.ui.toast('', 'Seed planted', 'It grows while you are away. Come back and see.');
         if (did === 'watered') this.ui.toast('', 'Watered', 'That will help it along.');
-        if (did) this.save();
+        if (did) {
+          this.did('tend');
+          this.save();
+        }
       }
       return;
     }
@@ -630,6 +717,7 @@ export class Game {
         if (this.input.interactPressed() && this.player.sit()) {
           const fresh = !this.rested.has(view.id);
           this.rested.add(view.id);
+          this.did('view');
           this.player.yaw = view.yaw + Math.PI;
           this.rig.yaw = view.yaw;
           this.rig.pitch = 0.26;
@@ -711,6 +799,7 @@ export class Game {
         this.ambience.plip(0.5);
         const first = !this.flags.has('pick');
         this.flags.add('pick');
+        this.did('fruit');
         this.ui.toast(first ? 'Into your basket' : '', `A ${FRUITS[kind].name}`, first ? `Press ${kind + 1} (or tap it) to eat it, or take it to a friend who loves them` : `${this.basket[kind]} in your basket. It will grow back in a few minutes`);
         this.save();
       };
@@ -720,6 +809,7 @@ export class Game {
         act = () => {
           home.lit = true;
           this.flags.add('fire');
+          this.did('fire');
           this.ui.toast('', 'The fire is lit', this.met.size ? 'Friends you have made may come and sit a while' : 'It will burn until morning');
         };
       } else if (!this.player.sitting) {
@@ -855,11 +945,208 @@ export class Game {
       this.flags.add('gathering');
       this.ui.toast('Evening at home', arrived === 1 ? `${guests[0].who.name} has come by` : `${arrived} friends have come by`, home.lit ? 'The fire is warm. Sit with them a while' : 'Light the fire and sit with them a while');
     }
+    if (this.player.sitting && this.waterNear > 0.12) this.did('water');
+    if (this.companion && this.player.speed > 1) this.did('friend');
     const s = this.springs.near(p);
-    if (s >= 0 && !this.springs.isAwake(s) && !this.springHinted.has(s)) {
+    if (s >= 0 && !this.springs.isAwake(s) && !this.springHinted.has(s) && this.tut >= 6) {
       this.springHinted.add(s);
       this.ui.toast('A sleeping spring', this.springs.spots[s].name, 'Sit beside it and take three deep breaths to wake it');
     }
+  }
+
+  /** Today, as a whole number of local days. */
+  private dayKey(): string {
+    return String(Math.floor((Date.now() - new Date().getTimezoneOffset() * 60000) / 864e5));
+  }
+
+  /** Three intentions for today, the same all day and different tomorrow. */
+  private pickIntents(): void {
+    const key = this.dayKey();
+    if (this.intents.key === key && this.intents.ids.length === 3) return;
+    const pool = Object.keys(INTENTS).filter((id) => id !== 'friend' || this.met.size > 0);
+    let h = Number(key) * 2654435761;
+    const ids: string[] = [];
+    while (ids.length < 3) {
+      h = (h * 1103515245 + 12345) >>> 0;
+      const id = pool[h % pool.length];
+      if (!ids.includes(id)) ids.push(id);
+    }
+    this.intents = { key, ids, done: [false, false, false] };
+  }
+
+  /** Something was just done. If it is one of today's intentions, it is kept, and the first one counts the day. */
+  private did(id: string): void {
+    if (this.tut < 9) return;
+    this.pickIntents();
+    const i = this.intents.ids.indexOf(id);
+    if (i < 0 || this.intents.done[i]) return;
+    this.intents.done[i] = true;
+    const kept = this.intents.done.filter(Boolean).length;
+    if (!this.countDay()) this.ui.toast(`Intention kept · ${kept} of 3`, INTENTS[id], kept === 3 ? 'All three. A full, gentle day' : 'Lovely');
+    this.save();
+  }
+
+  /**
+   * Count today as a day on the island, once. Days only ever add up. The run of
+   * days in a row forgives one missed day a week, and never punishes a longer gap:
+   * it simply starts again while the vine keeps every leaf.
+   */
+  private countDay(): boolean {
+    const today = this.dayKey();
+    if (this.lastDay === today) return false;
+    const gap = this.lastDay ? Number(today) - Number(this.lastDay) : 0;
+    const week = Math.floor(Number(today) / 7);
+    if (gap === 1) this.streak++;
+    else if (gap === 2 && this.restWeek !== week) {
+      this.streak++;
+      this.restWeek = week;
+    } else this.streak = 1;
+    this.lastDay = today;
+    this.days++;
+    this.home.setVine(this.days);
+    const milestone = [3, 7, 14, 30].includes(this.streak);
+    if (milestone) for (let k = 0; k < 3; k++) this.basket[k]++;
+    this.ambience.chime();
+    this.ui.moment(
+      this.streak > 1 ? `${this.streak} days in a row` : 'Your vine grows',
+      `Day ${this.days} on the island`,
+      milestone ? 'A gift for coming back: one of each fruit is in your basket' : this.days % 7 === 0 ? 'A flower has opened on the vine at your treehouse' : 'A new leaf has opened on the vine at your treehouse',
+    );
+    return true;
+  }
+
+  /** A friend mentions another Calmling: the nearest one you have not met gets a ? on the map. */
+  private introduce(from: Npc): void {
+    const next = this.npcs
+      .filter((n) => n !== from && !this.met.has(n.who.id) && !this.introduced.has(n.who.id))
+      .sort((a, b) => a.home.distanceTo(from.home) - b.home.distanceTo(from.home))[0];
+    if (!next) return;
+    this.introduced.add(next.who.id);
+    this.ui.toast(`${from.who.name} tells you`, 'A friend lives nearby', `Near ${this.nearestRegionName(next.home.x, next.home.z)}. A ? on your map shows roughly where`);
+    this.save();
+  }
+
+  /**
+   * The guided first ten minutes, one step at a time, then the single line of
+   * suggestion that stays under the logo. Also decides where the sparkle trail leads.
+   */
+  private updateGuide(dt: number): void {
+    const p = this.player.pos;
+    const g = this.guide;
+    const like = this.npcs.indexOf(g) % 3;
+    const fruit = FRUITS[like];
+    const key = (k: string): string => (this.ui.touch ? '' : ` (${k})`);
+    let text: string | null = null;
+    let target: { x: number; z: number } | null = null;
+    const go = (step: number): void => {
+      this.tut = step;
+      this.tutTimer = 0;
+      this.save();
+    };
+    this.tutTimer += dt;
+    switch (this.tut) {
+      case 0:
+        if (!this.arrivingIntro && !this.player.arriving) go(1);
+        break;
+      case 1:
+        text = 'Walk toward the warm light';
+        target = this.home;
+        if (this.flags.has('home')) go(2);
+        break;
+      case 2:
+        text = `Climb up and go inside${key('E at the ladder')}`;
+        target = this.home.ladderSpot;
+        if (this.inside) go(3);
+        break;
+      case 3:
+        text = 'Make yourself at home';
+        if (this.tutTimer > 2.2 || !this.inside) {
+          go(4);
+          this.playing = false;
+          this.input.enabled = false;
+          this.input.releaseLock();
+          this.ui.prompt(null);
+          this.ui.showLetter('A letter, left on your bed', [
+            'Dear new neighbour,',
+            'Welcome to Calm Island. I saw you float down and hoped you would find the little house. It has been waiting for someone.',
+            `I live down by the river, just along the earth path. I would love a visitor. I am very fond of ${fruit.plural}, if any are ripe in your patch.`,
+            'No hurry at all.',
+            `— ${g.who.name}`,
+          ]);
+        }
+        break;
+      case 4:
+        text = this.inside ? `Step outside${key('E')}, then pick a ${fruit.name} for ${g.who.name}` : `Pick a ${fruit.name} from your patch for ${g.who.name}${key('E')}`;
+        target = this.inside ? null : this.home.plantSpot(like, Date.now());
+        if (this.basket[like] > 0 || this.met.has(g.who.id)) go(this.tutSpring >= 0 && !this.springs.isAwake(this.tutSpring) ? 5 : 6);
+        break;
+      case 5: {
+        const sp = this.springs.spots[this.tutSpring];
+        text = Math.hypot(sp.x - p.x, sp.z - p.z) < 6.5 ? `Sit and take three slow breaths${key('B')}` : 'A spring is sleeping nearby. Follow the sparkles';
+        target = sp;
+        if (this.springs.isAwake(this.tutSpring) || this.met.has(g.who.id)) go(6);
+        break;
+      }
+      case 6:
+        text = `Someone is humming down by the river. Follow the sparkles`;
+        target = g.pos;
+        if (this.met.has(g.who.id)) go(7);
+        break;
+      case 7:
+        text = `Give ${g.who.name} the ${fruit.name}${key('Q')}`;
+        if (this.gifted.has(g.who.id) || this.basket[like] === 0 || this.tutTimer > 60) go(8);
+        break;
+      case 8:
+        text = `Invite ${g.who.name} to walk with you${key('E')}`;
+        if (this.companion === g || this.tutTimer > 45) {
+          go(9);
+          this.introduce(g);
+        }
+        break;
+      case 9:
+        if (this.tutTimer < 0.1) this.pickIntents();
+        text = `Three small intentions for today are in your journal${key('J')}`;
+        if (this.tutTimer > 9) go(10);
+        break;
+      case 10:
+        text = 'Head home and see what has grown';
+        target = this.home;
+        if (this.home.near(p)) {
+          go(99);
+          this.ui.introRunning(false);
+          this.countDay();
+          this.save();
+        }
+        break;
+      default: {
+        // after the introduction: at most one quiet suggestion, refreshed now and then
+        this.nextCheck -= dt;
+        if (this.nextCheck > 0) return void this.trail.update(dt, globalUniforms.uTime.value, p, this.trailTarget);
+        this.nextCheck = 2;
+        this.pickIntents();
+        let near: Npc | null = null;
+        let nearD = 60;
+        for (const n of this.npcs) {
+          const d = Math.hypot(n.pos.x - p.x, n.pos.z - p.z);
+          if (!n.absent && !this.met.has(n.who.id) && d < nearD) {
+            nearD = d;
+            near = n;
+          }
+        }
+        const undone = this.intents.ids.find((_, i) => !this.intents.done[i]);
+        const told = this.npcs.find((n) => this.introduced.has(n.who.id) && !this.met.has(n.who.id));
+        if (near) text = 'Someone is humming nearby. Follow the sparkles';
+        else if (this.lastDay !== this.dayKey() && undone) text = `Today: ${INTENTS[undone].toLowerCase()}`;
+        else if (told) text = `A friend is waiting near ${this.nearestRegionName(told.home.x, told.home.z)}. See the ? on your map`;
+        target = near ? near.pos : null;
+        this.trailTarget = target;
+        this.ui.next(this.inside ? null : text);
+        this.trail.update(dt, globalUniforms.uTime.value, p, target);
+        return;
+      }
+    }
+    this.ui.next(text);
+    this.trail.update(dt, globalUniforms.uTime.value, p, this.inside ? null : target);
   }
 
   /** Walking together slowly fills three hearts; the second one earns a story. */
@@ -889,6 +1176,8 @@ export class Game {
     // swing the camera round so they are framed beyond the player
     this.momentYaw = Math.atan2(this.player.pos.x - npc.pos.x, this.player.pos.z - npc.pos.z);
     this.momentUntil = globalUniforms.uTime.value + 4.5;
+    // a little later they mention someone else worth finding
+    if (this.tut >= 9) window.setTimeout(() => this.introduce(npc), 9500);
     // take their picture once the air has cleared
     window.setTimeout(() => this.portraits.set(npc.who.id, this.snapPortrait(npc)), 4800);
   }
@@ -1031,7 +1320,10 @@ export class Game {
           this.ambience.plip(0.6);
         }
       } else if (this.waterNear > 0.12 && this.player.grounded && !this.practice && !this.breathing.active && !this.sleeping) {
-        if (f.cast(this.player.pos, this.player.yaw) && this.player.sit()) this.ui.toast('', 'Line cast', 'Now there is nothing to do but wait');
+        if (f.cast(this.player.pos, this.player.yaw) && this.player.sit()) {
+          this.ui.toast('', 'Line cast', 'Now there is nothing to do but wait');
+          this.did('fish');
+        }
         else {
           f.stop();
           this.ui.toast('', 'No water there', 'Face the water and try again');
@@ -1064,6 +1356,7 @@ export class Game {
       if (!this.player.sit()) return;
       this.sleeping = true;
       this.sleptFor = 0;
+      this.did('sleep');
       this.player.sleeping = true;
       this.ui.prompt(null);
       this.ui.prompt2(null);
@@ -1159,7 +1452,10 @@ export class Game {
       this.waterNear = Math.min(1, near / 7);
       this.ui.skim(this.waterNear > 0.12 && this.player.grounded && !this.practice && !this.breathing.active && !this.fishing.active, this.fishing.state === 'bite' ? 'Reel!' : this.fishing.active ? 'Reel in' : 'Fish');
     }
-    if (this.input.skimPressed() && this.waterNear > 0.12 && this.player.grounded && !this.player.sitting) this.skimming.throw(p, this.player.yaw);
+    if (this.input.skimPressed() && this.waterNear > 0.12 && this.player.grounded && !this.player.sitting) {
+      this.skimming.throw(p, this.player.yaw);
+      this.did('skim');
+    }
     const event = this.skimming.update(dt);
     if (event) this.ambience.plip(event === 'skip' ? 1 : 0.2);
     if (event === 'done' && this.skimming.skips > 0) {
@@ -1296,6 +1592,20 @@ export class Game {
     this.springs.spots.forEach((sp, i) => {
       if (this.springs.isAwake(i)) dot(sp.x, sp.z, 5, '#8fe9ff', '#ffffff');
     });
+    // friends you have been told about: a question mark near (not on) where they live
+    this.npcs.forEach((npc, i) => {
+      if (!this.introduced.has(npc.who.id) || this.met.has(npc.who.id)) return;
+      const [qx, qy] = at(npc.home.x + Math.sin(i * 2.3) * 16, npc.home.z + Math.cos(i * 2.3) * 16);
+      ctx.save();
+      ctx.font = '800 30px ui-rounded, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = '#4f2f1e';
+      ctx.fillStyle = '#ffe9c6';
+      ctx.strokeText('?', qx, qy + 10);
+      ctx.fillText('?', qx, qy + 10);
+      ctx.restore();
+    });
     if (this.dailyDone !== this.daily.key) {
       const [dx, dy] = at(this.daily.npc.home.x, this.daily.npc.home.z);
       ctx.beginPath();
@@ -1359,7 +1669,14 @@ export class Game {
     this.ui.prompt(null);
     this.ui.prompt2(null);
     const best = Math.max(0, ...[...this.bonds.keys()].map((id) => this.hearts(id)));
+    const kept = this.intents.done.filter(Boolean).length;
     this.ui.showJournal([
+      ...(this.tut >= 9
+        ? [
+            { title: this.days ? `Day ${this.days} on the island` : 'Your first day on the island', hint: this.lastDay === this.dayKey() ? (this.streak > 1 ? `${this.streak} days in a row. Today is counted: the vine has its leaf` : 'Today is counted: the vine has its leaf') : 'Keep any one of today’s intentions and the vine grows a leaf', done: this.lastDay === this.dayKey() },
+            ...this.intents.ids.map((id, i) => ({ title: `Today: ${INTENTS[id]}`, hint: `One of three intentions for today. ${kept} kept so far`, done: this.intents.done[i] })),
+          ]
+        : []),
       { title: `Today’s moment: find ${this.daily.npc.who.name}`, hint: `Near ${this.nearestRegionName(this.daily.npc.home.x, this.daily.npc.home.z)}. A new one each day`, done: this.dailyDone === this.daily.key },
       { title: 'Take three deep breaths', hint: 'Press B anywhere', done: this.breathsDone > 0 },
       { title: 'Say hello to a Calmling', hint: 'Walk up to one and press E', done: this.met.size > 0 },
@@ -1434,6 +1751,7 @@ export class Game {
     this.player.breath = b.fill;
     if (finished) {
       this.breathsDone++;
+      this.did('breathe');
       this.reveal(this.player.pos.x, this.player.pos.z, 62); // three breaths push the fog back around you
       this.ambience.chime();
       this.ui.breath(null);
@@ -1668,6 +1986,13 @@ export class Game {
       fruit: this.home.serializeFruit(),
       gifted: [...this.gifted],
       springs: this.springs.serialize(),
+      tut: this.tut,
+      days: this.days,
+      streak: this.streak,
+      lastDay: this.lastDay,
+      restWeek: this.restWeek,
+      intents: this.intents,
+      introduced: [...this.introduced],
     });
   }
 
@@ -1677,6 +2002,7 @@ export class Game {
     const info = this.renderer.info.render;
     return {
       basket: [...this.basket], effects: this.effects.map((e) => Math.round(e)), gifted: [...this.gifted], inside: this.inside,
+      tut: this.tut, days: this.days, streak: this.streak, intents: this.intents, introduced: [...this.introduced], guide: this.guide.who.name,
       fireLit: this.home.lit, guests: this.guests, springs: this.springs.spots.length, springsAwake: this.springs.awakeCount,
       pos: [p.x, p.y, p.z],
       ground: this.island.heightAt(p.x, p.z),

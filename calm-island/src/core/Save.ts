@@ -34,6 +34,17 @@ export interface SaveData {
   gifted?: string[];
   /** ids of the regions whose calm spring is awake */
   springs?: string[];
+  /** the guided introduction: which step it is on (99 = finished) */
+  tut?: number;
+  /** days visited, the current run of days, the last day counted, and the week a rest day was forgiven */
+  days?: number;
+  streak?: number;
+  lastDay?: string;
+  restWeek?: number;
+  /** today's three intentions and which are kept */
+  intents?: { key: string; ids: string[]; done: boolean[] };
+  /** unmet Calmlings a friend has told you about */
+  introduced?: string[];
   /** patches of the map cleared of mist: x, z, radius */
   reveals?: number[][];
 }
