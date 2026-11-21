@@ -14,6 +14,7 @@ import { FRUITS, Home, KEEPSAKES } from '../world/Home';
 import { Springs } from '../world/Springs';
 import { Trail } from '../world/Trail';
 import { SHOP_ITEMS, Shop } from '../world/Shop';
+import { WildFruit } from '../world/WildFruit';
 import { SEASON, currentSeason, setSeason } from '../world/season';
 import { Cairns, Kite, Viewpoints } from '../world/Places';
 import { CELL, GRID, HALF, WORLD_SIZE } from '../world/islandMap';
@@ -148,6 +149,9 @@ export class Game {
   private intents: { key: string; ids: string[]; done: boolean[] } = { key: '', ids: [], done: [] };
   private introduced = new Set<string>();
   private shop!: Shop;
+  private wild!: WildFruit;
+  /** the springs in the order the chapters visit them: nearest home first, then on round the island */
+  private chapters: number[] = [];
   private owned = new Set<string>();
   private decor = { rug: '', quilt: '', lamp: '' };
   private wantSleep = false;
@@ -292,6 +296,7 @@ export class Game {
         this.restWeek = -1;
         this.introduced.clear();
         this.owned.clear();
+        this.wild.load([]);
         this.decor = { rug: '', quilt: '', lamp: '' };
         this.applyDecor();
         this.intents = { key: '', ids: [], done: [] };
@@ -399,6 +404,26 @@ export class Game {
     this.scene.add(this.springs.group, this.glow);
     this.shop = new Shop(this.island, this.vegetation.colliders, kit);
     this.scene.add(this.shop.group);
+    this.wild = new WildFruit(this.island, this.vegetation.colliders, [
+      { x: 0, z: 0, r: 18 },
+      { x: this.home.x, z: this.home.z, r: 22 },
+      { x: this.shop.x, z: this.shop.z, r: 9 },
+      ...this.springs.spots.map((sp) => ({ x: sp.x, z: sp.z, r: 6 })),
+    ]);
+    this.scene.add(this.wild.group);
+    {
+      // each chapter leads on to the nearest spring not yet visited
+      const left = this.springs.spots.map((_, i) => i);
+      let cx = this.home.x;
+      let cz = this.home.z;
+      while (left.length) {
+        left.sort((a, b) => Math.hypot(this.springs.spots[a].x - cx, this.springs.spots[a].z - cz) - Math.hypot(this.springs.spots[b].x - cx, this.springs.spots[b].z - cz));
+        const i = left.shift()!;
+        this.chapters.push(i);
+        cx = this.springs.spots[i].x;
+        cz = this.springs.spots[i].z;
+      }
+    }
     this.trail = new Trail(this.island);
     this.scene.add(this.trail.points);
     this.scene.add(this.fishing.group, this.home.group);
@@ -480,6 +505,7 @@ export class Game {
       for (const id of save.gifted ?? []) this.gifted.add(id);
       this.springs.load(save.springs);
       this.tut = save.tut ?? 99;
+      this.wild.load(save.wild);
       for (const id of save.owned ?? []) this.owned.add(id);
       if (save.decor) this.decor = { rug: save.decor.rug || '', quilt: save.decor.quilt || '', lamp: save.decor.lamp || '' };
       this.days = save.days ?? 0;
@@ -790,6 +816,40 @@ export class Game {
       this.startPractice(best!);
       return;
     }
+    if (!best && !this.practice && !this.breathing.active && !this.fishing.active && !this.player.sitting && this.player.grounded) {
+      // E always does whatever fits where you stand: pick a wild bush, or at the water's edge skim (E) or fish (Q)
+      const bush = this.wild.near(p, Date.now());
+      if (bush >= 0) {
+        this.nearby = null;
+        this.homePrompt = true;
+        this.ui.prompt(`Pick wild ${this.wild.name(bush)}`);
+        this.ui.prompt2(null);
+        if (this.input.interactPressed()) {
+          const kind = this.wild.pick(bush, Date.now());
+          this.basket[kind]++;
+          this.flags.add('wild');
+          this.did('fruit');
+          this.ambience.plip(0.5);
+          this.ui.toast('', `A ${FRUITS[kind].name}`, `${this.basket[kind]} in your basket. The bush will fruit again in a few minutes`);
+          this.save();
+        }
+        return;
+      }
+      if (this.waterNear > 0.12) {
+        this.nearby = null;
+        this.homePrompt = true;
+        this.ui.prompt('Skim a stone');
+        this.ui.prompt2('Cast a line');
+        if (this.input.interactPressed()) {
+          this.input.press('skim');
+          this.input.release('skim');
+        } else if (this.input.practisePressed()) {
+          this.input.press('fish');
+          this.input.release('fish');
+        }
+        return;
+      }
+    }
     if (best !== this.nearby || best) {
       this.nearby = best;
       const name = best?.who.name;
@@ -1087,7 +1147,10 @@ export class Game {
     if (i < 0 || this.intents.done[i]) return;
     this.intents.done[i] = true;
     const kept = this.intents.done.filter(Boolean).length;
-    if (!this.countDay()) this.ui.toast(`Intention kept · ${kept} of 3`, INTENTS[id], kept === 3 ? 'All three. A full, gentle day' : 'Lovely');
+    // every intention kept leaves a fruit in the basket
+    const gift = (Number(this.dayKey()) + i) % 3;
+    this.basket[gift]++;
+    if (!this.countDay()) this.ui.toast(`Intention kept · ${kept} of 3`, INTENTS[id], kept === 3 ? 'All three. A full, gentle day' : `A ${FRUITS[gift].name} for your basket`);
     this.save();
   }
 
@@ -1118,6 +1181,44 @@ export class Game {
       milestone ? 'A gift for coming back: one of each fruit is in your basket' : this.days % 7 === 0 ? 'A flower has opened on the vine at your treehouse' : 'A new leaf has opened on the vine at your treehouse',
     );
     return true;
+  }
+
+  /** Which chapter the story has reached (an index into `chapters`), or -1 when every spring is awake. */
+  private currentChapter(): number {
+    return this.chapters.findIndex((i) => !this.springs.isAwake(i));
+  }
+
+  /** After a spring wakes, a letter arrives from a friend in the next region, and they go on your map. */
+  private chapterLetter(woke: number): void {
+    if (!this.playing) return;
+    const ch = this.currentChapter();
+    const here = this.springs.spots[woke].name;
+    this.playing = false;
+    this.input.enabled = false;
+    this.input.releaseLock();
+    this.ui.prompt(null);
+    this.ui.prompt2(null);
+    if (ch < 0) {
+      this.ui.showLetter('A letter, signed by everyone', [
+        'Dear friend,',
+        'Every spring on the island is awake. We can see their lights from all our doors tonight.',
+        'There is nothing left that needs doing, which is the best time of all to do things. Come and sit by the fire.',
+        '— all of us',
+      ]);
+      return;
+    }
+    const sp = this.springs.spots[this.chapters[ch]];
+    const writer = [...this.npcs].sort((a, b) => Math.hypot(a.home.x - sp.x, a.home.z - sp.z) - Math.hypot(b.home.x - sp.x, b.home.z - sp.z))[0];
+    const known = this.met.has(writer.who.id);
+    if (!known) this.introduced.add(writer.who.id);
+    this.ui.showLetter(`Chapter ${ch + 1} · a letter by leaf`, [
+      known ? `Dear friend,` : 'Dear neighbour (we have not met yet),',
+      `We saw the light go up over ${here}. It reached all the way here.`,
+      `There is a spring near me too, in ${sp.name}, and it has been asleep a long while. Would you come and wake it? I have ringed it on your map.`,
+      'Bring your walking feet. There is wild fruit along the way.',
+      `— ${writer.who.name}`,
+    ]);
+    this.save();
   }
 
   /** A friend mentions another Calmling: the nearest one you have not met gets a ? on the map. */
@@ -1244,6 +1345,14 @@ export class Game {
         else if (this.lastDay !== this.dayKey() && undone) text = `Today: ${INTENTS[undone].toLowerCase()}`;
         else if (told) text = `A friend is waiting near ${this.nearestRegionName(told.home.x, told.home.z)}. See the ? on your map`;
         target = near ? near.pos : null;
+        // otherwise the story leads on: the next sleeping spring
+        const ch = this.currentChapter();
+        if (ch >= 0) {
+          const sp = this.springs.spots[this.chapters[ch]];
+          const d = Math.hypot(sp.x - p.x, sp.z - p.z);
+          if (!text) text = d < 7 ? 'Sit and take three slow breaths to wake the spring' : `Chapter ${ch + 1}: a spring sleeps in ${sp.name}. It is ringed on your map`;
+          if (!target && d < 140) target = sp;
+        }
         this.trailTarget = target;
         this.ui.next(this.inside ? null : text);
         this.trail.update(dt, globalUniforms.uTime.value, p, target);
@@ -1700,6 +1809,21 @@ export class Game {
     this.springs.spots.forEach((sp, i) => {
       if (this.springs.isAwake(i)) dot(sp.x, sp.z, 5, '#8fe9ff', '#ffffff');
     });
+    {
+      // the spring the story has reached: a ring to walk toward
+      const ch = this.currentChapter();
+      if (ch >= 0) {
+        const sp = this.springs.spots[this.chapters[ch]];
+        const [sx, sy] = at(sp.x, sp.z);
+        ctx.beginPath();
+        ctx.arc(sx, sy, 13, 0, Math.PI * 2);
+        ctx.strokeStyle = '#8fe9ff';
+        ctx.lineWidth = 4;
+        ctx.setLineDash([6, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
     // friends you have been told about: a question mark near (not on) where they live
     this.npcs.forEach((npc, i) => {
       if (!this.introduced.has(npc.who.id) || this.met.has(npc.who.id)) return;
@@ -1809,6 +1933,8 @@ export class Game {
       { title: 'Go inside your treehouse', hint: 'Press E at the foot of the ladder', done: this.flags.has('inside') },
       { title: 'Light the fire', hint: 'At the fire ring by the treehouse, once evening comes', done: this.flags.has('fire') },
       { title: 'Spend an evening with friends', hint: 'Friends you have met come to the fire after dark', done: this.flags.has('gathering') },
+      { title: this.currentChapter() >= 0 ? `Chapter ${this.currentChapter() + 1} of ${this.chapters.length}: ${this.springs.spots[this.chapters[this.currentChapter()]].name}` : 'Every chapter told', hint: this.currentChapter() >= 0 ? 'A spring is sleeping there. Wake it and a letter will lead you on' : 'All eight springs are awake', done: this.currentChapter() < 0 },
+      { title: 'Pick wild fruit', hint: `Bushes grow in every region: ${this.wild.count} across the island`, done: this.flags.has('wild') },
       { title: 'Wake a calm spring', hint: `${this.springs.awakeCount} of ${this.springs.spots.length} awake. Breathe beside the ring of stones in each place`, done: this.springs.awakeCount > 0 },
       { title: 'Watch night fall', hint: 'Stay sitting and the day drifts by', done: this.flags.has('night') },
       { title: 'Take a photo', hint: 'Press P, frame it, press Enter', done: this.flags.has('photo') },
@@ -1871,7 +1997,9 @@ export class Game {
         const n = this.springs.awakeCount;
         this.reveal(sp.x, sp.z, 150);
         this.ui.moment(`A calm spring wakes · ${n} of ${this.springs.spots.length}`, sp.name, n === this.springs.spots.length ? 'Every spring is awake. The whole island is calm.' : 'Its light can be seen from far away');
+        for (let k = 0; k < 3; k++) this.basket[k]++; // the waking water leaves one of each fruit
         this.save();
+        if (this.tut >= 9) window.setTimeout(() => this.chapterLetter(spring), 7000);
       } else this.ui.toast('', 'Three deep breaths', 'Carry that calm with you');
       return;
     }
@@ -2018,6 +2146,7 @@ export class Game {
     this.garden.update(Date.now(), globalUniforms.uTime.value);
     this.home.update(globalUniforms.uTime.value, this.day.night, Date.now(), this.inside);
     this.shop.update(dt, this.day.night, this.day.hour);
+    this.wild.update(globalUniforms.uTime.value, this.day.night, Date.now());
     this.springs.update(globalUniforms.uTime.value, this.day.night);
     // the music hushes for sleep, and beside a lit fire
     const hush = this.sleeping || (this.home.lit && !!this.player && Math.hypot(this.home.fireSpot.x - p.x, this.home.fireSpot.z - p.z) < 14);
@@ -2096,6 +2225,7 @@ export class Game {
       fruit: this.home.serializeFruit(),
       gifted: [...this.gifted],
       springs: this.springs.serialize(),
+      wild: this.wild.serialize(),
       owned: [...this.owned],
       decor: this.decor,
       tut: this.tut,
