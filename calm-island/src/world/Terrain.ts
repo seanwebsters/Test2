@@ -29,6 +29,10 @@ const ROCK_B = hex(0x7b7468);
 const ROCK_WARM = hex(0xb39c7c);
 const SNOW = hex(0xf6f9ff);
 const DRY = hex(0x9a9a55);
+const EARTH = hex(0x6a5a38);
+const FLOWER_A = hex(0xe8e2b0);
+const FLOWER_B = hex(0xb9a0d8);
+const MUD = hex(0x8a7650);
 const AUTUMN_GRASS = hex(0xc9a83a);
 
 /**
@@ -117,6 +121,15 @@ export function bakeGroundTexture(island: Island, res: number, shadeSpots: numbe
       mix3(c, DRY, smoothstep(0.62, 0.9, n2.simplex(x * 0.006 + 40, z * 0.006) * 0.5 + 0.5) * 0.45 * (1 - fr), c);
       const alpine = smoothstep(58, 98, h + big * 8);
       mix3(c, ALPINE, alpine, c);
+      // under the trees: leaf litter and bare earth showing through
+      mix3(c, EARTH, fr * smoothstep(0.35, 0.8, mid) * 0.5, c);
+      // faint washes of colour where wildflowers grow thickest
+      const fa = n1.simplex(x * 0.017, z * 0.017);
+      const fb = n1.simplex(x * 0.021 + 50, z * 0.021 - 20);
+      if (fr < 0.4) {
+        mix3(c, FLOWER_A, smoothstep(0.3, 0.8, fa) * 0.16, c);
+        mix3(c, FLOWER_B, smoothstep(0.45, 0.9, fb) * 0.18, c);
+      }
       const shade = 0.95 + 0.07 * fine + 0.05 * (mid - 0.5);
       c[0] *= shade;
       c[1] *= shade;
@@ -150,6 +163,7 @@ export function bakeGroundTexture(island: Island, res: number, shadeSpots: numbe
         grass *= 1 - sandAmt;
       }
       const bedAmt = smoothstep(0.08, 0.5, wt);
+      if (wt > 0.005 && wt < 0.3) mix3(c, MUD, smoothstep(0.005, 0.1, wt) * 0.55, c); // damp, trodden banks
       if (bedAmt > 0) {
         mix3(c, BED, bedAmt, c);
         grass *= 1 - smoothstep(0.02, 0.3, wt);
@@ -309,6 +323,35 @@ export class Terrain {
             float moss = smoothstep(0.62, 0.38, steepness) * smoothstep(0.45, 0.7, grain + warp * 0.3);
             rockCol = mix(rockCol, vec3(0.20, 0.42, 0.10), moss * 0.6);
             diffuseColor.rgb = mix(diffuseColor.rgb, rockCol, rockMask);
+          }
+          // Surface relief, from smooth noise only so its slope is clean:
+          // soft tussocks in grass, wind ripples in sand, ledges and cracks in rock.
+          float reliefGrass = gNoise(vWPos.xz * 1.9) * 0.55 + gNoise(vWPos.xz * 7.5 + 3.0) * 0.2;
+          float reliefSand = (sin(vWPos.x * 2.4 + vWPos.z * 0.9 + gNoise(vWPos.xz * 0.5) * 7.0) * 0.5 + 0.5) * 0.3 + gNoise(vWPos.xz * 5.0) * 0.15;
+          float beds2 = fract(vWPos.y * 0.17 + gNoise(vWPos.xz * 0.045) * 2.2);
+          // broad, smooth forms only: fine rock relief aliases into speckle on a distant cliff
+          float reliefRock = gNoise(vec2(vWPos.x + vWPos.z, vWPos.y * 1.6) * 0.33) * 0.9 + gNoise(vec2(vWPos.x - vWPos.z, vWPos.y) * 0.11) * 0.8;
+          float relief = mix(mix(reliefSand, reliefGrass, grassAmt), reliefRock, rockMask);
+          float reliefStrength = mix(mix(0.5, 0.75, grassAmt), 1.1, rockMask);
+          // cracks between the rock beds sit in shadow
+          diffuseColor.rgb *= 1.0 - rockMask * (1.0 - smoothstep(0.0, 0.14, beds2) * smoothstep(1.0, 0.86, beds2)) * 0.3 * (1.0 - smoothstep(40.0, 160.0, length(vViewPosition)));`,
+        )
+        .replace(
+          '#include <normal_fragment_maps>',
+          /* glsl */ `#include <normal_fragment_maps>
+          {
+            vec3 sigmaX = dFdx(-vViewPosition);
+            vec3 sigmaY = dFdy(-vViewPosition);
+            vec3 r1 = cross(sigmaY, normal);
+            vec3 r2 = cross(normal, sigmaX);
+            float det2 = dot(sigmaX, r1);
+            vec3 grad = sign(det2) * (dFdx(relief) * r1 + dFdy(relief) * r2);
+            // fade the relief with distance so far hills stay calm instead of shimmering
+            float fadeR = 1.0 - smoothstep(30.0, 140.0, length(vViewPosition));
+            // far away the screen-space slopes vanish; without this guard the normal
+            // becomes 0/0 and the glow pass smears the bad pixels across the frame
+            vec3 bumped = abs(det2) * normal - grad * reliefStrength * fadeR;
+            if (abs(det2) > 1e-10 && dot(bumped, bumped) > 1e-20) normal = normalize(bumped);
           }`,
         );
     };

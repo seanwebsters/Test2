@@ -24,6 +24,7 @@ const GradeShader = {
       vec3 around = texture2D(tDiffuse, vUv + vec2(uTexel.x, 0.0)).rgb + texture2D(tDiffuse, vUv - vec2(uTexel.x, 0.0)).rgb
         + texture2D(tDiffuse, vUv + vec2(0.0, uTexel.y)).rgb + texture2D(tDiffuse, vUv - vec2(0.0, uTexel.y)).rgb;
       c = clamp(c + (c - around * 0.25) * 0.45, 0.0, 1.0);
+      if (!(c.r >= 0.0 && c.g >= 0.0 && c.b >= 0.0)) c = vec3(0.5, 0.6, 0.7);
       float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));
       // a little more colour, with sunlit areas leaning warm and shade leaning cool
       c = mix(vec3(luma), c, 1.08);

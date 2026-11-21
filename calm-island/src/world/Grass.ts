@@ -96,7 +96,9 @@ export class Grass {
           float fade = 1.0 - smoothstep(uPatch * 0.36, uPatch * 0.5, distance(base, uCenter.xz));
           // thin the lawn out toward sand, rock and paths rather than cutting it off
           float grow = smoothstep(aOffset.w * 0.7, aOffset.w * 0.7 + 0.25, ground.a) * fade;
-          grow *= smoothstep(uInner * 0.7, uInner, distance(base, uPlayer.xz) + 0.001);
+          grow *= smoothstep(uInner * 0.7, uInner + 0.001, distance(base, uPlayer.xz) + 0.001);
+          // no stunted specks on sand and paths: a blade either grows properly or not at all
+          grow *= step(0.3, grow) * step(0.25, ground.a);
           float hgt = uBladeH * (0.55 + 0.9 * aOffset.z) * grow;
           float ang = aOffset.w * 6.2831 + aOffset.z * 40.0;
           float bend = position.y * position.y;
@@ -132,7 +134,8 @@ export class Grass {
           '#include <color_fragment>',
           /* glsl */ `
           diffuseColor.rgb = vGrassCol * mix(0.62, 1.3, vBladeY) + vec3(0.05, 0.06, 0.0) * vBladeY * vBladeY;
-          diffuseColor.rgb += vec3(0.16, 0.19, 0.05) * vSheen * vBladeY * vBladeY;`,
+          diffuseColor.rgb += vec3(0.16, 0.19, 0.05) * vSheen * vBladeY * vBladeY;
+          diffuseColor.rgb = min(diffuseColor.rgb, vec3(0.8)); // grass must never be bright enough to glow`,
         )
         .replace(
           '#include <normal_fragment_begin>',
