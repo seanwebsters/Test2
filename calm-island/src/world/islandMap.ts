@@ -299,6 +299,9 @@ function buildIsland(): Island {
       [-15, 0], [-46, -8], [-92, 10], [-136, -10], [-170, -42], [-190, -82], [-186, -132],
       [-170, -170], [-128, -190], [-140, -226], [-112, -250], [-90, -238], [-80, -262],
     ]),
+    // a narrow trodden track from the river path to the treehouse ladder, and a spur to the fruit patch
+    makePolyline([[18, 4.5], [19.5, 11], [21.8, 19.1], [26, 22.9], [30, 26.4]]),
+    makePolyline([[26, 22.9], [28.6, 21.8], [31, 21.5]]),
     // across the highlands to Mirror Lake
     makePolyline([[-170, -170], [-110, -152], [-42, -160], [20, E - 68], [62, E - 92]]),
   ];

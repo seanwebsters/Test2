@@ -20,8 +20,10 @@ export const KEEPSAKES: { id: string; name: string }[] = [
 
 /**
  * Home: a little thatched hut on the stump of a giant old tree, with a ladder,
- * a rope swing, a bench and a lantern, and stepping stones leading to it. It
- * starts bare and fills with keepsakes from the things you do.
+ * a rope swing, a bench and a lantern, and stepping stones leading to it.
+ * Outside are the signs of someone living there: a fenced patch of glowing
+ * fruit, a woodpile and a fire ring. Keepsakes from the things you do gather
+ * round it over time.
  */
 export class Home {
   readonly group = new THREE.Group();
@@ -31,6 +33,10 @@ export class Home {
   private swing = new THREE.Group();
   private glow: THREE.MeshBasicMaterial[] = [];
   private light = new THREE.PointLight(0xffc878, 0, 16, 1.6);
+  private patchLight = new THREE.PointLight(0xa8ecff, 0, 9, 1.8);
+  private fruit: { mat: THREE.MeshBasicMaterial; r: number; g: number; b: number; phase: number }[] = [];
+  /** Small solid things around the house, as [x, z, radius] in world metres. */
+  readonly solids: [number, number, number][] = [];
 
   constructor(island: Island) {
     this.x = HOME_SPOT.x;
@@ -251,6 +257,224 @@ export class Home {
       add(st);
     }
 
+
+    // ---- everything below sits on the real ground, which is not quite level around the stump
+    const ROT = this.group.rotation.y;
+    const world = (lx: number, lz: number): [number, number] => [this.x + lx * Math.cos(ROT) + lz * Math.sin(ROT), this.z - lx * Math.sin(ROT) + lz * Math.cos(ROT)];
+    const ground = (lx: number, lz: number): number => {
+      const [wx, wz] = world(lx, lz);
+      return island.heightAt(wx, wz) - y;
+    };
+    const put = (m: THREE.Object3D, lx: number, lz: number, up = 0): THREE.Object3D => {
+      m.position.set(lx, ground(lx, lz) + up, lz);
+      return add(m);
+    };
+    const solid = (lx: number, lz: number, r: number): void => {
+      const [wx, wz] = world(lx, lz);
+      this.solids.push([wx, wz, r]);
+    };
+
+    // ---- the fruit patch: three raised beds of glowing fruit, a little tree, a fence on two sides
+    const soil = L(0x6b4630);
+    const leaf = L(0x4fa046);
+    const leafLight = L(0x7cc45a);
+    const magic = (color: number): THREE.MeshBasicMaterial => {
+      const m = new THREE.MeshBasicMaterial({ color });
+      const c = new THREE.Color(color);
+      this.fruit.push({ mat: m, r: c.r, g: c.g, b: c.b, phase: this.fruit.length * 1.7 });
+      return m;
+    };
+    const pink = magic(0xff7ad0);
+    const aqua = magic(0x8fe9ff);
+    const gold = magic(0xffd65a);
+    const violet = magic(0xc59bff);
+    const ball = new THREE.SphereGeometry(1, 12, 9);
+    const orb = (mat: THREE.Material, r: number, x: number, yy: number, z: number, sy = 1): THREE.Mesh => {
+      const m = new THREE.Mesh(ball, mat);
+      m.scale.set(r, r * sy, r);
+      m.position.set(x, yy, z);
+      return m;
+    };
+    const FX = -7.5;
+    [4.3, 6.0, 7.7].forEach((bz, row) => {
+      const bed = new THREE.Group();
+      bed.add(new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.5, 1.1).translate(0, 0.05, 0), soil));
+      for (const sz of [-0.58, 0.58]) {
+        const log = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.13, 3.5, 8), sz < 0 ? barkDark : bark);
+        log.rotation.z = Math.PI / 2;
+        log.position.set(0, 0.2, sz);
+        bed.add(log);
+      }
+      for (const sx of [-1.7, 1.7]) {
+        const log = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.2, 8), bark);
+        log.rotation.x = Math.PI / 2;
+        log.position.set(sx, 0.2, 0);
+        bed.add(log);
+      }
+      for (let k = 0; k < 4; k++) {
+        const px = -1.2 + k * 0.8 + ((k * 7 + row * 3) % 5) * 0.03;
+        const plant = new THREE.Group();
+        plant.position.set(px, 0.3, ((k + row) % 2 ? 0.08 : -0.08));
+        const size = 0.85 + ((k * 5 + row * 2) % 4) * 0.08;
+        if (row === 0) {
+          // starberries: a round bush dotted with small bright berries
+          plant.add(orb(leaf, 0.36, 0, 0.26, 0, 0.8), orb(leafLight, 0.24, 0.12, 0.42, 0.06, 0.8));
+          for (let b = 0; b < 6; b++) {
+            const a = b * 1.05 + k;
+            plant.add(orb(b % 3 ? pink : violet, 0.075, Math.cos(a) * 0.33, 0.24 + (b % 3) * 0.13, Math.sin(a) * 0.33));
+          }
+        } else if (row === 1) {
+          // moon melons: one big pale fruit resting in a ring of broad leaves
+          for (let b = 0; b < 5; b++) {
+            const a = b * 1.256 + k;
+            const lf = orb(b % 2 ? leaf : leafLight, 0.26, Math.cos(a) * 0.3, 0.05, Math.sin(a) * 0.3, 0.14);
+            lf.rotation.set(Math.sin(a) * 0.3, 0, -Math.cos(a) * 0.3);
+            plant.add(lf);
+          }
+          plant.add(orb(k % 2 ? aqua : violet, 0.25, 0, 0.24, 0, 0.88));
+          const curl = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.2, 5), leaf);
+          curl.position.set(0.03, 0.52, 0);
+          curl.rotation.z = -0.5;
+          plant.add(curl);
+        } else {
+          // sun pods: a vine up a stake, hung with teardrop fruit
+          plant.add(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 1.5, 6).translate(0, 0.75, 0), beam));
+          for (let b = 0; b < 4; b++) {
+            const lf = orb(b % 2 ? leaf : leafLight, 0.17, Math.cos(b * 1.9) * 0.14, 0.35 + b * 0.32, Math.sin(b * 1.9) * 0.14, 0.5);
+            plant.add(lf);
+          }
+          for (let b = 0; b < 3; b++) plant.add(orb(b === 1 ? pink : gold, 0.085, Math.cos(b * 2.2 + k) * 0.2, 0.5 + b * 0.33, Math.sin(b * 2.2 + k) * 0.2, 1.4));
+        }
+        plant.scale.setScalar(size);
+        bed.add(plant);
+      }
+      bed.rotation.y = (row - 1) * 0.04;
+      put(bed, FX, bz);
+    });
+    // the little fruit tree at the corner of the patch
+    {
+      const tree = new THREE.Group();
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.26, 2.0, 8).translate(0, 1.0, 0), bark);
+      trunk.rotation.z = 0.08;
+      tree.add(trunk);
+      const crown: [number, number, number, number][] = [[0, 2.5, 0, 1.15], [0.75, 2.2, 0.3, 0.8], [-0.7, 2.25, -0.25, 0.85], [0.1, 2.15, -0.8, 0.75], [-0.1, 3.1, 0.2, 0.75]];
+      crown.forEach(([cx, cy, cz, r], i) => tree.add(orb(i % 2 ? leafLight : leaf, r, cx, cy, cz, 0.82)));
+      for (let b = 0; b < 9; b++) {
+        const a = b * 0.7;
+        const mat = [gold, pink, aqua][b % 3];
+        tree.add(orb(mat, 0.13, Math.cos(a) * (1.0 + (b % 2) * 0.25), 1.75 + (b % 4) * 0.22, Math.sin(a) * (1.0 + (b % 2) * 0.25), 1.15));
+      }
+      put(tree, -11.4, 9.6);
+      solid(-11.4, 9.6, 0.45);
+      put(orb(gold, 0.13, 0, 0, 0, 1.1), -10.6, 10.5, 0.12); // a windfall in the grass
+    }
+    // a low fence along the two far sides, posts a little crooked
+    const fence = (ax: number, az: number, bx: number, bz: number): void => {
+      const len = Math.hypot(bx - ax, bz - az);
+      const n = Math.round(len / 1.15);
+      for (let i = 0; i <= n; i++) {
+        const t = i / n;
+        const px = ax + (bx - ax) * t;
+        const pz = az + (bz - az) * t;
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.075, 0.95 + (i % 3) * 0.06, 6).translate(0, 0.45, 0), i % 2 ? beam : plankDark);
+        post.rotation.set(((i * 7) % 5 - 2) * 0.025, 0, ((i * 3) % 5 - 2) * 0.025);
+        put(post, px, pz);
+        solid(px, pz, 0.35);
+        if (i === n) break;
+        const qx = ax + (bx - ax) * ((i + 1) / n);
+        const qz = az + (bz - az) * ((i + 1) / n);
+        const g0 = ground(px, pz);
+        const g1 = ground(qx, qz);
+        for (const h of [0.36, 0.7]) {
+          const rail = new THREE.Mesh(new THREE.BoxGeometry(len / n + 0.1, 0.06, 0.04), plank);
+          rail.position.set((px + qx) / 2, (g0 + g1) / 2 + h, (pz + qz) / 2);
+          rail.rotation.y = -Math.atan2(qz - pz, qx - px);
+          rail.rotation.z = Math.atan2(g1 - g0, len / n) + (h > 0.5 ? 0.02 : -0.015);
+          rail.rotation.order = 'YZX';
+          add(rail);
+        }
+      }
+    };
+    fence(-10.4, 3.1, -10.4, 8.9);
+    fence(-10.4, 3.1, -5.4, 3.1);
+    // a basket of picked fruit and a watering can left by the beds
+    {
+      const basket = new THREE.Group();
+      basket.add(new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.26, 0.3, 12, 1, true).translate(0, 0.15, 0), L(0xc9a46a, { side: THREE.DoubleSide })));
+      basket.add(new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.04, 12).translate(0, 0.02, 0), rope));
+      const handle = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.025, 5, 14, Math.PI), rope);
+      handle.position.y = 0.28;
+      basket.add(handle);
+      [pink, gold, aqua, violet, gold].forEach((m, i) => basket.add(orb(m, 0.1, Math.cos(i * 1.4) * 0.14, 0.27 + (i % 2) * 0.05, Math.sin(i * 1.4) * 0.14)));
+      put(basket, -5.0, 7.2);
+      const can = new THREE.Group();
+      const tin = L(0x8fb7c9);
+      can.add(new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.19, 0.34, 12).translate(0, 0.17, 0), tin));
+      const spout = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.045, 0.42, 6), tin);
+      spout.position.set(0.3, 0.26, 0);
+      spout.rotation.z = -0.9;
+      const grip = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.022, 5, 10, Math.PI), tin);
+      grip.position.set(-0.17, 0.2, 0);
+      grip.rotation.z = Math.PI / 2;
+      can.add(spout, grip);
+      can.rotation.y = 0.7;
+      put(can, -5.3, 5.0);
+    }
+    this.patchLight.position.set(FX, ground(FX, 6) + 1.3, 6);
+    this.group.add(this.patchLight);
+
+    // ---- signs that someone lives here: a woodpile, a fire ring with log seats, pots by the ladder
+    {
+      const pile = new THREE.Group();
+      [[-0.5, 0.16], [0, 0.16], [0.5, 0.16], [-0.25, 0.46], [0.25, 0.46], [0, 0.76]].forEach(([px, py], i) => {
+        const log = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 1.3, 8), i % 2 ? bark : barkDark);
+        log.rotation.x = Math.PI / 2;
+        log.position.set(px, py, 0);
+        pile.add(log);
+        const end = new THREE.Mesh(new THREE.CircleGeometry(0.13, 8), plank);
+        end.position.set(px, py, 0.655);
+        pile.add(end);
+      });
+      pile.rotation.y = 2.2;
+      put(pile, 5.2, -3.4);
+      solid(5.2, -3.4, 0.8);
+
+      const fire = new THREE.Group();
+      for (let i = 0; i < 9; i++) {
+        const a = (i / 9) * Math.PI * 2;
+        const s = new THREE.Mesh(stone, L([0x9a958e, 0xb3aca0, 0x847f79][i % 3]));
+        s.scale.set(0.2 + (i % 2) * 0.04, 0.14, 0.17);
+        s.position.set(Math.cos(a) * 0.62, 0.08, Math.sin(a) * 0.62);
+        s.rotation.y = a;
+        fire.add(s);
+      }
+      for (let i = 0; i < 3; i++) {
+        const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.8, 6), L(0x3a2a20));
+        stick.rotation.set(Math.PI / 2 - 0.5, i * 2.1, 0);
+        stick.rotation.order = 'YXZ';
+        stick.position.y = 0.2;
+        fire.add(stick);
+      }
+      const ember = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), warm);
+      ember.scale.y = 0.4;
+      ember.position.y = 0.1;
+      fire.add(ember);
+      put(fire, 7.4, 6.8);
+      for (const [sx, sz, ry] of [[9.0, 7.4, 0.35], [7.0, 8.6, 1.4]]) {
+        const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.3, 1.5, 10), bark);
+        seat.rotation.set(0, ry, Math.PI / 2);
+        seat.rotation.order = 'YXZ';
+        put(seat, sx, sz, 0.26);
+      }
+      for (const [px, pz, c] of [[1.3, 5.6, 0xff8fb8], [-1.4, 5.5, 0xffd65a], [-1.9, 5.1, 0xb9a0ff]] as [number, number, number][]) {
+        const p2 = new THREE.Group();
+        p2.add(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.15, 0.28, 10).translate(0, 0.14, 0), L(0xb5683a)));
+        p2.add(orb(leaf, 0.2, 0, 0.36, 0, 0.7));
+        for (let b = 0; b < 4; b++) p2.add(orb(L(c), 0.07, Math.cos(b * 1.6) * 0.13, 0.46, Math.sin(b * 1.6) * 0.13));
+        put(p2, px, pz);
+      }
+    }
+
     // keepsakes, each hidden until earned
     const at = (i: number, r = 5.4): [number, number] => [Math.cos((i / 10) * Math.PI * 2 + 0.3) * r, Math.sin((i / 10) * Math.PI * 2 + 0.3) * r];
     const place = (id: string, i: number, obj: THREE.Object3D, yOff = 0): void => {
@@ -321,6 +545,12 @@ export class Home {
     this.glow[0].color.setRGB(1.0 * k, 0.82 * k, 0.48 * k);
     this.glow[1].color.setRGB(1.0 * k, 0.72 * k, 0.29 * k);
     this.light.intensity = 6 + night * 26;
+    // the fruit breathes: soft by day, properly aglow after dark
+    for (const f of this.fruit) {
+      const g = 0.8 + 0.1 * Math.sin(time * 1.3 + f.phase) + night * 0.75;
+      f.mat.color.setRGB(f.r * g, f.g * g, f.b * g);
+    }
+    this.patchLight.intensity = night * 9;
   }
 
   show(earned: Set<string>): void {

@@ -293,6 +293,7 @@ export class Game {
     this.fishing = new Fishing(this.island);
     this.home = new Home(this.island);
     this.vegetation.colliders.add(this.home.x, this.home.z, 3.7);
+    for (const [sx, sz, sr] of this.home.solids) this.vegetation.colliders.add(sx, sz, sr);
     this.scene.add(this.fishing.group, this.home.group);
     this.viewpoints = new Viewpoints(this.island);
     this.cairns = new Cairns(this.island);
