@@ -67,6 +67,7 @@ export class Grass {
       Object.assign(shader.uniforms, this.uniforms, {
         uTime: globalUniforms.uTime,
         uWorldSize: globalUniforms.uWorldSize,
+        uSunGrass: globalUniforms.uSunDir,
       });
       shader.vertexShader = shader.vertexShader
         .replace(
@@ -137,13 +138,18 @@ export class Grass {
           `#include <common>
           varying vec3 vGrassCol;
           varying float vBladeY;
-          varying float vSheen;`,
+          varying float vSheen;
+          uniform vec3 uSunGrass;`,
         )
         .replace(
           '#include <color_fragment>',
           /* glsl */ `
           diffuseColor.rgb = vGrassCol * mix(0.62, 1.3, vBladeY) + vec3(0.05, 0.06, 0.0) * vBladeY * vBladeY;
           diffuseColor.rgb += vec3(0.16, 0.19, 0.05) * vSheen * vBladeY * vBladeY;
+          // blades light up from behind when you look toward the sun across a meadow
+          vec3 sunGrassV = normalize((viewMatrix * vec4(uSunGrass, 0.0)).xyz);
+          float throughGrass = pow(max(dot(-normalize(vViewPosition), sunGrassV), 0.0), 4.0);
+          diffuseColor.rgb += vec3(0.2, 0.22, 0.02) * throughGrass * vBladeY;
           diffuseColor.rgb = min(diffuseColor.rgb, vec3(0.8)); // grass must never be bright enough to glow`,
         )
         .replace(

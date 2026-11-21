@@ -325,14 +325,18 @@ export class Terrain {
             float bed = fract(beds);
             float ledge = smoothstep(0.0, 0.12, bed) * smoothstep(1.0, 0.8, bed);
             float cracks = smoothstep(0.42, 0.5, abs(texture2D(uDetail, vec2((vWPos.x - vWPos.z) * 0.021 + floor(beds) * 0.37, vWPos.y * 0.01)).r - 0.5) * 2.0 + 0.3);
-            vec3 rockCol = mix(vec3(0.36, 0.32, 0.29), vec3(0.56, 0.50, 0.43), smoothstep(0.35, 0.65, strata));
-            rockCol *= mix(0.7, 1.0, ledge) * mix(0.86, 1.0, cracks);
-            rockCol *= mix(0.92, 1.1, smoothstep(0.1, 0.9, bed)); // each bed lighter toward its top edge
-            rockCol = mix(rockCol, vec3(0.60, 0.54, 0.45), smoothstep(0.45, 0.8, blotch) * 0.6);
+            vec3 rockCol = mix(vec3(0.40, 0.35, 0.38), vec3(0.64, 0.56, 0.55), smoothstep(0.35, 0.65, strata));
+            rockCol *= mix(0.78, 1.0, ledge) * mix(0.9, 1.0, cracks);
+            // each bed is a rounded block: shaded under its overhang, sunlit along its top lip
+            rockCol *= mix(0.84, 1.16, smoothstep(0.05, 0.95, bed));
+            rockCol += vec3(0.10, 0.08, 0.05) * smoothstep(0.8, 0.97, bed);
+            rockCol = mix(rockCol, vec3(0.70, 0.60, 0.52), smoothstep(0.45, 0.8, blotch) * 0.55);
             rockCol *= 0.9 + 0.2 * grain;
             // moss creeps over the gentler ledges
-            float moss = smoothstep(0.62, 0.38, steepness) * smoothstep(0.45, 0.7, grain + warp * 0.3);
-            rockCol = mix(rockCol, vec3(0.20, 0.42, 0.10), moss * 0.6);
+            float moss = smoothstep(0.7, 0.36, steepness) * smoothstep(0.38, 0.66, grain + warp * 0.3);
+            // and it gathers along the top of every ledge, trailing a little way down the face
+            moss = max(moss, smoothstep(0.72, 0.98, bed + (grain - 0.5) * 0.35) * smoothstep(0.92, 0.5, steepness) * 0.9);
+            rockCol = mix(rockCol, mix(vec3(0.16, 0.34, 0.08), vec3(0.34, 0.50, 0.12), blotch), moss * 0.78);
             diffuseColor.rgb = mix(diffuseColor.rgb, rockCol, rockMask);
           }
           // Surface relief, from smooth noise only so its slope is clean:

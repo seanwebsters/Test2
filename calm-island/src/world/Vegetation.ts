@@ -104,10 +104,24 @@ function mossy<T extends THREE.Material>(mat: T): T {
 
 /** Lambert material with vertex colours and a gentle wind sway above `base`. */
 function foliageMaterial(sway: number, base: number, doubleSide = false, leafy = false, bloom = false, map: THREE.Texture | null = null, crownY = 0): THREE.MeshLambertMaterial {
-  const mat = new THREE.MeshLambertMaterial({ vertexColors: !map, map, alphaTest: map ? 0.45 : 0, side: doubleSide ? THREE.DoubleSide : THREE.FrontSide });
+  const mat = new THREE.MeshLambertMaterial({ vertexColors: !map, map, alphaTest: map ? 0.32 : 0, side: doubleSide ? THREE.DoubleSide : THREE.FrontSide });
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = globalUniforms.uTime;
     shader.uniforms.uPlayer = globalUniforms.uPlayer;
+    shader.uniforms.uSunThrough = globalUniforms.uSunDir;
+    shader.uniforms.uDayThrough = globalUniforms.uDayLight;
+    // Leaves are thin: seen against the sun they light up from behind, warm and yellow-green.
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 uSunThrough;\nuniform float uDayThrough;')
+      .replace(
+        '#include <opaque_fragment>',
+        /* glsl */ `{
+          vec3 sunThroughV = normalize((viewMatrix * vec4(uSunThrough, 0.0)).xyz);
+          float through = pow(max(dot(-normalize(vViewPosition), sunThroughV), 0.0), 3.0);
+          outgoingLight += diffuseColor.rgb * vec3(1.25, 1.1, 0.5) * through * 0.75 * uDayThrough;
+        }
+        #include <opaque_fragment>`,
+      );
     shader.uniforms.uSunDirW = globalUniforms.uSunDir;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform vec3 uPlayer;')
