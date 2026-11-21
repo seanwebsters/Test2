@@ -290,14 +290,20 @@ export class UI {
     return !$('menu').classList.contains('hidden');
   }
 
-  toast(kicker: string, title: string, blurb: string): void {
+  /** A toast for the big moments: larger, and it lingers. */
+  moment(kicker: string, title: string, blurb: string): void {
+    this.toast(kicker, title, blurb, true);
+  }
+
+  toast(kicker: string, title: string, blurb: string, big = false): void {
     const el = $('toast');
+    el.classList.toggle('moment', big);
     el.querySelector('.toast-kicker')!.textContent = kicker;
     el.querySelector('.toast-title')!.textContent = title;
     el.querySelector('.toast-blurb')!.textContent = blurb;
     el.classList.add('show');
     clearTimeout(this.toastTimer);
-    this.toastTimer = window.setTimeout(() => el.classList.remove('show'), 4600);
+    this.toastTimer = window.setTimeout(() => el.classList.remove('show'), big ? 8200 : 4600);
   }
 
   fps(text: string): void {

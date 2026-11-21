@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import type { Island } from './islandMap';
 
+/** Where home stands, so the forest can leave a clearing around it. */
+export const HOME_SPOT = { x: 34, z: 30 };
+
 /** What each keepsake is and how it is earned, in the order they sit around the nook. */
 export const KEEPSAKES: { id: string; name: string }[] = [
   { id: 'lantern', name: 'A seed lantern' },
@@ -16,50 +19,227 @@ export const KEEPSAKES: { id: string; name: string }[] = [
 ];
 
 /**
- * Your own nook near the garden: a ring of mossy stones under one great leaf.
- * It starts bare and fills with keepsakes from the things you do.
+ * Home: a little thatched hut on the stump of a giant old tree, with a ladder,
+ * a rope swing, a bench and a lantern, and stepping stones leading to it. It
+ * starts bare and fills with keepsakes from the things you do.
  */
 export class Home {
   readonly group = new THREE.Group();
   readonly x: number;
   readonly z: number;
   private items = new Map<string, THREE.Object3D>();
+  private swing = new THREE.Group();
+  private glow: THREE.MeshBasicMaterial[] = [];
+  private light = new THREE.PointLight(0xffc878, 0, 16, 1.6);
 
   constructor(island: Island) {
-    this.x = 27;
-    this.z = 25;
+    this.x = HOME_SPOT.x;
+    this.z = HOME_SPOT.z;
     const y = island.heightAt(this.x, this.z);
     this.group.position.set(this.x, y, this.z);
+    this.group.rotation.y = -2.3; // the door looks back toward the garden
     const L = (color: number, extra: THREE.MeshLambertMaterialParameters = {}): THREE.MeshLambertMaterial => new THREE.MeshLambertMaterial({ color, ...extra });
-    const add = (m: THREE.Object3D, parent: THREE.Object3D = this.group): void => {
-      m.traverse((o) => ((o as THREE.Mesh).castShadow = true));
+    const add = (m: THREE.Object3D, parent: THREE.Object3D = this.group): THREE.Object3D => {
+      m.traverse((o) => {
+        (o as THREE.Mesh).castShadow = true;
+        (o as THREE.Mesh).receiveShadow = true;
+      });
       parent.add(m);
+      return m;
     };
-    const mat = new THREE.Mesh(new THREE.CircleGeometry(2.5, 28).rotateX(-Math.PI / 2), L(0x5f9f3c));
-    mat.position.y = 0.04;
-    mat.receiveShadow = true;
-    this.group.add(mat);
+    const box = (w: number, h: number, d: number, mat: THREE.Material, x: number, yy: number, z: number, ry = 0, rz = 0, rx = 0): THREE.Mesh => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      m.position.set(x, yy, z);
+      m.rotation.set(rx, ry, rz);
+      add(m);
+      return m;
+    };
+    const bark = L(0x8a5a36);
+    const barkDark = L(0x6f4528);
+    const plank = L(0xb98a56);
+    const plankDark = L(0x9a6f42);
+    const beam = L(0x7a5230);
+    const thatch = L(0xe6c25a);
+    const thatchDark = L(0xcfa644);
+    const rope = L(0xc9a46a);
     const stone = new THREE.SphereGeometry(1, 12, 9);
-    for (let i = 0; i < 11; i++) {
-      const a = (i / 11) * Math.PI * 2;
-      const s = new THREE.Mesh(stone, L([0x8d8a86, 0xa39d94, 0x7f8a76][i % 3]));
-      s.scale.set(0.42 + (i % 3) * 0.06, 0.22, 0.34);
-      s.position.set(Math.cos(a) * 2.7, 0.12, Math.sin(a) * 2.7);
-      s.rotation.y = -a;
-      add(s);
+
+    // ---- the stump: wide, flared and rooted
+    const stump = new THREE.CylinderGeometry(2.1, 2.7, 4.2, 18, 8, false).translate(0, 2.1, 0);
+    {
+      const p = stump.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        const px = p.getX(i);
+        const py = p.getY(i);
+        const pz = p.getZ(i);
+        const a = Math.atan2(pz, px);
+        const flare = 1 + Math.max(0, 1.3 - py) * 0.42 * (0.6 + 0.4 * Math.sin(a * 5)) + 0.05 * Math.sin(a * 11 + py * 3);
+        p.setXYZ(i, px * flare, py, pz * flare);
+      }
+      stump.computeVertexNormals();
     }
-    // one great leaf on a bent stalk for a roof
-    const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.11, 3.4, 8).translate(0, 1.7, 0), L(0x4f9a3a));
-    stalk.position.set(-2.2, 0, -1.2);
-    stalk.rotation.z = -0.3;
-    add(stalk);
-    const leaf = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12).scale(2.6, 0.16, 1.9), L(0x57b043));
-    leaf.position.set(-0.6, 3.25, -0.9);
-    leaf.rotation.set(0.12, 0.3, -0.16);
-    add(leaf);
+    add(new THREE.Mesh(stump, bark));
+    for (let i = 0; i < 6; i++) {
+      // roots running out into the grass
+      const a = (i / 6) * Math.PI * 2 + 0.4;
+      const root = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 2.2, 4, 8), barkDark);
+      root.position.set(Math.cos(a) * 3.1, 0.2, Math.sin(a) * 3.1);
+      root.rotation.set(0, -a, Math.PI / 2 - 0.3);
+      add(root);
+    }
+
+    // ---- the deck, with posts and a rope rail
+    const DECK = 4.3;
+    const deck = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 3.5, 0.22, 8), plank);
+    deck.position.y = DECK;
+    add(deck);
+    for (let i = -4; i <= 4; i++) box(0.06, 0.02, 6.4 - Math.abs(i) * 0.5, plankDark, i * 0.72, DECK + 0.12, 0); // gaps between planks
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
+      if (Math.abs(a - Math.PI / 2 - Math.PI / 8) < 0.5) continue; // leave the ladder side open
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.9, 7), beam);
+      post.position.set(Math.cos(a) * 3.25, DECK + 0.55, Math.sin(a) * 3.25);
+      add(post);
+      const a2 = a + (Math.PI * 2) / 8;
+      const railing = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.5, 5), rope);
+      railing.position.set(Math.cos((a + a2) / 2) * 3.0, DECK + 0.78, Math.sin((a + a2) / 2) * 3.0);
+      railing.rotation.set(Math.PI / 2, 0, 0);
+      railing.rotation.y = -(a + a2) / 2;
+      railing.rotation.order = 'YXZ';
+      add(railing);
+    }
+
+    // ---- the hut: plank walls, a doorway, a window
+    const HY = DECK + 0.11;
+    box(3.0, 2.3, 0.14, plank, 0, HY + 1.15, -1.15); // back
+    box(0.14, 2.3, 2.3, plank, -1.5, HY + 1.15, 0); // left
+    box(0.14, 2.3, 2.3, plank, 1.5, HY + 1.15, 0); // right
+    box(0.95, 2.3, 0.14, plank, -1.02, HY + 1.15, 1.15); // front, beside the door
+    box(0.95, 2.3, 0.14, plank, 1.02, HY + 1.15, 1.15);
+    box(1.1, 0.5, 0.14, plank, 0, HY + 2.05, 1.15); // above the door
+    box(1.0, 1.8, 0.05, L(0x2a1c12), 0, HY + 0.9, 1.1); // the dark inside
+    box(1.3, 0.14, 0.2, beam, 0, HY + 1.86, 1.2); // lintel
+    box(0.14, 1.9, 0.2, beam, -0.6, HY + 0.95, 1.2);
+    box(0.14, 1.9, 0.2, beam, 0.6, HY + 0.95, 1.2);
+    for (const sx of [-1.5, 1.5]) for (const sz of [-1.15, 1.15]) box(0.2, 2.4, 0.2, beam, sx, HY + 1.2, sz); // corner posts
+    for (let i = 0; i < 4; i++) box(3.02, 0.03, 0.02, plankDark, 0, HY + 0.5 + i * 0.5, -1.23); // board lines
+    box(0.04, 0.8, 0.8, L(0x2a1c12), 1.58, HY + 1.3, 0.2); // window
+    for (const [w, h, dy, dz] of [[0.1, 0.95, 0, -0.42], [0.1, 0.95, 0, 0.42], [0.1, 0.1, 0.42, 0], [0.1, 0.1, -0.42, 0]] as const) {
+      box(w, h === 0.95 ? 0.95 : 0.1, h === 0.95 ? 0.1 : 0.95, beam, 1.6, HY + 1.3 + dy, 0.2 + dz);
+    }
+
+    // ---- the thatched roof: two shaggy slopes with a ridge beam
+    const RY = HY + 2.3;
+    for (const side of [-1, 1]) {
+      for (let layer = 0; layer < 4; layer++) {
+        const t = layer / 3;
+        const slab = box(3.9 - t * 0.2, 0.26, 0.98, layer % 2 ? thatchDark : thatch, 0, RY + 1.45 - t * 1.25, side * (0.38 + t * 1.2), 0, 0, side * 0.82);
+        slab.scale.x = 1 + (layer % 2) * 0.03;
+      }
+      // a ragged fringe along the eaves
+      for (let k = 0; k < 13; k++) {
+        const straw = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.5, 5), k % 2 ? thatch : thatchDark);
+        straw.position.set(-1.8 + k * 0.3, RY + 0.08, side * 1.95);
+        straw.rotation.x = Math.PI + side * 0.75;
+        add(straw);
+      }
+    }
+    box(4.2, 0.22, 0.3, beam, 0, RY + 1.72, 0); // ridge
+    for (const sx of [-1.75, 1.75]) {
+      // gable ends
+      const tri = new THREE.Shape();
+      tri.moveTo(-1.5, 0);
+      tri.lineTo(1.5, 0);
+      tri.lineTo(0, 1.6);
+      const gable = new THREE.Mesh(new THREE.ExtrudeGeometry(tri, { depth: 0.12, bevelEnabled: false }), plankDark);
+      gable.position.set(sx - 0.06, RY, 0);
+      gable.rotation.y = Math.PI / 2;
+      add(gable);
+    }
+
+    // ---- ladder up to the deck
+    const ladder = new THREE.Group();
+    for (const sx of [-0.4, 0.4]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.1, 5.1, 0.1), beam);
+      rail.position.set(sx, 2.45, 0);
+      ladder.add(rail);
+    }
+    for (let i = 0; i < 9; i++) {
+      const rung = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.08, 0.1), plank);
+      rung.position.y = 0.45 + i * 0.52;
+      ladder.add(rung);
+    }
+    ladder.position.set(0, 0, 4.25);
+    ladder.rotation.x = -0.22;
+    add(ladder);
+
+    // ---- rope swing under the deck
+    for (const sx of [-0.45, 0.45]) {
+      const r = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 2.9, 5).translate(0, -1.45, 0), rope);
+      r.position.x = sx;
+      this.swing.add(r);
+    }
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.08, 0.38), plank);
+    seat.position.y = -2.9;
+    this.swing.add(seat);
+    this.swing.position.set(3.0, DECK - 0.1, 1.3);
+    add(this.swing);
+
+    // ---- bench and lantern
+    const bench = new THREE.Group();
+    const part = (w: number, h: number, d: number, x: number, yy: number, z: number, rx = 0): void => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), plank);
+      m.position.set(x, yy, z);
+      m.rotation.x = rx;
+      bench.add(m);
+    };
+    part(1.9, 0.1, 0.6, 0, 0.52, 0);
+    part(1.9, 0.6, 0.1, 0, 0.95, -0.3, -0.18);
+    for (const sx of [-0.8, 0.8]) part(0.12, 0.52, 0.5, sx, 0.26, 0);
+    bench.position.set(4.6, 0, 3.1);
+    bench.rotation.y = -0.9;
+    add(bench);
+    const lampPost = new THREE.Group();
+    lampPost.add(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 2.3, 7).translate(0, 1.15, 0), beam));
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.08, 0.08), beam);
+    arm.position.set(0.3, 2.25, 0);
+    lampPost.add(arm);
+    // the lantern is never dimmed by fog: it is the light you walk toward
+    const flame = new THREE.MeshBasicMaterial({ color: 0xffd27a, fog: false });
+    this.glow.push(flame);
+    const lantern = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.34, 0.26), flame);
+    lantern.position.set(0.58, 1.98, 0);
+    lampPost.add(lantern);
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.16, 4), beam);
+    cap.position.set(0.58, 2.22, 0);
+    cap.rotation.y = Math.PI / 4;
+    lampPost.add(cap);
+    lampPost.position.set(5.7, 0, 1.9);
+    add(lampPost);
+    lantern.castShadow = false;
+    this.light.position.set(6.3, 2.0, 1.9);
+    this.group.add(this.light);
+    // a second, larger beacon high on the roof so the house can be found from far off in the fog
+    const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 10), flame);
+    beacon.position.set(0, RY + 2.1, 0);
+    this.group.add(beacon);
+    const warm = new THREE.MeshBasicMaterial({ color: 0xffb84a, fog: false });
+    this.glow.push(warm);
+    const doorGlow = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 1.5), warm);
+    doorGlow.position.set(0, HY + 0.85, 1.13);
+    this.group.add(doorGlow);
+
+    // ---- stepping stones leading away from the ladder
+    for (let i = 0; i < 9; i++) {
+      const st = new THREE.Mesh(stone, L([0xe0b8a8, 0xd6a898, 0xe8c4b2][i % 3]));
+      st.scale.set(0.55 + (i % 3) * 0.08, 0.07, 0.42 + (i % 2) * 0.1);
+      st.position.set(Math.sin(i * 0.9) * 0.7, 0.05, 5.6 + i * 1.25);
+      st.rotation.y = i * 1.3;
+      add(st);
+    }
 
     // keepsakes, each hidden until earned
-    const at = (i: number, r = 1.75): [number, number] => [Math.cos((i / 10) * Math.PI * 2 + 0.3) * r, Math.sin((i / 10) * Math.PI * 2 + 0.3) * r];
+    const at = (i: number, r = 4.6): [number, number] => [Math.cos((i / 10) * Math.PI * 2 + 0.3) * r, Math.sin((i / 10) * Math.PI * 2 + 0.3) * r];
     const place = (id: string, i: number, obj: THREE.Object3D, yOff = 0): void => {
       const [px, pz] = at(i);
       obj.position.set(px, yOff, pz);
@@ -118,7 +298,16 @@ export class Home {
   }
 
   near(p: THREE.Vector3): boolean {
-    return Math.hypot(this.x - p.x, this.z - p.z) < 3.2;
+    return Math.hypot(this.x - p.x, this.z - p.z) < 7.5;
+  }
+
+  /** The swing drifts in the breeze and the lantern warms up as evening comes. */
+  update(time: number, night: number): void {
+    this.swing.rotation.x = Math.sin(time * 1.1) * 0.12;
+    const k = 0.55 + 0.45 * night + Math.sin(time * 7) * 0.03;
+    this.glow[0].color.setRGB(1.0 * k, 0.82 * k, 0.48 * k);
+    this.glow[1].color.setRGB(1.0 * k, 0.72 * k, 0.29 * k);
+    this.light.intensity = 6 + night * 26;
   }
 
   show(earned: Set<string>): void {

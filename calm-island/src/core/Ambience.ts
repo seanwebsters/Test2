@@ -163,6 +163,26 @@ export class Ambience {
     }
   }
 
+  /** A few rising bell notes, for the moment fog lifts. */
+  chime(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.master) return;
+    const now = ctx.currentTime;
+    [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => {
+      const t = now + i * 0.16;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.11, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0005, t + 2.2);
+      o.connect(g).connect(this.master!);
+      o.start(t);
+      o.stop(t + 2.3);
+    });
+  }
+
   /** A small watery plip, for skimming stones. */
   plip(strength: number): void {
     const ctx = this.ctx;
