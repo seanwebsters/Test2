@@ -46,6 +46,7 @@ export class Home {
   private patchLight = new THREE.PointLight(0xffb868, 0, 13, 1.6);
   private plants: { kind: number; x: number; z: number; fruits: THREE.Group; t: number }[] = [];
   private flames: THREE.Mesh[] = [];
+  private vine: THREE.Object3D[] = [];
   private lanterns: { group: THREE.Group; mat: THREE.MeshBasicMaterial; c: THREE.Color }[] = [];
   private flies!: THREE.Points;
   private flyMat = new THREE.PointsMaterial({ color: 0xeaff9a, size: 0.17, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
@@ -520,6 +521,59 @@ export class Home {
 
     [this.ladderSpot.x, this.ladderSpot.z] = world(0, 6.4);
 
+    // ---- the vine: one leaf for every day spent on the island, a flower every seventh
+    {
+      const stem = L(0x4c8a3a);
+      const leafA = L(0x62b04a);
+      const leafB = L(0x86cc5e);
+      const petal = L(0xff9cc4);
+      const at = (i: number, out: THREE.Vector3): THREE.Vector3 => {
+        const t = i / 44;
+        const py = 0.25 + t * 5.4; // up the stump, past the deck and on up the corner of the hut
+        const a = Math.PI / 2 + 0.75 + t * Math.PI * 2.6;
+        let r: number;
+        if (py < 3.5) {
+          const flare = 1 + Math.max(0, 1.3 - py) * 0.42 * (0.6 + 0.4 * Math.sin(a * 5)) + 0.05 * Math.sin(a * 11 + py * 3);
+          r = (3.3 - (py / 3.5) * 0.6) * flare + 0.07;
+        } else r = 4.25 - Math.min(1, (py - 3.5) / 0.5) * 1.85;
+        return out.set(Math.cos(a) * r, py, Math.sin(a) * r);
+      };
+      const p0 = new THREE.Vector3();
+      const p1 = new THREE.Vector3();
+      const upY = new THREE.Vector3(0, 1, 0);
+      for (let i = 0; i < 44; i++) {
+        at(i, p0);
+        at(i + 1, p1);
+        const g = new THREE.Group();
+        const seg = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.034, p0.distanceTo(p1) + 0.04, 5), stem);
+        seg.position.copy(p0).lerp(p1, 0.5);
+        seg.quaternion.setFromUnitVectors(upY, p1.clone().sub(p0).normalize());
+        g.add(seg);
+        const out = new THREE.Vector3(p1.x, 0, p1.z).normalize();
+        const leaf = new THREE.Mesh(ball, i % 2 ? leafA : leafB);
+        leaf.scale.set(0.2, 0.035, 0.13);
+        leaf.position.copy(p1).addScaledVector(out, 0.16);
+        leaf.position.y += (i % 2 ? 0.08 : -0.06);
+        leaf.rotation.set(0, -Math.atan2(out.z, out.x), i % 2 ? 0.5 : -0.4);
+        g.add(leaf);
+        if (i % 7 === 6) {
+          for (let k = 0; k < 5; k++) {
+            const pt = new THREE.Mesh(ball, petal);
+            pt.scale.setScalar(0.065);
+            pt.position.copy(p1).addScaledVector(out, 0.2).add(new THREE.Vector3(0, Math.sin(k * 1.257) * 0.09, 0)).addScaledVector(new THREE.Vector3(-out.z, 0, out.x), Math.cos(k * 1.257) * 0.09);
+            g.add(pt);
+          }
+          const eye = new THREE.Mesh(ball, gold);
+          eye.scale.setScalar(0.05);
+          eye.position.copy(p1).addScaledVector(out, 0.24);
+          g.add(eye);
+        }
+        g.visible = false;
+        add(g);
+        this.vine.push(g);
+      }
+    }
+
     // ---- a lantern for every friend who has been given a gift, strung round the deck
     for (let i = 0; i < 18; i++) {
       const a = (i / 18) * Math.PI * 2 + 0.17;
@@ -690,6 +744,12 @@ export class Home {
     return this.plants[i].kind;
   }
 
+  /** Where a ripe plant of one kind stands (any plant of that kind if none is ripe). */
+  plantSpot(kind: number, now: number): { x: number; z: number } {
+    const mine = this.plants.filter((pl) => pl.kind === kind);
+    return mine.find((pl) => now - pl.t >= REGROW) ?? mine[0];
+  }
+
   fireNear(p: THREE.Vector3): boolean {
     return Math.hypot(this.fireSpot.x - p.x, this.fireSpot.z - p.z) < 2.3;
   }
@@ -704,6 +764,11 @@ export class Home {
 
   loadFruit(times: number[] | undefined): void {
     this.plants.forEach((pl, i) => (pl.t = typeof times?.[i] === 'number' ? times[i] : 0));
+  }
+
+  /** The vine shows one leaf per day on the island (it stops at the roof). */
+  setVine(days: number): void {
+    this.vine.forEach((g, i) => (g.visible = i < days));
   }
 
   /** One lantern per friend: a colour to show it, or null to hide it. */

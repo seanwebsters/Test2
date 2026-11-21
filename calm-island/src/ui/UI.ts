@@ -40,6 +40,7 @@ export interface UIHandlers {
   onHome(): void;
   onArrive(): void;
   onEat(kind: number): void;
+  onSkipIntro(): void;
   onReset(): void;
   onSettings(s: Settings): void;
 }
@@ -69,6 +70,13 @@ export class UI {
     $('btn-map').addEventListener('click', () => handlers.onMap());
     $('home').addEventListener('click', () => handlers.onHome());
     $('arrive').addEventListener('click', () => handlers.onArrive());
+    $('skip-tut').addEventListener('click', () => handlers.onSkipIntro());
+    $('letter-close').addEventListener('click', () => handlers.onLogClose());
+    $('next').addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this.nextHidden = this.nextText;
+      $('next').classList.add('hidden');
+    });
     for (let i = 0; i < 3; i++) $(`eat${i}`).addEventListener('pointerdown', (e) => {
       e.preventDefault();
       handlers.onEat(i);
@@ -142,7 +150,7 @@ export class UI {
   }
 
   showGame(): void {
-    for (const id of ['loading', 'start', 'menu', 'log', 'map', 'photo-bar', 'journal']) $(id).classList.add('hidden');
+    for (const id of ['loading', 'start', 'menu', 'log', 'map', 'photo-bar', 'journal', 'letter']) $(id).classList.add('hidden');
     $('hud').classList.remove('hidden');
     $('touch').classList.toggle('hidden', !this.touch);
     $('hints').classList.remove('faded');
@@ -273,6 +281,37 @@ export class UI {
   }
 
   private basketKey = '';
+  private nextText = '';
+  private nextHidden = '';
+
+  /** The one-line suggestion under the logo. Tapping it puts it away until it changes. */
+  next(text: string | null): void {
+    const t = text ?? '';
+    if (t === this.nextText) return;
+    this.nextText = t;
+    $('next').textContent = t;
+    $('next').classList.toggle('hidden', !t || t === this.nextHidden);
+  }
+
+  /** A handwritten letter, shown as its own card. */
+  showLetter(from: string, paragraphs: string[]): void {
+    $('menu').classList.add('hidden');
+    $('letter-kicker').textContent = from;
+    const body = $('letter-body');
+    body.replaceChildren();
+    for (const line of paragraphs) {
+      const p = document.createElement('p');
+      p.textContent = line;
+      body.append(p);
+    }
+    $('letter').classList.remove('hidden');
+    $('letter-close').focus();
+  }
+
+  /** The menu offers to skip the introduction only while it is running. */
+  introRunning(on: boolean): void {
+    $('skip-tut').classList.toggle('hidden', !on);
+  }
 
   /** Fruit carried, and seconds left of each fruit's effect. */
   basket(counts: number[], effects: number[]): void {
@@ -307,7 +346,7 @@ export class UI {
   }
 
   get logOpen(): boolean {
-    return ['log', 'map', 'photo-bar', 'journal'].some((id) => !$(id).classList.contains('hidden'));
+    return ['log', 'map', 'photo-bar', 'journal', 'letter'].some((id) => !$(id).classList.contains('hidden'));
   }
 
   showMenu(stats: string): void {

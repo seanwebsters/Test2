@@ -49,6 +49,7 @@
         <button id="btn-hop">Hop</button>
       </div>
       <img id="hud-logo" src="./brand/calmlings-logo.png" alt="Calmlings" />
+      <button id="next" class="hidden" aria-label="Dismiss suggestion"></button>
       <div id="seeds" class="hidden"></div>
       <div id="basket" class="hidden">
         <button id="eat0" class="fruit f-star" aria-label="Eat a starberry"></button>
@@ -135,6 +136,7 @@
           <button id="open-journal">Journal</button>
           <button id="home">Return to the garden</button>
           <button id="arrive">Watch the arrival again</button>
+          <button id="skip-tut" class="hidden">Skip the introduction</button>
           <button id="reset" class="quiet">Start afresh</button>
         </div>
       </div>
@@ -160,6 +162,13 @@
       </div>
     </div>
 
+    <div id="letter" class="screen hidden">
+      <div class="card letter">
+        <div class="kicker" id="letter-kicker"></div>
+        <div id="letter-body"></div>
+        <button id="letter-close" class="primary">Fold it away</button>
+      </div>
+    </div>
     <div id="journal" class="screen hidden">
       <div class="card log-card" style="width: min(560px, 100%)">
         <div class="log-head">

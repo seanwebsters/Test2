@@ -53,6 +53,14 @@ export class Npc {
     this.sync();
   }
 
+  /** Settle somewhere new for good. */
+  moveHome(x: number, z: number): void {
+    this.home.set(x, this.island.heightAt(x, z), z);
+    this.pos.copy(this.home);
+    this.target.copy(this.home);
+    this.sync();
+  }
+
   private dry(x: number, z: number): boolean {
     return this.island.heightAt(x, z) > this.island.waterLevelAt(x, z) + 0.3;
   }
