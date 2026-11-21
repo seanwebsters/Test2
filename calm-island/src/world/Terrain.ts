@@ -260,6 +260,7 @@ export class Terrain {
     this.material.onBeforeCompile = (shader) => {
       shader.uniforms.uDetail = { value: detail };
       shader.uniforms.uTime = globalUniforms.uTime;
+      shader.uniforms.uDayLight = globalUniforms.uDayLight;
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nvarying vec3 vWNormal;')
         .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = position;\nvWNormal = normal;');
@@ -269,6 +270,7 @@ export class Terrain {
           /* glsl */ `#include <map_pars_fragment>
           uniform sampler2D uDetail;
           uniform float uTime;
+          uniform float uDayLight;
           varying vec3 vWPos;
           varying vec3 vWNormal;
           float gHash(vec2 p) {
@@ -356,7 +358,8 @@ export class Terrain {
             float det2 = dot(sigmaX, r1);
             vec3 grad = sign(det2) * (dFdx(relief) * r1 + dFdy(relief) * r2);
             // fade the relief with distance so far hills stay calm instead of shimmering
-            float fadeR = 1.0 - smoothstep(30.0, 140.0, length(vViewPosition));
+            // (and soften it after dark: lamplight at a low angle turns the screen-space slopes blocky)
+            float fadeR = (1.0 - smoothstep(30.0, 140.0, length(vViewPosition))) * mix(0.15, 1.0, clamp(uDayLight, 0.0, 1.0));
             // far away the screen-space slopes vanish; without this guard the normal
             // becomes 0/0 and the glow pass smears the bad pixels across the frame
             vec3 bumped = abs(det2) * normal - grad * reliefStrength * fadeR;

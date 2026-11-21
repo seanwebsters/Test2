@@ -231,7 +231,7 @@ export class Vegetation {
 
     const tree1 = (kind: Kind, x: number, z: number, scale: number, colliderR: number, spacing: number): boolean => {
       if (I.gradientAt(x, z, grad) > 0.62) return false; // never on a cliff face
-      if (Math.hypot(x - HOME_SPOT.x, z - HOME_SPOT.z) < 13) return false; // a clearing around home
+      if (Math.hypot(x - HOME_SPOT.x, z - HOME_SPOT.z) < 16.5) return false; // a clearing around home
       if (spacing > 0 && !this.claim(x, z, spacing)) return false;
       this.put(kind, x, I.heightAt(x, z) - 0.15 * scale, z, rnd() * Math.PI * 2, scale, scale * (0.9 + rnd() * 0.25));
       if (colliderR > 0) this.colliders.add(x, z, colliderR * scale);
@@ -363,7 +363,7 @@ export class Vegetation {
       const f = at(I.forest, x, z);
       const h = I.heightAt(x, z);
       if (h < 3.2 || h > 80 || at(I.sand, x, z) > 0.2 || at(I.path, x, z) > 0.1 || !this.dry(x, z, 0.6)) continue;
-      if (I.gradientAt(x, z, grad) > 0.7 || Math.hypot(x - HOME_SPOT.x, z - HOME_SPOT.z) < 9) continue;
+      if (I.gradientAt(x, z, grad) > 0.7 || Math.hypot(x - HOME_SPOT.x, z - HOME_SPOT.z) < 14) continue;
       const edge = f * (1 - f) * 4;
       const p = rnd();
       if (p < 0.1 + f * 0.35) this.put(pick(fern), x, h, z, rnd() * 6.3, 0.8 + rnd() * 0.9);
