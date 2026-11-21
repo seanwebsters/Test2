@@ -171,6 +171,7 @@ export class Vegetation {
     const tropical: Kind = { hi: plants.tropicalPlant(), material: leafy, shadow: true, lodDist: 1e9, cullDist: 260, tint: false };
     const rock = [0, 1, 2].map((v): Kind => ({ hi: plants.rock(v), material: rockMat, shadow: true, lodDist: 1e9, cullDist: 1e9, tint: false }));
     let mushroom: Kind | null = null;
+    const pebble: Kind = { hi: rock[1].hi, material: rockMat, shadow: false, lodDist: 1e9, cullDist: 110, tint: false };
     if (models) {
       // Swap the hand-built plants for the imported models, keeping the old
       // blob trees only as the far-away low-detail stand-ins.
@@ -203,6 +204,8 @@ export class Vegetation {
       model(fern[1], use('Fern_1', { sway: 0.035, base: 0.2, shadow: false }));
       model(tropical, use('Plant_1_Big', { sway: 0.03, base: 0.3 }));
       ['Rock_Medium_1', 'Rock_Medium_2', 'Rock_Medium_3'].forEach((n, i) => model(rock[i], use(n)));
+      pebble.hi = rock[1].hi;
+      pebble.material = rock[1].material;
       mushroom = { hi: plants.rock(0), material: rockMat, shadow: true, lodDist: 1e9, cullDist: 160, tint: false };
       model(mushroom, use('Mushroom_Common'));
       greatTree = { hi: plants.rock(0), material: rockMat, shadow: true, lodDist: 1e9, cullDist: 1e9, tint: false, receive: false };
@@ -397,6 +400,72 @@ export class Vegetation {
       this.put(pick(rock), x, h - 0.12 * s, z, rnd() * 6.3, s, s * (0.7 + rnd() * 0.5));
       if (s > 0.7) this.colliders.add(x, z, s * 0.78);
       if (s > 0.6) this.shade.push(x, z, 1.5 * s);
+    }
+
+    // ---- sculpted rock: boulders breaking up cliffs and mountain, sea stacks, landmark trees
+    for (let i = 0; i < 60000; i++) {
+      const x = (rnd() - 0.5) * 940;
+      const z = (rnd() - 0.5) * 940;
+      const h = I.heightAt(x, z);
+      if (h < 2 || Math.hypot(x, z) < 40) continue;
+      const slope = I.gradientAt(x, z, grad);
+      // big blocks half-buried in every steep face, bigger still high on the mountain
+      if (slope < 1.1 || slope > 5 || rnd() > 0.2) continue;
+      if (at(I.wet, x, z) > 0 || !this.claim(x, z, 5)) continue;
+      const s = (h > 70 ? 3.2 : 2.2) + Math.pow(rnd(), 1.6) * 4.2;
+      this.put(pick(rock), x, h - 0.45 * s, z, rnd() * 6.3, s, s * (0.8 + rnd() * 0.8));
+      this.colliders.add(x, z, s * 0.75);
+    }
+    // sea stacks: tall weathered rocks standing just offshore, landmarks from any beach
+    for (let i = 0, placed = 0; i < 4000 && placed < 22; i++) {
+      const a = rnd() * Math.PI * 2;
+      const r = 380 + rnd() * 110;
+      const x = Math.cos(a) * r;
+      const z = Math.sin(a) * r;
+      const h = I.heightAt(x, z);
+      if (h > -2.5 || h < -11 || !this.claim(x, z, 34)) continue;
+      const s = 6 + rnd() * 8;
+      this.put(pick(rock), x, h - 1, z, rnd() * 6.3, s, s * (1.5 + rnd() * 1.3));
+      this.colliders.add(x, z, s * 0.8);
+      // each one with a few smaller companions
+      for (let k = 0; k < 3; k++) {
+        const bx = x + (rnd() - 0.5) * s * 3.4;
+        const bz = z + (rnd() - 0.5) * s * 3.4;
+        const bh = I.heightAt(bx, bz);
+        if (bh > -1.5) continue;
+        const bs = s * (0.25 + rnd() * 0.3);
+        this.put(pick(rock), bx, bh - 0.6, bz, rnd() * 6.3, bs, bs * (1 + rnd()));
+        this.colliders.add(bx, bz, bs * 0.8);
+      }
+      placed++;
+    }
+    // pebbles and small stones strung along the paths
+    for (const pth of I.paths) {
+      for (let s = 2; s < pth.length; s += 1.6 + rnd() * 2.4) {
+        const q = polylineAt(pth, s);
+        const side = rnd() < 0.5 ? -1 : 1;
+        const off = 1.5 + rnd() * 1.6;
+        const x = q.x - q.tz * off * side;
+        const z = q.z + q.tx * off * side;
+        const h = I.heightAt(x, z);
+        if (h < I.waterLevelAt(x, z) + 0.2) continue;
+        const ps = 0.1 + Math.pow(rnd(), 2) * 0.34;
+        this.put(pebble, x, h - ps * 0.2, z, rnd() * 6.3, ps, ps * (0.6 + rnd() * 0.5));
+      }
+    }
+    // three great old trees you can steer by
+    if (greatTree) {
+      for (const [x0, z0, s] of [[150, 100, 1.5], [-205, 22, 1.7], [-40, -160, 1.3]] as const) {
+        let x: number = x0;
+        let z: number = z0;
+        for (let k = 0; k < 40 && (I.gradientAt(x, z, grad) > 0.4 || !this.dry(x, z, 0.5)); k++) {
+          x = x0 + Math.cos(k * 2.4) * (3 + k);
+          z = z0 + Math.sin(k * 2.4) * (3 + k);
+        }
+        this.put(greatTree, x, I.heightAt(x, z) - 0.2, z, rnd() * 6.3, s);
+        this.colliders.add(x, z, 1.0 * s);
+        this.shade.push(x, z, 8 * s);
+      }
     }
 
     // ---- wildflower drifts ------------------------------------------------
