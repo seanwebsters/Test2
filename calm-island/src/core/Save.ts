@@ -27,6 +27,13 @@ export interface SaveData {
   dailyDone?: string;
   /** keepsakes already shown in the nook */
   keepsakes?: string[];
+  /** fruit carried (starberries, moon melons, sun pods) and when each plant was last picked */
+  basket?: number[];
+  fruit?: number[];
+  /** ids of Calmlings who have been given a gift */
+  gifted?: string[];
+  /** ids of the regions whose calm spring is awake */
+  springs?: string[];
   /** patches of the map cleared of mist: x, z, radius */
   reveals?: number[][];
 }

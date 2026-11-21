@@ -31,6 +31,11 @@ export class Player {
   sleeping = false;
   /** drifting down from the sky at the very start: the leaf opens by itself */
   arriving = false;
+  /** held still at this spot (indoors): no walking, no falling */
+  hold: THREE.Vector3 | null = null;
+  /** fruit effects: a faster run, and a longer, flatter glide */
+  speedBoost = 1;
+  glideBoost = false;
   /** 0..1 lung fill while breathing, read by the model */
   breath = 0;
   private moveTime = 0;
@@ -87,6 +92,29 @@ export class Player {
 
   update(dt: number, input: Input, camYaw: number): void {
     const I = this.island;
+    if (this.hold) {
+      this.pos.copy(this.hold);
+      this.vel.set(0, 0, 0);
+      this.prevVel.set(0, 0, 0);
+      this.accel.set(0, 0, 0);
+      this.grounded = true;
+      this.swimming = false;
+      this.gliding = false;
+      this.pose.speed = 0;
+      this.pose.grounded = true;
+      this.pose.swimming = false;
+      this.pose.verticalSpeed = 0;
+      this.pose.turnRate = 0;
+      this.pose.yaw = this.yaw;
+      this.pose.gliding = false;
+      if (!this.sitting) this.sleeping = false;
+      this.pose.sleeping = this.sleeping;
+      this.pose.sitting = this.sitting;
+      this.pose.breath = this.breath;
+      this.model.update(dt, this.pose);
+      this.sync();
+      return;
+    }
     let amount = input.moveAxis(this.axis);
     let jump = input.jumpPressed();
     if (this.sitting) {
@@ -104,7 +132,7 @@ export class Player {
     // a gentle push on the thumb stick stays a walk
     this.moveTime = amount > 0.08 ? this.moveTime + dt : 0;
     const run = smoothstep(0.8, 1.7, this.moveTime) * smoothstep(0.6, 0.95, amount);
-    const top = this.swimming ? SWIM : this.gliding ? 8.6 : lerp(WALK, RUN, run);
+    const top = this.swimming ? SWIM : this.gliding ? (this.glideBoost ? 11 : 8.6) : lerp(WALK, RUN, run) * this.speedBoost;
     const hasInput = wx !== 0 || wz !== 0;
     // quick to start, a touch longer to settle: weighty but never sluggish
     const rate = this.swimming ? 4 : this.grounded ? (hasInput ? 11 : 9) : this.gliding ? 3.2 : 2.5;
@@ -196,7 +224,7 @@ export class Player {
       // under the leaf the fall eases to a gentle drift instead of accelerating
       this.gliding = (this.arriving || input.jumpHeld()) && this.vel.y < -0.8;
       // arriving: a long fall through the cloud, slowing to a float for the last stretch
-      const sink = this.arriving ? (this.pos.y - ground > 26 ? -13 : -2.6) : -1.5;
+      const sink = this.arriving ? (this.pos.y - ground > 26 ? -13 : -2.6) : this.glideBoost ? -0.55 : -1.5;
       if (this.gliding) this.vel.y = damp(this.vel.y, sink, this.arriving ? 2.2 : 6, dt);
       else this.vel.y -= GRAVITY * dt;
       this.pos.y += this.vel.y * dt;
