@@ -19,6 +19,7 @@ import { Grass } from '../world/Grass';
 import { SPAWN, getIsland, type Island, type Region } from '../world/islandMap';
 import { SKY_HORIZON, Sky } from '../world/Sky';
 import { Terrain, bakeGroundTexture } from '../world/Terrain';
+import { loadNatureModels } from '../world/NatureModels';
 import { Vegetation } from '../world/Vegetation';
 import { Water } from '../world/Water';
 import { SUN_DIR, globalUniforms, makeHeightTexture } from '../world/shared';
@@ -41,6 +42,8 @@ export interface GameOptions {
   quality?: Quality;
   /** force a season instead of following the calendar */
   season?: string | null;
+  /** skip the imported nature models and use the built-in plants */
+  plainPlants?: boolean;
 }
 
 export class Game {
@@ -128,6 +131,8 @@ export class Game {
     if (opts.quality) this.settings.quality = opts.quality;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    // Neutral tone mapping keeps the sky and sea their true colours; ACES was
+    // tried and washed the whole scene toward grey.
     this.renderer.toneMapping = THREE.NeutralToneMapping;
     this.renderer.toneMappingExposure = 1.0;
     this.renderer.info.autoReset = false; // counted across all passes of a frame
@@ -235,14 +240,16 @@ export class Game {
     };
     const low = this.settings.quality === 'low';
 
-    setSeason(currentSeason(this.opts.season ?? (this.settings.season === 'auto' ? null : this.settings.season)));
+    setSeason(currentSeason(this.opts.season ?? (this.settings.tropical ? 'spring' : this.settings.season === 'auto' ? null : this.settings.season)));
     this.weather = new Weather(SEASON === 'winter');
     await step(0.08, 'Raising hills from the sea…');
     this.island = getIsland();
     const heightTex = makeHeightTexture(this.island);
 
     await step(0.25, 'Planting trees and wildflowers…');
-    this.vegetation = new Vegetation(this.island);
+    const base = import.meta.env.BASE_URL;
+    const models = this.settings.quality === 'low' || this.opts.plainPlants ? null : await loadNatureModels(base);
+    this.vegetation = new Vegetation(this.island, models, base);
     this.scene.add(this.vegetation.group);
 
     await step(0.55, 'Painting meadows and beaches…');
@@ -259,6 +266,7 @@ export class Game {
     this.water = new Water(this.island, heightTex, SKY_HORIZON);
     this.scene.add(this.water.group);
     this.post = new PostFX(this.renderer, this.scene, this.camera);
+
 
     await step(0.86, 'Combing the grass…');
     this.grassNear = new Grass(heightTex, groundTex, { patch: 42, maxBlades: 190000, bladeHeight: 0.46, bladeWidth: 0.062, seed: 1 });
@@ -280,6 +288,8 @@ export class Game {
     this.scene.add(this.ambient.group);
 
     this.sun.castShadow = true;
+    this.sun.shadow.radius = 3;
+    this.sun.shadow.blurSamples = 12;
     this.sun.shadow.bias = -0.0012;
     this.sun.shadow.normalBias = 0.22;
     const sc = this.sun.shadow.camera;

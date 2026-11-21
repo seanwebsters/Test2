@@ -10,6 +10,8 @@ export interface Settings {
   showFps: boolean;
   /** 'auto' follows the real calendar */
   season: 'auto' | 'spring' | 'summer' | 'autumn' | 'winter';
+  /** the island's own climate: always lush and in bloom, whatever the calendar says */
+  tropical: boolean;
   musicVolume: number; // 0..1
   /** wind, water, birds */
   soundVolume: number;
@@ -34,6 +36,7 @@ const DEFAULTS: Settings = {
   invertY: false,
   showFps: false,
   season: 'auto',
+  tropical: true,
   musicVolume: 0.6,
   soundVolume: 0.7,
   autoQuality: true,
