@@ -34,6 +34,9 @@ export interface SaveData {
   gifted?: string[];
   /** ids of the regions whose calm spring is awake */
   springs?: string[];
+  /** things bought from the market, and which rug, quilt and lamp are in use ('' = the plain one) */
+  owned?: string[];
+  decor?: { rug: string; quilt: string; lamp: string };
   /** the guided introduction: which step it is on (99 = finished) */
   tut?: number;
   /** days visited, the current run of days, the last day counted, and the week a rest day was forgiven */

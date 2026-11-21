@@ -885,6 +885,68 @@ function addExtras(
       add(m);
     }
   }
+  if (has('bandana')) {
+    // a patterned scarf tied over the head, with the knot and its tails at one side
+    const cloth = mat(0x6f4a8f, { side: THREE.DoubleSide });
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(1, 30, 12, 0, Math.PI * 2, 0, Math.PI * 0.33).scale(RX * 1.3, RY * 1.34, RZ * 1.3), cloth);
+    cap.position.y = 0.02;
+    cap.rotation.x = -0.16;
+    add(cap);
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.035, 8, 30).scale(RX * 2.05, RZ * 2.05, 1), mat(0x5a3a78));
+    band.rotation.x = Math.PI / 2 - 0.16;
+    band.position.set(0, 0.27, -0.04);
+    add(band);
+    const pale = mat(0xb99ad0);
+    for (let k = 0; k < 9; k++) {
+      const a = k * 0.7 + 0.2;
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 6), pale);
+      const r = 0.2 + (k % 3) * 0.1;
+      dot.position.set(Math.cos(a) * r * RX * 2.2, 0.6 - r * r * 0.9, Math.sin(a) * r * RZ * 2.2 - 0.05);
+      dot.scale.y = 0.4;
+      add(dot);
+    }
+    const knot = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), cloth);
+    knot.position.set(-0.56, 0.24, -0.12);
+    add(knot);
+    for (const t of [0, 1]) {
+      const tail = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.34, 6).scale(1, 1, 0.3), cloth);
+      tail.position.set(-0.62 - t * 0.05, 0.06, -0.14 - t * 0.1);
+      tail.rotation.z = 0.25 + t * 0.3;
+      add(tail);
+    }
+  }
+  if (has('bigEars')) {
+    for (const s of [-1, 1]) {
+      const ear = new THREE.Group();
+      ear.add(new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.36, 12).scale(1, 1, 0.45), mat(look.fur)));
+      const inner = new THREE.Mesh(new THREE.ConeGeometry(0.095, 0.26, 10).scale(1, 1, 0.3), mat(0xf29a7a));
+      inner.position.set(0, -0.02, 0.045);
+      ear.add(inner);
+      ear.position.set(s * 0.6, 0.2, 0.04);
+      ear.rotation.z = -s * 1.4;
+      add(ear);
+    }
+  }
+  if (has('apron')) {
+    // a shopkeeper's apron with a pocket, charms at the hip and a crystal on a cord
+    const maroon = mat(0x7a2f4a, { side: THREE.DoubleSide });
+    const panel = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 10, Math.PI / 2 - 0.62, 1.24, Math.PI * 0.56, Math.PI * 0.27).scale(RX * 1.32, RY * 1.3, RZ * 1.4), maroon);
+    add(panel);
+    const pocket = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8, Math.PI / 2 - 0.26, 0.52, Math.PI * 0.64, Math.PI * 0.13).scale(RX * 1.36, RY * 1.33, RZ * 1.45), mat(0x64243c, { side: THREE.DoubleSide }));
+    add(pocket);
+    const tie = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.022, 6, 30).scale(RX * 2.52, RZ * 2.6, 1), mat(0x6f4a8f));
+    tie.rotation.x = Math.PI / 2;
+    tie.position.y = -0.13;
+    add(tie);
+    [0xe8b84a, 0x4fb0a8, 0xd9603a, 0xf2e6c8].forEach((c, i) => {
+      const bead = new THREE.Mesh(new THREE.SphereGeometry(0.032, 8, 6), mat(c));
+      bead.position.set((i % 2 ? 1 : -1) * 0.4, -0.2 - Math.floor(i / 2) * 0.07, 0.46);
+      add(bead);
+    });
+    const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.055).scale(1, 1.9, 1), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.1, emissive: 0xbfe6ff, emissiveIntensity: 0.6 }));
+    crystal.position.set(0, -0.1, 0.66);
+    add(crystal);
+  }
   if (has('moustache')) {
     for (const s of [-1, 1]) {
       const m = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10).scale(0.15, 0.055, 0.06), mat(0xb5622a));
