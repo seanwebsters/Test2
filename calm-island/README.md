@@ -37,6 +37,8 @@ Open http://localhost:5173 and press **Begin wandering**.
 | `1` `2` `3` | Eat a starberry (longer glide), moon melon (you glow) or sun pod (faster run) |
 | `Q` beside a friend | Give them the fruit they love, if you are carrying it. Their lantern goes up at your treehouse |
 | `B` beside a ring of stones | Wake the calm spring of that region with three breaths |
+| `E` at Sampoyoshi's stall | Trade fruit for rugs, quilts, lanterns and things for the outside of the treehouse. Open by day; the stock changes weekly |
+| `E` at the chest indoors | Choose which rug, quilt and lantern are out |
 
 A new player is walked through the first ten minutes one step at a time (the
 menu can skip it). After that a single line of suggestion sits at the top of
@@ -159,3 +161,11 @@ scripts/smoke.cjs      headless play-through
 The world layout lives in `islandMap.ts`. Coordinates are metres: `x` east,
 `z` south, `y` up, with the garden at the origin. The island is about 800 m
 across.
+
+## Models
+
+Trees and plants come from the Stylized Nature MegaKit, and the treehouse's
+door, windows, floor and furniture and the market stall from the Medieval
+Village and Fantasy Props MegaKits, all by Quaternius and all CC0 (see the
+`LICENSE.txt` beside each set in `public/models/`). The log walls, thatch and
+stump are built in code and wrapped in bark from the same tree textures.

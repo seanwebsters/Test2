@@ -33,6 +33,8 @@ export class Player {
   arriving = false;
   /** held still at this spot (indoors): no walking, no falling */
   hold: THREE.Vector3 | null = null;
+  /** walking about indoors: a flat floor with walls, instead of the island */
+  room: { x: number; z: number; hw: number; hd: number; cos: number; sin: number; y: number; solids: [number, number, number][] } | null = null;
   /** fruit effects: a faster run, and a longer, flatter glide */
   speedBoost = 1;
   glideBoost = false;
@@ -139,6 +141,33 @@ export class Player {
     this.vel.x = damp(this.vel.x, wx * top, rate, dt);
     this.vel.z = damp(this.vel.z, wz * top, rate, dt);
 
+    const room = this.room;
+    if (room) {
+      // indoors: stroll on the boards, kept in by the walls and nudged round the furniture
+      this.vel.x *= 0.55;
+      this.vel.z *= 0.55;
+      this.pos.x += this.vel.x * dt;
+      this.pos.z += this.vel.z * dt;
+      for (const [sx, sz, sr] of room.solids) {
+        const dx = this.pos.x - sx;
+        const dz = this.pos.z - sz;
+        const d = Math.hypot(dx, dz);
+        if (d < sr + RADIUS && d > 1e-4) {
+          this.pos.x = sx + (dx / d) * (sr + RADIUS);
+          this.pos.z = sz + (dz / d) * (sr + RADIUS);
+        }
+      }
+      const dx = this.pos.x - room.x;
+      const dz = this.pos.z - room.z;
+      const lx = clamp(dx * room.cos - dz * room.sin, -room.hw, room.hw);
+      const lz = clamp(dx * room.sin + dz * room.cos, -room.hd, room.hd);
+      this.pos.x = room.x + lx * room.cos + lz * room.sin;
+      this.pos.z = room.z - lx * room.sin + lz * room.cos;
+      this.pos.y = room.y;
+      this.vel.y = 0;
+      this.grounded = true;
+      this.swimming = false;
+    } else {
     // jumping, with a little forgiveness either side of the edge
     this.jumpBuffer = jump ? 0.14 : this.jumpBuffer - dt;
     this.coyote = this.grounded ? 0.12 : this.coyote - dt;
@@ -239,6 +268,8 @@ export class Player {
         this.model.impulse(-clamp(-this.vel.y * 0.28, 0.6, 3.2));
         this.vel.y = 0;
       }
+    }
+
     }
 
     // face where we are going

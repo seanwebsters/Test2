@@ -13,6 +13,7 @@ import { Fishing } from '../world/Fishing';
 import { FRUITS, Home, KEEPSAKES } from '../world/Home';
 import { Springs } from '../world/Springs';
 import { Trail } from '../world/Trail';
+import { SHOP_ITEMS, Shop } from '../world/Shop';
 import { SEASON, currentSeason, setSeason } from '../world/season';
 import { Cairns, Kite, Viewpoints } from '../world/Places';
 import { CELL, GRID, HALF, WORLD_SIZE } from '../world/islandMap';
@@ -22,6 +23,7 @@ import { SPAWN, getIsland, type Island, type Region } from '../world/islandMap';
 import { SKY_HORIZON, Sky } from '../world/Sky';
 import { Terrain, bakeGroundTexture } from '../world/Terrain';
 import { loadNatureModels } from '../world/NatureModels';
+import { loadKit } from '../world/Kit';
 import { Vegetation } from '../world/Vegetation';
 import { Water } from '../world/Water';
 import { SUN_DIR, clearFog, fogClearAt, globalUniforms, makeHeightTexture, resetFog, paintCanopy } from '../world/shared';
@@ -145,6 +147,12 @@ export class Game {
   private restWeek = -1;
   private intents: { key: string; ids: string[]; done: boolean[] } = { key: '', ids: [], done: [] };
   private introduced = new Set<string>();
+  private shop!: Shop;
+  private owned = new Set<string>();
+  private decor = { rug: '', quilt: '', lamp: '' };
+  private wantSleep = false;
+  private camLook = new THREE.Vector3();
+  private insideYaw = 0;
   private baseFov = 50;
   private springs!: Springs;
   private springHinted = new Set<number>();
@@ -283,6 +291,9 @@ export class Game {
         this.lastDay = '';
         this.restWeek = -1;
         this.introduced.clear();
+        this.owned.clear();
+        this.decor = { rug: '', quilt: '', lamp: '' };
+        this.applyDecor();
         this.intents = { key: '', ids: [], done: [] };
         this.home.setVine(0);
         this.tut = 0;
@@ -380,11 +391,14 @@ export class Game {
     this.seeds = new Seeds(this.island);
     this.skimming = new Skimming(this.island);
     this.fishing = new Fishing(this.island);
-    this.home = new Home(this.island);
+    const kit = this.opts.plainPlants ? null : await loadKit(base);
+    this.home = new Home(this.island, kit);
     this.vegetation.colliders.add(this.home.x, this.home.z, 3.7);
     for (const [sx, sz, sr] of this.home.solids) this.vegetation.colliders.add(sx, sz, sr);
     this.springs = new Springs(this.island, this.vegetation.colliders);
     this.scene.add(this.springs.group, this.glow);
+    this.shop = new Shop(this.island, this.vegetation.colliders, kit);
+    this.scene.add(this.shop.group);
     this.trail = new Trail(this.island);
     this.scene.add(this.trail.points);
     this.scene.add(this.fishing.group, this.home.group);
@@ -466,6 +480,8 @@ export class Game {
       for (const id of save.gifted ?? []) this.gifted.add(id);
       this.springs.load(save.springs);
       this.tut = save.tut ?? 99;
+      for (const id of save.owned ?? []) this.owned.add(id);
+      if (save.decor) this.decor = { rug: save.decor.rug || '', quilt: save.decor.quilt || '', lamp: save.decor.lamp || '' };
       this.days = save.days ?? 0;
       this.streak = save.streak ?? 0;
       this.lastDay = save.lastDay ?? '';
@@ -484,6 +500,7 @@ export class Game {
     if (!save && !this.opts.test) this.tut = 0;
     if (this.tut >= 9) this.pickIntents();
     this.home.setVine(this.days);
+    this.applyDecor();
     this.ui.introRunning(this.tut < 99);
     if ((!save && !this.opts.test) || this.opts.intro) {
       this.player.dropFromSky(0, 6, 170);
@@ -592,12 +609,16 @@ export class Game {
     if (this.photo) this.rig.update(dt, this.input, this.player, this.settings);
     if (this.playing) {
       this.updateBreathing(dt);
-      this.player.update(dt, this.input, this.rig.yaw);
+      this.player.update(dt, this.input, this.inside ? this.insideYaw : this.rig.yaw);
       const now = globalUniforms.uTime.value;
       if (this.inside) {
         // indoors the camera sits in one corner of the room
+        // (it turns a little to keep the Calmling in view as he potters about)
         this.camera.position.copy(this.home.inside.cam);
-        this.camera.lookAt(this.home.inside.look);
+        this.camLook.copy(this.home.inside.look).lerp(this.player.pos, 0.42);
+        this.camLook.y += 0.25;
+        this.camera.lookAt(this.camLook);
+        this.insideYaw = Math.atan2(this.camera.position.x - this.camLook.x, this.camera.position.z - this.camLook.z);
       } else this.rig.update(dt, this.input, this.player, this.settings, this.breathing.active ? this.player.yaw : now < this.momentUntil ? this.momentYaw : null);
       this.updateFog(dt);
       this.updateHums();
@@ -676,8 +697,14 @@ export class Game {
       this.nearby = null;
       this.gardenPlot = -1;
       this.ui.prompt2(null);
-      this.ui.prompt(this.sleeping || this.breathing.active ? null : 'Step outside');
-      if (!this.sleeping && !this.breathing.active && this.input.interactPressed()) this.leaveHome();
+      const busy = this.sleeping || this.breathing.active;
+      const at = busy ? '' : this.home.doorNear(p) ? 'door' : this.home.chestNear(p) ? 'chest' : this.home.bedNear(p) ? 'bed' : '';
+      this.ui.prompt(at === 'door' ? 'Step outside' : at === 'chest' ? 'Open your chest' : at === 'bed' ? 'Get into bed' : null);
+      if (at && this.input.interactPressed()) {
+        if (at === 'door') this.leaveHome();
+        else if (at === 'chest') this.openChest();
+        else this.wantSleep = true;
+      }
       return;
     }
     // garden plots share the E key when no Calmling is in reach
@@ -695,6 +722,19 @@ export class Game {
           this.save();
         }
       }
+      return;
+    }
+    if (!best && !this.practice && this.shop.near(p)) {
+      this.nearby = null;
+      this.homePrompt = true;
+      this.ui.prompt2(null);
+      const open = this.shop.open(this.day.hour);
+      this.ui.prompt(open ? 'Browse Sampoyoshi’s stall' : null);
+      if (!this.flags.has('shop')) {
+        this.flags.add('shop');
+        this.ui.toast('Sampoyoshi’s stall', open ? 'Come and have a look' : 'Shut for the night', 'He trades rugs, quilts and lanterns for fruit from your patch');
+      }
+      if (open && this.input.interactPressed()) this.openShop();
       return;
     }
     if (!best && !this.practice && this.updateHome(p)) {
@@ -840,15 +880,15 @@ export class Game {
     if (this.inside || !this.player.grounded) return;
     this.inside = true;
     this.kite.flying = false;
-    this.player.hold = this.home.inside.pos;
+    this.player.room = this.home.room;
     this.player.pos.copy(this.home.inside.pos);
+    this.player.vel.set(0, 0, 0);
     this.player.yaw = this.home.inside.yaw;
-    this.player.sitting = true;
     this.camera.fov = Math.min(86, this.baseFov + 24);
     this.camera.updateProjectionMatrix();
     const first = !this.flags.has('inside');
     this.flags.add('inside');
-    this.ui.toast(first ? 'Your own room' : '', 'Home', 'Warm and quiet. Press Z to sleep in your bed, B to breathe');
+    this.ui.toast(first ? 'Your own room' : '', 'Home', 'Warm and quiet. Have a wander round');
     this.save();
   }
 
@@ -858,6 +898,7 @@ export class Game {
     this.inside = false;
     this.ui.prompt(null);
     this.player.hold = null;
+    this.player.room = null;
     const l = this.home.ladderSpot;
     this.player.teleport(l.x + (l.x - this.home.x) * 0.25, l.z + (l.z - this.home.z) * 0.25, Math.atan2(l.x - this.home.x, l.z - this.home.z));
     this.camera.fov = this.baseFov;
@@ -952,6 +993,70 @@ export class Game {
       this.springHinted.add(s);
       this.ui.toast('A sleeping spring', this.springs.spots[s].name, 'Sit beside it and take three deep breaths to wake it');
     }
+  }
+
+  private applyDecor(): void {
+    const col = (id: string, plain: number): number => SHOP_ITEMS.find((i) => i.id === id)?.color ?? plain;
+    this.home.setDecor(col(this.decor.rug, 0x6fa8c9), col(this.decor.quilt, 0x7fb7e6), col(this.decor.lamp, 0xffd27a));
+    this.home.setExtras(this.owned);
+  }
+
+  private openCard(): void {
+    this.playing = false;
+    this.input.enabled = false;
+    this.input.releaseLock();
+    this.stopBreathing();
+    this.ui.prompt(null);
+    this.ui.prompt2(null);
+  }
+
+  /** Sampoyoshi's stall: this week's goods, paid for in fruit. */
+  openShop(): void {
+    this.openCard();
+    const week = Math.floor(Number(this.dayKey()) / 7);
+    // seven of the eleven things are out each week; the rest come round again
+    const stock = SHOP_ITEMS.filter((_, i) => (i * 7 + week * 5) % 11 < 7);
+    const hex = (c: number): string => `#${c.toString(16).padStart(6, '0')}`;
+    this.ui.showChoices(
+      'Sampoyoshi’s stall',
+      `“Take your time. Fruit will do nicely.” You have ${this.basket[0]} ${this.basket[0] === 1 ? 'starberry' : 'starberries'}, ${this.basket[1]} moon ${this.basket[1] === 1 ? 'melon' : 'melons'} and ${this.basket[2]} sun ${this.basket[2] === 1 ? 'pod' : 'pods'}. New things arrive each week.`,
+      stock.map((it) => {
+        const has = this.owned.has(it.id);
+        const can = it.cost.every((n, i) => this.basket[i] >= n);
+        return { id: it.id, name: it.name, note: it.note, color: hex(it.color), cost: has ? undefined : it.cost, action: has ? 'Yours' : can ? 'Trade' : 'Need fruit', enabled: !has && can };
+      }),
+      (id) => {
+        const it = SHOP_ITEMS.find((i) => i.id === id)!;
+        if (this.owned.has(id) || !it.cost.every((n, i) => this.basket[i] >= n)) return;
+        it.cost.forEach((n, i) => (this.basket[i] -= n));
+        this.owned.add(id);
+        if (it.kind !== 'home') this.decor[it.kind] = id; // new things go straight into use
+        this.applyDecor();
+        this.ambience.chime();
+        this.save();
+        this.openShop();
+      },
+    );
+  }
+
+  /** The chest indoors: choose which rug, quilt and lantern are out. */
+  openChest(): void {
+    this.openCard();
+    const hex = (c: number): string => `#${c.toString(16).padStart(6, '0')}`;
+    const rows = (['rug', 'quilt', 'lamp'] as const).flatMap((kind) => {
+      const plain = { rug: ['Sky-blue rug', 0x6fa8c9], quilt: ['Blue quilt', 0x7fb7e6], lamp: ['Candle lantern', 0xffd27a] }[kind] as [string, number];
+      return [
+        { id: `${kind}:`, name: plain[0], note: 'The one that came with the house', color: hex(plain[1]), action: this.decor[kind] === '' ? 'In use' : 'Use', enabled: this.decor[kind] !== '' },
+        ...SHOP_ITEMS.filter((i) => i.kind === kind && this.owned.has(i.id)).map((i) => ({ id: `${kind}:${i.id}`, name: i.name, note: i.note, color: hex(i.color), action: this.decor[kind] === i.id ? 'In use' : 'Use', enabled: this.decor[kind] !== i.id })),
+      ];
+    });
+    this.ui.showChoices('Your chest', this.owned.size ? 'Choose what to put out.' : 'Only the things that came with the house, for now. Sampoyoshi’s stall by the river has more.', rows, (id) => {
+      const [kind, item] = id.split(':') as ['rug' | 'quilt' | 'lamp', string];
+      this.decor[kind] = item;
+      this.applyDecor();
+      this.save();
+      this.openChest();
+    });
   }
 
   /** Today, as a whole number of local days. */
@@ -1348,7 +1453,8 @@ export class Game {
     const can = !this.sleeping && this.player.grounded && !this.practice && !this.breathing.active && !this.fishing.active && (this.day.night > 0.5 || this.inside || this.home.near(this.player.pos));
     this.ui.sleepButton(can);
     if (!this.sleeping) {
-      if (!this.input.sleepPressed()) return;
+      if (!this.input.sleepPressed() && !this.wantSleep) return;
+      this.wantSleep = false;
       if (!can) {
         this.ui.toast('', 'Not sleepy yet', 'Sleep comes after dark, or any time at your nook');
         return;
@@ -1379,9 +1485,10 @@ export class Game {
     this.player.sleeping = false;
     this.ui.sleeping(false);
     if (this.inside) {
-      this.player.hold = this.home.inside.pos;
-      this.player.yaw = this.home.inside.yaw;
-      this.player.sitting = true;
+      // out of bed, standing beside it
+      this.player.hold = null;
+      this.player.pos.copy(this.home.inside.bedside);
+      this.player.sitting = false;
     }
     if (morning) {
       this.flags.add('sleep');
@@ -1589,6 +1696,7 @@ export class Game {
       ctx.fillText(npc.who.name, cx, cy - 12);
     }
     dot(this.home.x, this.home.z, 6, '#fff', '#8a5a36');
+    dot(this.shop.x, this.shop.z, 5, '#ffd65a', '#6f4a8f');
     this.springs.spots.forEach((sp, i) => {
       if (this.springs.isAwake(i)) dot(sp.x, sp.z, 5, '#8fe9ff', '#ffffff');
     });
@@ -1697,6 +1805,7 @@ export class Game {
       { title: 'Pick fruit from your patch', hint: 'Beside the treehouse. It grows back in a few minutes', done: this.flags.has('pick') },
       { title: 'Eat a magical fruit', hint: 'Press 1, 2 or 3. Each one does something different', done: this.flags.has('eat') },
       { title: 'Bring a friend the fruit they love', hint: `${this.gifted.size} of ${this.npcs.length} lanterns hung. The log says who loves what`, done: this.gifted.size > 0 },
+      { title: 'Buy something from Sampoyoshi', hint: 'His stall is by the river path, east of the garden. He takes fruit', done: this.owned.size > 0 },
       { title: 'Go inside your treehouse', hint: 'Press E at the foot of the ladder', done: this.flags.has('inside') },
       { title: 'Light the fire', hint: 'At the fire ring by the treehouse, once evening comes', done: this.flags.has('fire') },
       { title: 'Spend an evening with friends', hint: 'Friends you have met come to the fire after dark', done: this.flags.has('gathering') },
@@ -1908,6 +2017,7 @@ export class Game {
     this.day.update(dt * drift, this.sun, this.hemi, this.scene.fog as THREE.FogExp2, this.weather.rain);
     this.garden.update(Date.now(), globalUniforms.uTime.value);
     this.home.update(globalUniforms.uTime.value, this.day.night, Date.now(), this.inside);
+    this.shop.update(dt, this.day.night, this.day.hour);
     this.springs.update(globalUniforms.uTime.value, this.day.night);
     // the music hushes for sleep, and beside a lit fire
     const hush = this.sleeping || (this.home.lit && !!this.player && Math.hypot(this.home.fireSpot.x - p.x, this.home.fireSpot.z - p.z) < 14);
@@ -1986,6 +2096,8 @@ export class Game {
       fruit: this.home.serializeFruit(),
       gifted: [...this.gifted],
       springs: this.springs.serialize(),
+      owned: [...this.owned],
+      decor: this.decor,
       tut: this.tut,
       days: this.days,
       streak: this.streak,
@@ -2002,6 +2114,7 @@ export class Game {
     const info = this.renderer.info.render;
     return {
       basket: [...this.basket], effects: this.effects.map((e) => Math.round(e)), gifted: [...this.gifted], inside: this.inside,
+      owned: [...this.owned], decor: this.decor, shopAt: [Math.round(this.shop.x), Math.round(this.shop.z)],
       tut: this.tut, days: this.days, streak: this.streak, intents: this.intents, introduced: [...this.introduced], guide: this.guide.who.name,
       fireLit: this.home.lit, guests: this.guests, springs: this.springs.spots.length, springsAwake: this.springs.awakeCount,
       pos: [p.x, p.y, p.z],

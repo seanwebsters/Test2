@@ -3,6 +3,22 @@ import type { Island } from './islandMap';
 
 const COUNT = 16;
 
+let dot: THREE.CanvasTexture | null = null;
+/** A soft round glow, so sparkles and fireflies are dots of light rather than squares. */
+export function glowDot(): THREE.CanvasTexture {
+  if (dot) return dot;
+  const c = document.createElement('canvas');
+  c.width = c.height = 32;
+  const ctx = c.getContext('2d')!;
+  const g = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.35, 'rgba(255,255,255,0.75)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 32, 32);
+  return (dot = new THREE.CanvasTexture(c));
+}
+
 /**
  * A drift of golden sparkles leading from the Calmling toward somewhere worth
  * going. It hugs the ground, flows away from you, and fades when there is
@@ -10,7 +26,7 @@ const COUNT = 16;
  */
 export class Trail {
   readonly points: THREE.Points;
-  private mat = new THREE.PointsMaterial({ color: 0xffe9a0, size: 0.36, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+  private mat = new THREE.PointsMaterial({ color: 0xffe9a0, map: glowDot(), size: 0.5, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
   private show = 0;
   private dir = new THREE.Vector3();
 

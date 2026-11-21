@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import type { Island } from './islandMap';
+import type { Kit } from './Kit';
+import { glowDot } from './Trail';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 /** Where home stands, so the forest can leave a clearing around it. */
 export const HOME_SPOT = { x: 34, z: 30 };
@@ -10,6 +13,17 @@ export const FRUITS = [
   { name: 'moon melon', plural: 'moon melons', effect: 'You glow softly for a while. Lovely after dark' },
   { name: 'sun pod', plural: 'sun pods', effect: 'A spring in your step: you run faster for a while' },
 ];
+/** The walkable floor indoors. */
+export interface Room {
+  x: number;
+  z: number;
+  hw: number;
+  hd: number;
+  cos: number;
+  sin: number;
+  y: number;
+  solids: [number, number, number][];
+}
 /** How long a picked plant takes to fruit again, in real milliseconds. */
 const REGROW = 8 * 60 * 1000;
 
@@ -49,8 +63,10 @@ export class Home {
   private vine: THREE.Object3D[] = [];
   private lanterns: { group: THREE.Group; mat: THREE.MeshBasicMaterial; c: THREE.Color }[] = [];
   private flies!: THREE.Points;
-  private flyMat = new THREE.PointsMaterial({ color: 0xeaff9a, size: 0.17, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+  private flyMat = new THREE.PointsMaterial({ color: 0xeaff9a, map: glowDot(), size: 0.3, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
   private firePos = new THREE.Vector3();
+  private patchLamp = new THREE.Color(0xffe2b0);
+  private fireColor = new THREE.Color(0xffb868);
   private lampPos = new THREE.Vector3();
   /** the fire ring is burning (until morning) */
   lit = false;
@@ -59,12 +75,26 @@ export class Home {
   /** places round the fire where visiting friends sit */
   readonly gatherSpots: { x: number; z: number }[] = [];
   /** the room indoors: where you sit, the bed, and the fixed camera */
-  readonly inside = { pos: new THREE.Vector3(), yaw: 0, bed: new THREE.Vector3(), bedYaw: 0, cam: new THREE.Vector3(), look: new THREE.Vector3() };
+  readonly inside = {
+    pos: new THREE.Vector3(), yaw: 0, bed: new THREE.Vector3(), bedYaw: 0, bedside: new THREE.Vector3(), cam: new THREE.Vector3(), look: new THREE.Vector3(),
+    door: new THREE.Vector3(), chest: new THREE.Vector3(), bedEdge: new THREE.Vector3(),
+  };
+  /** the floor of the room: a rectangle turned with the house, and the furniture standing on it */
+  room!: Room;
+  private rugMat = new THREE.MeshLambertMaterial({ color: 0x6fa8c9 });
+  private rugMat2 = new THREE.MeshLambertMaterial({ color: 0xe6f1f7 });
+  private quiltMat = new THREE.MeshLambertMaterial({ color: 0x7fb7e6 });
+  private quiltMat2 = new THREE.MeshLambertMaterial({ color: 0xfff6e6 });
+  private lampMat = new THREE.MeshBasicMaterial({ color: 0xffd27a, fog: false });
+  private lampColor = new THREE.Color(0xffd27a);
+  private pane!: THREE.MeshBasicMaterial;
+  private extras = new Map<string, THREE.Group>();
+  private quiltKit: THREE.MeshLambertMaterial | null = null;
   private fruit: { mat: THREE.MeshBasicMaterial; r: number; g: number; b: number; phase: number }[] = [];
   /** Small solid things around the house, as [x, z, radius] in world metres. */
   readonly solids: [number, number, number][] = [];
 
-  constructor(island: Island) {
+  constructor(island: Island, kit: Kit | null = null) {
     this.x = HOME_SPOT.x;
     this.z = HOME_SPOT.z;
     const y = island.heightAt(this.x, this.z);
@@ -110,11 +140,16 @@ export class Home {
       }
       stump.computeVertexNormals();
     }
-    add(new THREE.Mesh(stump, bark));
+    const stumpMat = kit?.barkDark ? new THREE.MeshLambertMaterial({ map: kit.barkDark, color: 0xffffff, emissive: 0x4a2c16, emissiveMap: kit.barkDark }) : bark;
+    if (kit?.barkDark) {
+      const uv = stump.attributes.uv;
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 5, uv.getY(i) * 1.6);
+    }
+    add(new THREE.Mesh(stump, stumpMat));
     for (let i = 0; i < 6; i++) {
       // roots running out into the grass
       const a = (i / 6) * Math.PI * 2 + 0.4;
-      const root = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 2.2, 4, 8), barkDark);
+      const root = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 2.2, 4, 8), kit?.barkDark ? stumpMat : barkDark);
       root.position.set(Math.cos(a) * 3.7, 0.2, Math.sin(a) * 3.7);
       root.rotation.set(0, -a, Math.PI / 2 - 0.3);
       add(root);
@@ -141,66 +176,282 @@ export class Home {
       add(railing);
     }
 
-    // ---- the hut: low and wide, plank walls, a doorway, a window
-    const HY = DECK + 0.12;
-    const HW = 1.95; // half width
-    const HD = 1.5; // half depth
-    const HH = 1.9; // wall height
-    box(HW * 2, HH, 0.14, plank, 0, HY + HH / 2, -HD);
-    box(0.14, HH, HD * 2, plank, -HW, HY + HH / 2, 0);
-    box(0.14, HH, HD * 2, plank, HW, HY + HH / 2, 0);
-    box(HW - 0.6, HH, 0.14, plank, -(HW + 0.6) / 2, HY + HH / 2, HD);
-    box(HW - 0.6, HH, 0.14, plank, (HW + 0.6) / 2, HY + HH / 2, HD);
-    box(1.3, 0.34, 0.14, plank, 0, HY + HH - 0.17, HD);
-    box(1.2, 1.56, 0.05, L(0x2a1c12), 0, HY + 0.78, HD - 0.05); // the dark inside
-    box(1.5, 0.16, 0.22, beam, 0, HY + 1.6, HD + 0.05); // lintel
-    box(0.16, 1.62, 0.22, beam, -0.68, HY + 0.81, HD + 0.05);
-    box(0.16, 1.62, 0.22, beam, 0.68, HY + 0.81, HD + 0.05);
-    for (const sx of [-HW, HW]) for (const sz of [-HD, HD]) box(0.24, HH + 0.1, 0.24, beam, sx, HY + HH / 2, sz); // corner posts
-    for (let i = 0; i < 3; i++) {
-      // board lines round the walls
-      box(HW * 2 + 0.02, 0.03, 0.02, plankDark, 0, HY + 0.45 + i * 0.5, -HD - 0.08);
-      box(0.02, 0.03, HD * 2 + 0.02, plankDark, -HW - 0.08, HY + 0.45 + i * 0.5, 0);
-    }
-    box(0.04, 0.72, 0.72, L(0x2a1c12), HW + 0.08, HY + 1.05, 0.2); // window
-    box(0.1, 0.86, 0.1, beam, HW + 0.1, HY + 1.05, -0.2);
-    box(0.1, 0.86, 0.1, beam, HW + 0.1, HY + 1.05, 0.6);
-    box(0.1, 0.1, 0.9, beam, HW + 0.1, HY + 1.46, 0.2);
-    box(0.1, 0.1, 0.9, beam, HW + 0.1, HY + 0.64, 0.2);
+    // ---- shared batches: hundreds of planks, reeds and books drawn as a handful of meshes
+    const batches = new Map<string, { geo: THREE.BufferGeometry; mat: THREE.Material; list: THREE.Matrix4[] }>();
+    const unitBox = new THREE.BoxGeometry(1, 1, 1);
+    const reed = new THREE.CylinderGeometry(0.5, 0.56, 1, 7);
+    const tuft = new THREE.ConeGeometry(0.5, 1, 5);
+    const pe = new THREE.Euler();
+    const pq = new THREE.Quaternion();
+    const piece = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, yy: number, z: number, sx = 1, sy = 1, sz = 1, rx = 0, ry = 0, rz = 0): void => {
+      const key = geo.uuid + mat.uuid;
+      let bt = batches.get(key);
+      if (!bt) batches.set(key, (bt = { geo, mat, list: [] }));
+      bt.list.push(new THREE.Matrix4().compose(new THREE.Vector3(x, yy, z), pq.setFromEuler(pe.set(rx, ry, rz)).clone(), new THREE.Vector3(sx, sy, sz)));
+    };
+    const flush = (): void => {
+      for (const bt of batches.values()) {
+        const mesh = new THREE.InstancedMesh(bt.geo, bt.mat, bt.list.length);
+        bt.list.forEach((m, i) => mesh.setMatrixAt(i, m));
+        mesh.instanceMatrix.needsUpdate = true;
+        mesh.castShadow = mesh.receiveShadow = true;
+        mesh.computeBoundingSphere();
+        this.group.add(mesh);
+      }
+      batches.clear();
+    };
+    const rnd = (i: number): number => {
+      const v = Math.sin(i * 127.1 + 311.7) * 43758.5453;
+      return v - Math.floor(v);
+    };
 
-    // ---- the thatched roof: steep, shaggy, and hanging well out past the walls
-    const RY = HY + HH;
-    const SLOPE = 0.86;
-    for (const side of [-1, 1]) {
-      for (let layer = 0; layer < 6; layer++) {
-        const t = layer / 5;
-        // each course of thatch overlaps the one below and sticks out a little further
-        const slab = box(5.3 + (layer % 2) * 0.14, 0.34, 0.95, layer % 2 ? thatchDark : thatch, (layer % 3 - 1) * 0.05, RY + 2.25 - t * 2.55, side * (0.3 + t * 2.25), 0, 0, side * SLOPE);
-        slab.rotation.y = (layer % 2 ? 1 : -1) * 0.012;
+    // ---- the hut: every wall is a row of hand-cut planks, no two quite alike
+    const HY = DECK + 0.12;
+    const KS = 0.85; // the model pieces are built for people; the house is Calmling-sized
+    const HW = 2.55; // half width
+    const HD = 1.7; // half depth
+    const HH = kit ? 2.65 : 2.1; // wall height
+    const tones = [plank, L(0xd4aa72), L(0xb98c58), plankDark];
+    let seed = 1;
+    /** A plank wall from a to b. `gap(u, yLow, yHigh)` says where a doorway or window leaves a hole. */
+    const wall = (ax: number, az: number, bx: number, bz: number, gap: (u: number) => [number, number] | null): void => {
+      const len = Math.hypot(bx - ax, bz - az);
+      const ry = -Math.atan2(bz - az, bx - ax);
+      const n = Math.round(len / 0.27);
+      for (let i = 0; i < n; i++) {
+        const u = (i + 0.5) / n;
+        const px = ax + (bx - ax) * u;
+        const pz = az + (bz - az) * u;
+        const top = HH + rnd(seed) * 0.07;
+        const mat = tones[Math.floor(rnd(seed + 7) * tones.length)];
+        const w = len / n - 0.012;
+        const hole = gap(u * len - len / 2);
+        const span = (y0: number, y1: number): void => {
+          if (y1 - y0 > 0.04) piece(unitBox, mat, px, HY + (y0 + y1) / 2, pz, w, y1 - y0, 0.09 + rnd(seed + 3) * 0.02, 0, ry, (rnd(seed + 5) - 0.5) * 0.012);
+        };
+        if (hole) {
+          span(0, hole[0]);
+          span(hole[1], top);
+        } else span(0, top);
+        seed += 11;
       }
-      // a ragged fringe along the eaves
-      for (let k = 0; k < 19; k++) {
-        const straw = new THREE.Mesh(new THREE.ConeGeometry(0.19, 0.62, 5), k % 2 ? thatch : thatchDark);
-        straw.position.set(-2.6 + k * 0.29, RY - 0.52, side * 2.86);
-        straw.rotation.x = Math.PI + side * 0.8;
-        add(straw);
+    };
+    const DOOR = 0.66; // half width of the doorway
+    const WZ0 = -0.25; // the window, along the right-hand wall
+    const WZ1 = 0.95;
+    const WX = HW + 0.05;
+    const WC = (WZ0 + WZ1) / 2;
+    const RY = HY + HH + 0.12;
+    const RISE = 2.35;
+    const RUN = HD + 0.85;
+    const DROP = 0.42; // how far the eaves hang below the top of the walls
+    const SLOPE = Math.atan2(RISE + DROP, RUN);
+    const SLEN = Math.hypot(RISE + DROP, RUN);
+    const ROWS = 7;
+    const RIDGE = RY + RISE;
+    if (kit) {
+      // ---- a cabin of whole logs, bark still on, notched together at the corners.
+      // The door, the windows and their shutters are carpentered pieces set into the log walls.
+      const sides: THREE.BufferGeometry[] = [];
+      const ends: THREE.BufferGeometry[] = [];
+      const LR = 0.138; // log radius
+      const logM = new THREE.Matrix4();
+      /** One log from a to b (house space), with pale sawn ends. */
+      const log = (ax: number, ay: number, az: number, bx: number, by: number, bz: number, r = LR): void => {
+        const d = new THREE.Vector3(bx - ax, by - ay, bz - az);
+        const len = d.length();
+        if (len < 0.12) return;
+        const rr = r * (0.94 + rnd(seed++) * 0.12);
+        const g = new THREE.CylinderGeometry(rr, rr * (0.95 + rnd(seed++) * 0.08), len, 10, 1, true);
+        const uv = g.attributes.uv;
+        const turn = rnd(seed++);
+        for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 0.5 + turn, uv.getY(i) * len * 0.32 + turn);
+        logM.compose(new THREE.Vector3((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2), new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()), new THREE.Vector3(1, 1, 1));
+        sides.push(g.applyMatrix4(logM));
+        for (const s2 of [-1, 1]) {
+          const cap = new THREE.CircleGeometry(rr, 10);
+          cap.rotateX(-s2 * Math.PI / 2);
+          cap.translate(0, (s2 * len) / 2, 0);
+          ends.push(cap.applyMatrix4(logM));
+        }
+      };
+      type Hole = [number, number, number, number]; // along the wall from..to, and from..to in height
+      const DOORW = 0.6;
+      const WINW = 0.6;
+      const WY0 = 0.86;
+      const WY1 = 2.36;
+      /** A wall of stacked logs along one axis, leaving the holes open. */
+      const logWall = (alongX: boolean, fixed: number, half: number, lift: number, holes: Hole[], rows: number): void => {
+        for (let k = 0; k < rows; k++) {
+          const yy = HY + LR + lift + k * LR * 1.9;
+          const cut = holes.filter((h) => yy - HY > h[2] - 0.06 && yy - HY < h[3] + 0.06).sort((p1, p2) => p1[0] - p2[0]);
+          let from = -half - 0.24 - rnd(seed++) * 0.1;
+          const end = half + 0.24 + rnd(seed++) * 0.1;
+          for (const h of [...cut, [end, end, 0, 0] as Hole]) {
+            const to = h[0];
+            if (alongX) log(from, yy, fixed, to, yy, fixed);
+            else log(fixed, yy, from, fixed, yy, to);
+            from = h[1];
+          }
+        }
+      };
+      const ROWSL = Math.floor((HH - 0.05) / (LR * 1.9));
+      logWall(true, HD, HW, 0, [[-1.7 - WINW, -1.7 + WINW, WY0, WY1], [-DOORW, DOORW, 0, 2.2], [1.7 - WINW, 1.7 + WINW, WY0, WY1]], ROWSL);
+      logWall(true, -HD, HW, 0, [[-WINW, WINW, WY0, WY1]], ROWSL);
+      logWall(false, -HW, HD, LR * 0.95, [[0.85 - WINW, 0.85 + WINW, WY0, WY1]], ROWSL);
+      logWall(false, HW, HD, LR * 0.95, [], ROWSL);
+      // the gable ends carry on up in shorter and shorter logs to the ridge
+      const RYK = HY + HH + 0.12;
+      for (const sx of [-HW, HW]) {
+        for (let yy = HY + LR * 0.95 + ROWSL * LR * 1.9 + LR; yy < RYK + 2.35 - 0.2; yy += LR * 1.9) {
+          const halfLen = Math.max(0, (HD + 0.5) * (1 - (yy - RYK) / 2.35));
+          log(sx, yy, -Math.min(halfLen, HD + 0.3), sx, yy, Math.min(halfLen, HD + 0.3));
+        }
       }
+      // upright posts either side of the door and windows hide the cut ends
+      for (const dx of [-DOORW - 0.02, DOORW + 0.02]) log(dx, HY, HD, dx, HY + 2.3, HD, 0.1);
+      const barkMat = new THREE.MeshLambertMaterial({ map: kit.bark, color: 0xf2d2b0 });
+      const endMat = new THREE.MeshLambertMaterial({ color: 0xe6c08e });
+      for (const [list, mat] of [[sides, barkMat], [ends, endMat]] as [THREE.BufferGeometry[], THREE.Material][]) {
+        const m = new THREE.Mesh(mergeGeometries(list), mat);
+        m.castShadow = m.receiveShadow = true;
+        this.group.add(m);
+      }
+      // carpentered pieces, laid out in the kit's own 4 m by 6 m plan and turned to face the ladder
+      const cot = new THREE.Group();
+      cot.position.y = HY;
+      cot.scale.setScalar(KS);
+      cot.rotation.y = -Math.PI / 2;
+      const put = (name: string, x: number, yy: number, z: number, ry = 0, parent: THREE.Object3D = cot): THREE.Group => {
+        const g = kit.make(name);
+        g.position.set(x, yy, z);
+        g.rotation.y = ry;
+        parent.add(g);
+        return g;
+      };
+      const Q = Math.PI / 2;
+      for (const cx of [-1, 1]) for (const cz of [-2, 0, 2]) put('Floor_WoodLight', cx, 0.012, cz);
+      const windowAt = (x: number, z: number, ry: number, shutters: boolean): void => {
+        put('Window_Wide_Round1', x, 0, z, ry);
+        if (shutters) put('WindowShutters_Wide_Round_Open', x, 0, z, ry);
+      };
+      windowAt(2, -2, Q, true);
+      windowAt(2, 2, Q, true);
+      windowAt(-2, 0, -Q, false);
+      windowAt(1, 3, 0, true);
+      const frame = put('DoorFrame_Round_WoodDark', 2, 0, 0, Q);
+      const door = put('Door_1_Round', -0.56, 0, 0.06, 0, frame);
+      door.rotation.y = -1.95; // standing open
+      // vines find their way up the logs and over the eaves
+      put('Prop_Vine1', 2.2, 2.95, 1.05, Q);
+      put('Prop_Vine4', 2.2, 2.9, -2.8, Q);
+      put('Prop_Vine1', 0.2, 2.95, 3.2, 0);
+      put('Prop_Vine4', -2.2, 2.9, -1.1, -Q);
+      put('Prop_Vine1', -1.2, 3.3, -3.2, Math.PI);
+      this.group.add(cot);
+    } else {
+    wall(-HW, -HD, HW, -HD, () => null);
+    wall(-HW, HD, HW, HD, (u) => (Math.abs(u) < DOOR ? [0, 1.72] : null));
+    wall(-HW, -HD, -HW, HD, () => null);
+    wall(HW, -HD, HW, HD, (u) => (u > WZ0 && u < WZ1 ? [0.82, 1.62] : null));
+    // log posts at the corners, and a beam tying the walls together
+    for (const sx of [-HW, HW]) for (const sz of [-HD, HD]) piece(reed, bark, sx, HY + (HH + 0.16) / 2, sz, 0.34, HH + 0.16, 0.34);
+    for (const sz of [-HD, HD]) piece(unitBox, beam, 0, HY + HH + 0.06, sz, HW * 2 + 0.3, 0.16, 0.2);
+    for (const sx of [-HW, HW]) piece(unitBox, beam, sx, HY + HH + 0.06, 0, 0.2, 0.16, HD * 2 + 0.3);
+    // skirting log round the foot of the walls
+    for (const sz of [-HD - 0.06, HD + 0.06]) for (const side of [-1, 1]) {
+      if (sz > 0) piece(unitBox, barkDark, side * (HW + DOOR) / 2, HY + 0.07, sz, HW - DOOR, 0.14, 0.12);
+      else if (side > 0) piece(unitBox, barkDark, 0, HY + 0.07, sz, HW * 2, 0.14, 0.12);
     }
-    box(5.6, 0.26, 0.34, beam, 0, RY + 2.52, 0); // ridge
-    box(5.9, 0.2, 0.2, beam, 0, RY + 2.42, 0, 0, 0.03); // a second, crooked ridge pole, as in the picture
-    for (const sx of [-HW - 0.02, HW + 0.02]) {
-      // gable ends
+    // the doorway: a stout frame, an arched top, and the door standing open
+    for (const sx of [-DOOR - 0.07, DOOR + 0.07]) piece(unitBox, beam, sx, HY + 0.9, HD + 0.02, 0.15, 1.8, 0.24);
+    piece(unitBox, beam, 0, HY + 1.8, HD + 0.02, DOOR * 2 + 0.44, 0.17, 0.26);
+    {
+      const leaf = new THREE.Group();
+      for (let i = 0; i < 4; i++) {
+        const b2 = new THREE.Mesh(unitBox, tones[(i + 1) % 3]);
+        b2.scale.set(0.31, 1.66, 0.07);
+        b2.position.set(0.17 + i * 0.32, 0.86, 0);
+        leaf.add(b2);
+      }
+      for (const yy of [0.35, 1.35]) {
+        const bar = new THREE.Mesh(unitBox, beam);
+        bar.scale.set(1.26, 0.1, 0.1);
+        bar.position.set(0.66, yy, 0.05);
+        leaf.add(bar);
+      }
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), L(0xd9a441));
+      knob.position.set(1.14, 0.86, 0.09);
+      leaf.add(knob);
+      leaf.position.set(-DOOR, HY + 0.03, HD + 0.1);
+      leaf.rotation.y = 2.05; // swung right back against the wall
+      add(leaf);
+    }
+    // the window: frame, cross bars, a pair of painted shutters
+    const teal = L(0x4f9aa8);
+    for (const zz of [WZ0 - 0.05, WZ1 + 0.05]) piece(unitBox, beam, WX, HY + 1.22, zz, 0.16, 0.98, 0.11);
+    for (const yy of [0.78, 1.66]) piece(unitBox, beam, WX, HY + yy, WC, 0.18, 0.11, WZ1 - WZ0 + 0.22);
+    piece(unitBox, beam, WX, HY + 1.22, WC, 0.07, 0.8, 0.05);
+    piece(unitBox, beam, WX, HY + 1.22, WC, 0.07, 0.05, WZ1 - WZ0);
+    for (const [zz, ry] of [[WZ0 - 0.36, 0.5], [WZ1 + 0.36, -0.5]]) {
+      for (let i = 0; i < 3; i++) piece(unitBox, teal, WX + 0.1, HY + 1.22, zz + (i - 1) * 0.17, 0.05, 0.86, 0.16, 0, ry * 0.25, 0);
+      piece(unitBox, L(0x3c7f8c), WX + 0.13, HY + 1.22, zz, 0.04, 0.08, 0.5, 0, ry * 0.25, 0);
+    }
+    // the floor: boards laid across the room
+    for (let i = 0; i < 13; i++) piece(unitBox, tones[(i * 2 + 1) % 3], -HW + 0.2 + i * 0.4, HY + 0.012, 0, 0.385, 0.03, HD * 2 - 0.1);
+
+    // ---- the thatched roof: rows of reed bundles, each lapped over the row below
+    for (const sx of [-HW - 0.03, HW + 0.03]) {
+      // gable ends, planked
       const tri = new THREE.Shape();
-      tri.moveTo(-HD - 0.1, 0);
-      tri.lineTo(HD + 0.1, 0);
-      tri.lineTo(0, 1.95);
-      const gable = new THREE.Mesh(new THREE.ExtrudeGeometry(tri, { depth: 0.12, bevelEnabled: false }), plankDark);
-      gable.position.set(sx - 0.06, RY, 0);
+      tri.moveTo(-HD - 0.12, 0);
+      tri.lineTo(HD + 0.12, 0);
+      tri.lineTo(0, RISE * (HD + 0.12) / RUN + 0.5);
+      const gable = new THREE.Mesh(new THREE.ExtrudeGeometry(tri, { depth: 0.1, bevelEnabled: false }), plankDark);
+      gable.position.set(sx - 0.05, RY - 0.06, 0);
       gable.rotation.y = Math.PI / 2;
       add(gable);
     }
-    // a patch on the roof, like the one in the picture
-    box(0.9, 0.06, 0.7, plankDark, 1.3, RY + 1.42, 1.15, 0.3, 0, SLOPE);
+    // a stone chimney through the back slope
+    for (let i = 0; i < 7; i++) piece(unitBox, L([0x9a958e, 0xb3aca0, 0x847f79][i % 3]), -1.5 + (rnd(seed++) - 0.5) * 0.04, RY + 0.9 + i * 0.3, -1.25, 0.62 - (i > 5 ? -0.12 : 0), 0.31, 0.62 - (i > 5 ? -0.12 : 0), 0, (rnd(seed++) - 0.5) * 0.12, 0);
+    }
+    for (const side of [-1, 1]) {
+      for (let c = 0; c < ROWS; c++) {
+        const t = (c + 0.5) / ROWS;
+        const cols = 20;
+        for (let j = 0; j < cols; j++) {
+          const r1 = rnd(seed++);
+          const r2 = rnd(seed++);
+          const x = -HW - 0.62 + ((j + 0.5 + (c % 2) * 0.5) / cols) * (HW * 2 + 1.24);
+          const along = t + (r1 - 0.5) * 0.03;
+          const lift = 0.1 + (ROWS - c) * 0.012 + r2 * 0.05;
+          const yy = RIDGE - along * (RISE + DROP) + Math.cos(SLOPE) * lift;
+          const zz = side * (along * RUN + Math.sin(SLOPE) * lift);
+          piece(reed, (j + c) % 3 === 0 ? thatchDark : thatch, x, yy, zz, 0.36 + r2 * 0.06, (SLEN / ROWS) * (1.5 + r1 * 0.25), 0.3, side * (Math.PI / 2 + SLOPE - 0.07), 0, (r1 - 0.5) * 0.1);
+        }
+      }
+      // a ragged fringe along the eaves
+      for (let k = 0; k < 26; k++) {
+        const r1 = rnd(seed++);
+        piece(tuft, k % 2 ? thatch : thatchDark, -HW - 0.6 + (k / 25) * (HW * 2 + 1.2), RY - DROP - 0.12, side * (RUN + 0.08), 0.36, 0.55 + r1 * 0.3, 0.36, Math.PI + side * 0.75, 0, 0);
+      }
+      // barge boards finishing the gable ends
+      for (const sx of [-HW - 0.6, HW + 0.6]) piece(unitBox, beam, sx, RIDGE - (RISE + DROP) / 2 + 0.05, side * (RUN / 2), 0.1, 0.2, SLEN + 0.2, side * SLOPE, 0, 0);
+    }
+    // the ridge: a pole with a cap of short reeds folded over it
+    piece(reed, beam, 0, RIDGE + 0.2, 0, 0.22, HW * 2 + 1.7, 0.22, 0, 0, Math.PI / 2);
+    for (let k = 0; k < 24; k++) piece(reed, k % 2 ? thatchDark : thatch, -HW - 0.55 + (k / 23) * (HW * 2 + 1.1), RIDGE + 0.1, 0, 0.3, 0.75, 0.42, Math.PI / 2, 0, (rnd(seed++) - 0.5) * 0.2);
+    // moss and a few self-sown plants have settled into the thatch
+    const mossGeo = new THREE.SphereGeometry(1, 8, 6);
+    const mossy = [L(0x7f8f3a), L(0x8f9a44), L(0x6a7f34)];
+    for (let k = 0; k < 18; k++) {
+      const side = k % 2 ? 1 : -1;
+      const along = 0.08 + rnd(seed++) * 0.84;
+      const mx = (rnd(seed++) - 0.5) * (HW * 2 + 0.8);
+      const sc = 0.1 + rnd(seed++) * 0.16;
+      piece(mossGeo, mossy[k % 3], mx, RIDGE - along * (RISE + DROP) + Math.cos(SLOPE) * 0.3, side * (along * RUN + Math.sin(SLOPE) * 0.3), sc * 1.5, sc * 0.4, sc, side * SLOPE, 0, 0);
+    }
+    flush();
 
     // ---- ladder up to the deck
     const ladder = new THREE.Group();
@@ -266,13 +517,10 @@ export class Home {
     this.group.add(this.light);
     // a second, larger beacon high on the roof so the house can be found from far off in the fog
     const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 10), flame);
-    beacon.position.set(0, RY + 2.95, 0);
+    beacon.position.set(0, RIDGE + 0.62, 0);
     this.group.add(beacon);
     const warm = new THREE.MeshBasicMaterial({ color: 0xffb84a, fog: false });
     this.glow.push(warm);
-    const doorGlow = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.5), warm);
-    doorGlow.position.set(0, HY + 0.78, HD - 0.02);
-    this.group.add(doorGlow);
 
     // ---- stepping stones leading away from the ladder
     for (let i = 0; i < 9; i++) {
@@ -535,7 +783,7 @@ export class Home {
         if (py < 3.5) {
           const flare = 1 + Math.max(0, 1.3 - py) * 0.42 * (0.6 + 0.4 * Math.sin(a * 5)) + 0.05 * Math.sin(a * 11 + py * 3);
           r = (3.3 - (py / 3.5) * 0.6) * flare + 0.07;
-        } else r = 4.25 - Math.min(1, (py - 3.5) / 0.5) * 1.85;
+        } else r = 4.25 - Math.min(1, (py - 3.5) / 0.5) * 1.12;
         return out.set(Math.cos(a) * r, py, Math.sin(a) * r);
       };
       const p0 = new THREE.Vector3();
@@ -604,61 +852,233 @@ export class Home {
       this.group.add(this.flies);
     }
 
-    // ---- indoors: a bed, a rug, a shelf of fruit jars, a lamp in the rafters
+    // ---- indoors: a real little room, furnished, with space to potter about
     {
-      const room = new THREE.Group();
-      room.position.y = HY;
-      const rin = (m: THREE.Mesh, x: number, yy: number, z: number, ry = 0): THREE.Mesh => {
-        m.position.set(x, yy, z);
+      const rm = (m: THREE.Object3D, x: number, yy: number, z: number, ry = 0): THREE.Object3D => {
+        m.position.set(x, HY + yy, z);
         m.rotation.y = ry;
-        m.receiveShadow = true;
-        room.add(m);
+        m.traverse((o) => ((o as THREE.Mesh).receiveShadow = true));
+        this.group.add(m);
         return m;
       };
-      const rug = rin(new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 0.03, 20), L(0x6fa8c9)), -0.2, 0.02, 0.1);
-      rug.scale.z = 0.8;
-      rin(new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.035, 20), L(0xe6f1f7)), -0.2, 0.022, 0.1).scale.z = 0.8;
-      // the bed, along the back wall
-      rin(new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.26, 1.0), plankDark), -0.85, 0.16, -0.9);
-      rin(new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.2, 0.92), L(0xfff4e0)), -0.85, 0.36, -0.9);
-      rin(new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.1, 0.98), L(0x7fb7e6)), -0.5, 0.48, -0.9);
-      rin(new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 8), L(0xffffff)), -1.5, 0.52, -0.9).scale.set(1, 0.5, 1.3);
-      rin(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.7, 1.0), beam), -1.82, 0.38, -0.9);
-      // shelf with jars of fruit
-      rin(new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.06, 0.3), beam), 1.0, 1.15, -1.28);
-      [pink, aqua, gold, violet].forEach((m, i) => {
-        rin(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.24, 10), L(0xdff3ff, { transparent: true, opacity: 0.45 })), 0.5 + i * 0.34, 1.3, -1.28);
-        rin(new THREE.Mesh(ball, m), 0.5 + i * 0.34, 1.27, -1.28).scale.setScalar(0.07);
-      });
-      // a little table with a candle and a cup
-      rin(new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.3, 0.42, 12), bark), 1.35, 0.21, -0.55);
-      rin(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.16, 6), L(0xfff4e0)), 1.3, 0.5, -0.55);
-      rin(new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), warm), 1.3, 0.62, -0.55).scale.y = 1.6;
-      rin(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.09, 8), L(0x8fb7c9)), 1.5, 0.47, -0.45);
-      // bunting along the back wall
-      for (let i = 0; i < 9; i++) {
-        const flag = rin(new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.2, 3), L([0xff8fb8, 0xffd65a, 0x8fe9ff, 0xb9a0ff, 0x9fe07a][i % 5])), -1.5 + i * 0.37, 1.62 - Math.sin((i / 8) * Math.PI) * 0.12, -1.38);
-        flag.rotation.x = Math.PI;
-        flag.scale.z = 0.2;
+      const mesh = (geo: THREE.BufferGeometry, mat: THREE.Material, sx = 1, sy = 1, sz = 1): THREE.Mesh => {
+        const m = new THREE.Mesh(geo, mat);
+        m.scale.set(sx, sy, sz);
+        return m;
+      };
+      const cyl = new THREE.CylinderGeometry(1, 1, 1, 20);
+      let bedX = 0;
+      let bedZ = 0;
+      let shX = 0;
+      let shZ = 0;
+      let chX = 0;
+      let chZ = 0;
+      let chestX = 0;
+      let chestZ = 0;
+      if (kit) {
+        // furnished from the same family of models as the house itself
+        const P = 0.74;
+        const prop = (name: string, x: number, z: number, ry = 0, sc = P, yy = 0, swap?: { name: string; mat: THREE.Material }): THREE.Group => {
+          const g = kit.make(name, swap);
+          g.scale.setScalar(sc);
+          g.position.set(x, HY + yy, z);
+          g.rotation.y = ry;
+          this.group.add(g);
+          return g;
+        };
+        const pane = new THREE.MeshBasicMaterial({ color: 0xffb84a, fog: false, side: THREE.DoubleSide, transparent: true, opacity: 0.2, depthWrite: false });
+        this.pane = pane;
+        for (const [px, pz, ry] of [[-1.7, HD - 0.1, 0], [1.7, HD - 0.1, 0], [0, -HD + 0.1, 0], [-HW + 0.1, 0.85, Math.PI / 2]]) rm(mesh(new THREE.PlaneGeometry(0.95, 1.2), pane), px, 1.6, pz, ry);
+        // the rug: two rings
+        rm(mesh(cyl, this.rugMat, 1.3, 0.03, 1.0), 0.15, 0.04, 0.2);
+        rm(mesh(cyl, this.rugMat2, 1.0, 0.034, 0.76), 0.15, 0.042, 0.2);
+        rm(mesh(cyl, this.rugMat, 0.55, 0.038, 0.42), 0.15, 0.044, 0.2);
+        // the bed wears whichever quilt is chosen: its cloth takes the quilt's colour
+        const cloth = kit.material('MI_Trim_Cloth');
+        if (cloth) {
+          this.quiltKit = cloth.clone();
+          this.quiltKit.name = 'quilt';
+        }
+        bedX = -1.5;
+        bedZ = -0.72;
+        prop('Bed_Twin1', bedX, bedZ, Math.PI / 2, P, 0, this.quiltKit ? { name: 'MI_Trim_Cloth', mat: this.quiltKit } : undefined);
+        prop('Nightstand_Shelf', -0.2, -HD + 0.52, 0);
+        prop('Book_Stack_1', -0.28, -HD + 0.52, 0.4, P, 1.21 * P);
+        prop('Candle_1', -0.05, -HD + 0.55, 0, 1.3, 1.21 * P);
+        rm(mesh(ball, warm, 0.035, 0.06, 0.035), -0.05, 1.21 * P + 0.2, -HD + 0.55);
+        shX = 1.35;
+        shZ = -HD + 0.5;
+        prop('Bookcase_2', shX, shZ, 0);
+        chestX = HW - 0.72;
+        chestZ = -0.2;
+        prop('Chest_Wood', chestX, chestZ, -Math.PI / 2);
+        chX = -1.8;
+        chZ = 0.85;
+        prop('Chair_1', chX, chZ, 2.3, 0.85);
+        prop('Stool', -1.15, 1.1, 0.4);
+        prop('Mug', -1.15, 1.1, 1.0, P, 0.58 * P);
+        prop('Cabinet', 1.6, HD - 0.5, Math.PI);
+        prop('BookGroup_Medium_1', 1.55, HD - 0.5, Math.PI, P, 1.0 * P);
+        prop('Vase_2', HW - 0.62, 0.95, 0.5, 0.55);
+        for (let k = 0; k < 5; k++) rm(mesh(ball, k % 2 ? leaf : leafLight, 0.06, 0.3, 0.12), HW - 0.62 + Math.cos(k * 1.26) * 0.08, 0.5, 0.95 + Math.sin(k * 1.26) * 0.08, k * 1.26).rotation.z = 0.35;
+        // round rafters across the open roof
+        for (const xx of [-1.6, 0, 1.6]) {
+          const raft = mesh(new THREE.CylinderGeometry(0.09, 0.1, HD * 2 + 0.2, 8), beam);
+          raft.rotation.x = Math.PI / 2;
+          rm(raft, xx, HH + 0.12, 0);
+        }
+        // a candle wheel hanging from the roof, with a soft light inside it
+        prop('Chandelier', 0.1, 0.2, 0, 0.62, HH + 0.95);
+        rm(mesh(new THREE.SphereGeometry(1, 14, 10), this.lampMat, 0.15, 0.15, 0.15), 0.1, HH + 0.25, 0.2);
+        this.lampPos.set(0.1, HY + HH + 0.05, 0.2);
+      } else {
+        // window panes and the little attic lights glow warm from outside after dark
+        const pane = new THREE.MeshBasicMaterial({ color: 0xffb84a, fog: false, side: THREE.DoubleSide, transparent: true, opacity: 0.55 });
+        this.pane = pane;
+        rm(mesh(new THREE.PlaneGeometry(WZ1 - WZ0, 0.8), pane), HW + 0.02, 1.22, WC, Math.PI / 2);
+        for (const sx of [-HW - 0.1, HW + 0.1]) rm(mesh(new THREE.CircleGeometry(0.26, 14), warm), sx, HH + 0.75, 0, sx > 0 ? Math.PI / 2 : -Math.PI / 2);
+        // rafters across the open roof
+        for (const xx of [-1.5, 0, 1.5]) piece(unitBox, beam, xx, HY + HH + 0.1, 0, 0.14, 0.16, HD * 2);
+        // the rug: two rings and a fringe
+        rm(mesh(cyl, this.rugMat, 1.45, 0.03, 1.1), 0.1, 0.035, 0.25);
+        rm(mesh(cyl, this.rugMat2, 1.12, 0.034, 0.84), 0.1, 0.037, 0.25);
+        rm(mesh(cyl, this.rugMat, 0.62, 0.038, 0.46), 0.1, 0.039, 0.25);
+        // the bed, tucked into the back corner
+        bedX = -1.5;
+        bedZ = -1.3;
+        piece(unitBox, plankDark, bedX, HY + 0.2, bedZ, 2.05, 0.22, 1.12);
+        for (const sx of [-0.98, 0.98]) for (const sz of [-0.5, 0.5]) piece(reed, bark, bedX + sx, HY + 0.22, bedZ + sz, 0.16, 0.44, 0.16);
+        piece(unitBox, beam, bedX - 1.0, HY + 0.62, bedZ, 0.1, 0.72, 1.16);
+        rm(mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.1, 18, 1, false, 0, Math.PI), beam), bedX - 1.0, 0.96, bedZ, Math.PI / 2).rotation.z = Math.PI / 2;
+        rm(mesh(unitBox, L(0xfff6e6), 1.9, 0.2, 1.0), bedX, 0.4, bedZ);
+        rm(mesh(unitBox, this.quiltMat, 1.25, 0.13, 1.06), bedX + 0.36, 0.5, bedZ);
+        rm(mesh(unitBox, this.quiltMat2, 0.2, 0.14, 1.07), bedX - 0.2, 0.505, bedZ);
+        rm(mesh(ball, L(0xffffff), 0.3, 0.13, 0.4), bedX - 0.66, 0.56, bedZ);
+        // bedside stump with a candle and a cup
+        piece(reed, bark, -0.2, HY + 0.24, -1.62, 0.52, 0.48, 0.52);
+        rm(mesh(cyl, L(0xfff4e0), 0.035, 0.18, 0.035), -0.25, 0.57, -1.62);
+        rm(mesh(ball, warm, 0.04, 0.07, 0.04), -0.25, 0.72, -1.62);
+        rm(mesh(cyl, L(0x8fb7c9), 0.06, 0.09, 0.06), -0.07, 0.52, -1.52);
+        // bookshelf against the back wall
+        shX = 1.55;
+        shZ = -HD + 0.28;
+        for (const sx of [-0.78, 0.78]) piece(unitBox, beam, shX + sx, HY + 0.95, shZ, 0.08, 1.9, 0.36);
+        for (let k = 0; k < 4; k++) piece(unitBox, plankDark, shX, HY + 0.12 + k * 0.58, shZ, 1.52, 0.06, 0.36);
+        piece(unitBox, plankDark, shX, HY + 0.95, shZ - 0.16, 1.56, 1.9, 0.04);
+        const bookCols = [0xd9603a, 0x4f9aa8, 0xe8b84a, 0x7a4f8f, 0x5fa05a, 0xc8556f, 0x3f6fa8].map((c) => L(c));
+        for (let k = 0; k < 2; k++) {
+          let bx = shX - 0.66;
+          for (let i = 0; bx < shX + 0.6; i++) {
+            const w = 0.06 + rnd(seed++) * 0.06;
+            const h = 0.32 + rnd(seed++) * 0.14;
+            piece(unitBox, bookCols[(i + k * 3) % bookCols.length], bx + w / 2, HY + 0.15 + k * 0.58 + h / 2, shZ + 0.02, w, h, 0.24, 0, 0, i % 6 === 5 ? 0.18 : 0);
+            bx += w + 0.012 + (i % 6 === 5 ? 0.05 : 0);
+          }
+        }
+        [pink, aqua, gold, violet].forEach((m, i) => {
+          rm(mesh(cyl, L(0xdff3ff, { transparent: true, opacity: 0.45 }), 0.1, 0.26, 0.1), shX - 0.5 + i * 0.34, 1.44, shZ + 0.02);
+          rm(mesh(ball, m, 0.07, 0.07, 0.07), shX - 0.5 + i * 0.34, 1.41, shZ + 0.02);
+        });
+        rm(mesh(ball, leaf, 0.2, 0.16, 0.2), shX + 0.45, 2.02, shZ);
+        rm(mesh(cyl, L(0xb5683a), 0.12, 0.16, 0.12), shX + 0.45, 1.92, shZ);
+        // an armchair by the door
+        chX = -1.85;
+        chZ = 1.05;
+        const cushion = L(0x5fa8a0);
+        const chair = new THREE.Group();
+        chair.add(mesh(ball, cushion, 0.5, 0.2, 0.46).translateY(0.38), mesh(ball, cushion, 0.48, 0.44, 0.17).translateY(0.74).translateZ(-0.36));
+        for (const sx of [-0.46, 0.46]) chair.add(mesh(ball, L(0x4c8f88), 0.14, 0.2, 0.42).translateX(sx).translateY(0.5));
+        chair.add(mesh(cyl, bark, 0.42, 0.22, 0.4).translateY(0.13));
+        chair.add(mesh(ball, L(0xffd65a), 0.2, 0.16, 0.1).translateY(0.62).translateZ(-0.2));
+        rm(chair, chX, 0, chZ, 0.9);
+        // the chest where rugs, quilts and lanterns are kept
+        const chest = new THREE.Group();
+        chest.add(mesh(unitBox, plankDark, 0.95, 0.46, 0.56).translateY(0.24));
+        const lid = mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.95, 12, 1, false, 0, Math.PI), plank);
+        lid.rotation.set(0, 0, Math.PI / 2);
+        lid.rotation.order = 'ZYX';
+        lid.position.y = 0.47;
+        chest.add(lid);
+        for (const sx of [-0.3, 0.3]) chest.add(mesh(unitBox, L(0xd9a441), 0.07, 0.5, 0.6).translateX(sx).translateY(0.25));
+        chest.add(mesh(unitBox, L(0xd9a441), 0.12, 0.14, 0.05).translateY(0.42).translateZ(0.29));
+        chestX = HW - 0.42;
+        chestZ = -0.95;
+        rm(chest, chestX, 0, chestZ, -Math.PI / 2);
+        // curtains, pictures, bunting and a couple of pot plants
+        for (const zz of [WZ0 - 0.12, WZ1 + 0.12]) rm(mesh(unitBox, L(0xf2c4a0), 0.05, 0.95, 0.22), HW - 0.09, 1.25, zz);
+        piece(unitBox, beam, HW - 0.09, HY + 1.76, WC, 0.06, 0.06, WZ1 - WZ0 + 0.6);
+        for (const [px, c] of [[-0.35, 0x9fd6ff], [0.3, 0xffd0a0]] as [number, number][]) {
+          piece(unitBox, beam, px, HY + 1.45, -HD + 0.07, 0.5, 0.42, 0.04);
+          rm(mesh(new THREE.PlaneGeometry(0.4, 0.32), new THREE.MeshBasicMaterial({ color: c })), px, 1.45, -HD + 0.095);
+        }
+        for (let i = 0; i < 11; i++) {
+          const fl = rm(mesh(new THREE.ConeGeometry(0.11, 0.2, 3), L([0xff8fb8, 0xffd65a, 0x8fe9ff, 0xb9a0ff, 0x9fe07a][i % 5]), 1, 1, 0.2), -HW + 0.1, 1.86 - Math.sin((i / 10) * Math.PI) * 0.14, -1.6 + i * 0.32, Math.PI / 2);
+          fl.rotation.x = Math.PI;
+        }
+        for (const [px, pz] of [[HW - 0.4, HD - 0.4], [0.75, -HD + 0.3]]) {
+          rm(mesh(cyl, L(0xb5683a), 0.17, 0.26, 0.17), px, 0.13, pz);
+          for (let k = 0; k < 5; k++) rm(mesh(ball, k % 2 ? leaf : leafLight, 0.07, 0.3, 0.13), px + Math.cos(k * 1.26) * 0.1, 0.5, pz + Math.sin(k * 1.26) * 0.1, k * 1.26).rotation.z = 0.35;
+        }
+        rm(mesh(cyl, L(0xc9a46a), 0.5, 0.02, 0.34), 0, 0.03, HD - 0.55); // door mat
+        // the lamp hanging from the ridge
+        rm(mesh(cyl, rope, 0.012, RIDGE - HY - 2.5, 0.012), 0.1, (RIDGE - HY + 2.5) / 2, 0.2);
+        rm(mesh(new THREE.SphereGeometry(1, 14, 10), this.lampMat, 0.2, 0.24, 0.2), 0.1, 2.4, 0.2);
+        rm(mesh(new THREE.ConeGeometry(0.3, 0.16, 12, 1, true), beam), 0.1, 2.66, 0.2);
+        this.lampPos.set(0.1, HY + 2.2, 0.2);
+        flush();
+
       }
-      // a round window of sky in the back wall, and a picture
-      rin(new THREE.Mesh(new THREE.CircleGeometry(0.3, 16), new THREE.MeshBasicMaterial({ color: 0xbfe6ff })), -0.2, 1.25, -1.42);
-      rin(new THREE.Mesh(new THREE.TorusGeometry(0.31, 0.04, 6, 18), beam), -0.2, 1.25, -1.41);
-      // the lamp hanging from the ridge
-      rin(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1.0, 4), rope), 0.2, 2.75, 0.1);
-      rin(new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), flame), 0.2, 2.2, 0.1);
-      this.group.add(room);
-      this.lampPos.set(0.2, HY + 2.0, 0.1);
+
+      // ---- things bought at the market that dress the outside of the house
+      const boxG = new THREE.Group();
+      boxG.add(mesh(unitBox, plankDark, 0.26, 0.2, WZ1 - WZ0 + 0.3).translateY(0.1));
+      for (let k = 0; k < 7; k++) {
+        boxG.add(mesh(ball, leaf, 0.1, 0.1, 0.1).translateY(0.24).translateZ(-0.6 + k * 0.2));
+        boxG.add(mesh(ball, L([0xff8fb8, 0xffd65a, 0xb9a0ff][k % 3]), 0.065, 0.065, 0.065).translateY(0.34).translateZ(-0.6 + k * 0.2).translateX(0.04));
+      }
+      if (kit) {
+        boxG.position.set(-1.7, HY + 0.7, HD + 0.26);
+        boxG.rotation.y = Math.PI / 2;
+      } else boxG.position.set(HW + 0.24, HY + 0.56, WC);
+      const bunt = new THREE.Group();
+      for (let i = 0; i < 16; i++) {
+        const a2 = Math.PI / 2 + 0.5 + (i / 15) * (Math.PI * 2 - 1.0);
+        const fl = mesh(new THREE.ConeGeometry(0.13, 0.26, 3), L([0xff8fb8, 0xffd65a, 0x8fe9ff, 0xb9a0ff, 0x9fe07a][i % 5]), 1, 1, 0.2);
+        fl.position.set(Math.cos(a2) * 3.95, DECK + 0.86 - Math.abs(Math.sin(i * Math.PI)) * 0.1, Math.sin(a2) * 3.95);
+        fl.rotation.set(Math.PI, -a2, 0);
+        bunt.add(fl);
+      }
+      const wreath = new THREE.Group();
+      wreath.add(mesh(new THREE.TorusGeometry(0.24, 0.07, 8, 18), leaf));
+      for (let k = 0; k < 6; k++) wreath.add(mesh(ball, L([0xff8fb8, 0xffd65a][k % 2]), 0.05, 0.05, 0.05).translateX(Math.cos(k * 1.05) * 0.24).translateY(Math.sin(k * 1.05) * 0.24).translateZ(0.06));
+      wreath.position.set(0, HY + (kit ? 2.42 : 2.02), HD + (kit ? 0.2 : 0.16));
+      for (const [id, g] of [['windowbox', boxG], ['bunting', bunt], ['wreath', wreath]] as [string, THREE.Group][]) {
+        g.visible = false;
+        this.group.add(g);
+        this.extras.set(id, g);
+      }
+
       const at3 = (lx: number, ly: number, lz: number, out: THREE.Vector3): void => {
         const [wx, wz] = world(lx, lz);
         out.set(wx, y + ly, wz);
       };
-      at3(-0.35, HY + 0.04, 0.0, this.inside.pos);
-      at3(-0.6, HY + 0.5, -0.9, this.inside.bed);
-      at3(1.72, HY + 1.8, 1.3, this.inside.cam);
-      at3(-0.5, HY + 0.6, -0.55, this.inside.look);
-      this.inside.yaw = Math.atan2(2.07, 1.3) + ROT; // sits facing the camera corner
+      at3(0, HY + 0.04, HD - 1.05, this.inside.pos);
+      at3(bedX + 0.25, HY + 0.56, bedZ, this.inside.bed);
+      at3(bedX + 0.3, HY + 0.04, bedZ + 1.0, this.inside.bedside);
+      at3(HW - (kit ? 0.42 : 0.24), HY + (kit ? 2.25 : 1.92), HD - (kit ? 0.42 : 0.24), this.inside.cam); // tucked in the corner by the door
+      at3(-0.8, HY + 0.5, -0.6, this.inside.look);
+      at3(0, 0, HD - 0.55, this.inside.door);
+      at3(chestX - 0.5, 0, chestZ, this.inside.chest);
+      at3(bedX + 0.2, 0, bedZ + 0.75, this.inside.bedEdge);
+      this.inside.yaw = Math.PI + ROT; // walks in facing the room
       this.inside.bedYaw = Math.PI / 2 + ROT;
+      // where a Calmling can walk indoors, and what is in the way
+      const [rx, rz] = world(0, 0);
+      this.room = { x: rx, z: rz, hw: HW - (kit ? 0.72 : 0.5), hd: HD - (kit ? 0.68 : 0.5), cos: Math.cos(ROT), sin: Math.sin(ROT), y: y + HY + 0.04, solids: [] };
+      for (const [lx, lz, r] of [[bedX - 0.5, bedZ, 0.62], [bedX + 0.5, bedZ, 0.62], [-0.2, -1.62, 0.36], [shX - 0.4, shZ, 0.42], [shX + 0.4, shZ, 0.42], [chX, chZ, 0.5], [chestX, chestZ, 0.5]]) {
+        const [wx, wz] = world(lx, lz);
+        this.room.solids.push([wx, wz, r]);
+      }
     }
 
     // keepsakes, each hidden until earned
@@ -766,6 +1186,34 @@ export class Home {
     this.plants.forEach((pl, i) => (pl.t = typeof times?.[i] === 'number' ? times[i] : 0));
   }
 
+  /** Dress the room: rug, quilt and lamp colours. */
+  setDecor(rug: number, quilt: number, lamp: number): void {
+    this.rugMat.color.setHex(rug);
+    this.rugMat2.color.setHex(rug).lerp(new THREE.Color(0xffffff), 0.72);
+    this.quiltMat.color.setHex(quilt);
+    this.quiltKit?.color.setHex(quilt).lerp(new THREE.Color(0xffffff), 0.25);
+    this.quiltMat2.color.setHex(quilt).lerp(new THREE.Color(0xffffff), 0.75);
+    this.lampColor.setHex(lamp);
+    this.patchLamp.setHex(lamp).lerp(new THREE.Color(0xffffff), 0.35);
+  }
+
+  /** Show the market pieces that have been bought for the outside of the house. */
+  setExtras(owned: Set<string>): void {
+    for (const [id, g] of this.extras) g.visible = owned.has(id);
+  }
+
+  doorNear(p: THREE.Vector3): boolean {
+    return Math.hypot(this.inside.door.x - p.x, this.inside.door.z - p.z) < 0.95;
+  }
+
+  chestNear(p: THREE.Vector3): boolean {
+    return Math.hypot(this.inside.chest.x - p.x, this.inside.chest.z - p.z) < 1.0;
+  }
+
+  bedNear(p: THREE.Vector3): boolean {
+    return Math.hypot(this.inside.bedEdge.x - p.x, this.inside.bedEdge.z - p.z) < 1.1;
+  }
+
   /** The vine shows one leaf per day on the island (it stops at the roof). */
   setVine(days: number): void {
     this.vine.forEach((g, i) => (g.visible = i < days));
@@ -809,9 +1257,13 @@ export class Home {
       fl.scale.set(1 + (f - 1) * 0.5, f, 1 + (f - 1) * 0.5);
       fl.rotation.z = Math.sin(time * 6 + i * 2) * 0.1;
     });
+    const lampGlow = 0.8 + 0.35 * night;
+    this.lampMat.color.copy(this.lampColor).multiplyScalar(lampGlow);
+    this.pane.opacity = 0.18 + 0.7 * night;
+    this.patchLight.color.copy(indoors ? this.patchLamp : this.fireColor);
     if (indoors) {
       this.patchLight.position.copy(this.lampPos);
-      this.patchLight.intensity = 2.6;
+      this.patchLight.intensity = 1.9;
     } else {
       this.patchLight.position.copy(this.firePos);
       this.patchLight.intensity = this.lit ? 30 + Math.sin(time * 11) * 5 + Math.sin(time * 27) * 3 : 0;

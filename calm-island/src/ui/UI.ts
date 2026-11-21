@@ -2,6 +2,18 @@ import type { Quality, Settings } from '../core/Settings';
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
+export interface ChoiceRow {
+  id: string;
+  name: string;
+  note: string;
+  /** CSS colour for the swatch */
+  color: string;
+  /** price in starberries, moon melons, sun pods */
+  cost?: number[];
+  action: string;
+  enabled: boolean;
+}
+
 export interface LogEntry {
   name: string;
   meaning: string;
@@ -72,6 +84,7 @@ export class UI {
     $('arrive').addEventListener('click', () => handlers.onArrive());
     $('skip-tut').addEventListener('click', () => handlers.onSkipIntro());
     $('letter-close').addEventListener('click', () => handlers.onLogClose());
+    $('choices-close').addEventListener('click', () => handlers.onLogClose());
     $('next').addEventListener('pointerdown', (e) => {
       e.preventDefault();
       this.nextHidden = this.nextText;
@@ -150,7 +163,7 @@ export class UI {
   }
 
   showGame(): void {
-    for (const id of ['loading', 'start', 'menu', 'log', 'map', 'photo-bar', 'journal', 'letter']) $(id).classList.add('hidden');
+    for (const id of ['loading', 'start', 'menu', 'log', 'map', 'photo-bar', 'journal', 'letter', 'choices']) $(id).classList.add('hidden');
     $('hud').classList.remove('hidden');
     $('touch').classList.toggle('hidden', !this.touch);
     $('hints').classList.remove('faded');
@@ -293,6 +306,47 @@ export class UI {
     $('next').classList.toggle('hidden', !t || t === this.nextHidden);
   }
 
+  /** A list to pick from: the market stall, or the chest of things for the room. */
+  showChoices(title: string, lead: string, rows: ChoiceRow[], onPick: (id: string) => void): void {
+    $('menu').classList.add('hidden');
+    $('choices-title').textContent = title;
+    $('choices-lead').textContent = lead;
+    const list = $('choices-list');
+    list.replaceChildren();
+    for (const r of rows) {
+      const row = document.createElement('div');
+      row.className = 'c-item';
+      const sw = document.createElement('span');
+      sw.className = 'swatch';
+      sw.style.background = r.color;
+      const text = document.createElement('div');
+      const b = document.createElement('b');
+      b.textContent = r.name;
+      const small = document.createElement('small');
+      small.textContent = r.note;
+      text.append(b, small);
+      if (r.cost) {
+        const cost = document.createElement('div');
+        cost.className = 'cost';
+        r.cost.forEach((n, i) => {
+          if (!n) return;
+          const chip = document.createElement('span');
+          chip.className = `fruit-dot ${['f-star', 'f-moon', 'f-sun'][i]}`;
+          chip.textContent = String(n);
+          cost.append(chip);
+        });
+        text.append(cost);
+      }
+      const btn = document.createElement('button');
+      btn.textContent = r.action;
+      btn.disabled = !r.enabled;
+      btn.addEventListener('click', () => onPick(r.id));
+      row.append(sw, text, btn);
+      list.append(row);
+    }
+    $('choices').classList.remove('hidden');
+  }
+
   /** A handwritten letter, shown as its own card. */
   showLetter(from: string, paragraphs: string[]): void {
     $('menu').classList.add('hidden');
@@ -346,7 +400,7 @@ export class UI {
   }
 
   get logOpen(): boolean {
-    return ['log', 'map', 'photo-bar', 'journal', 'letter'].some((id) => !$(id).classList.contains('hidden'));
+    return ['log', 'map', 'photo-bar', 'journal', 'letter', 'choices'].some((id) => !$(id).classList.contains('hidden'));
   }
 
   showMenu(stats: string): void {
