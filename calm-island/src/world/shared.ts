@@ -59,6 +59,16 @@ export function fogClearAt(x: number, z: number): number {
   return fogData[j * FOG_RES + i] / 255;
 }
 
+// The sky's two colours, kept in a tiny texture so every material can read
+// them live (plain colour uniforms are copied per material and would go stale).
+const skyData = new Float32Array(8);
+export const skyTex = new THREE.DataTexture(skyData, 2, 1, THREE.RGBAFormat, THREE.FloatType);
+skyTex.minFilter = skyTex.magFilter = THREE.NearestFilter;
+export function setFogSky(horizon: THREE.Color, top: THREE.Color): void {
+  skyData.set([horizon.r, horizon.g, horizon.b, 1, top.r, top.g, top.b, 1]);
+  skyTex.needsUpdate = true;
+}
+
 THREE.ShaderChunk.fog_pars_vertex = THREE.ShaderChunk.fog_pars_vertex.replace('varying float vFogDepth;', 'varying float vFogDepth;\n\tvarying vec3 vFogWorld;');
 THREE.ShaderChunk.fog_vertex = THREE.ShaderChunk.fog_vertex.replace(
   'vFogDepth = - mvPosition.z;',
@@ -66,7 +76,7 @@ THREE.ShaderChunk.fog_vertex = THREE.ShaderChunk.fog_vertex.replace(
 );
 THREE.ShaderChunk.fog_pars_fragment = THREE.ShaderChunk.fog_pars_fragment.replace(
   'varying float vFogDepth;',
-  'varying float vFogDepth;\n\tvarying vec3 vFogWorld;\n\tuniform sampler2D uFogMask;',
+  'varying float vFogDepth;\n\tvarying vec3 vFogWorld;\n\tuniform sampler2D uFogMask;\n\tuniform sampler2D uSkyTex;',
 );
 THREE.ShaderChunk.fog_fragment = THREE.ShaderChunk.fog_fragment.replace(
   'gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );',
@@ -76,11 +86,22 @@ THREE.ShaderChunk.fog_fragment = THREE.ShaderChunk.fog_fragment.replace(
 	float islandClear = texture2D(uFogMask, vFogWorld.xz / ${WORLD_SIZE.toFixed(1)} + 0.5).r;
 	float lowAir = 1.0 - smoothstep(50.0, 96.0, vFogWorld.y);
 	float murk = (1.0 - islandClear) * lowAir * (1.0 - exp(-vFogDepth * 0.055));
-	gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor * 1.04 + vec3(0.05, 0.055, 0.06), murk * 0.975);`,
+	// Close by, fog is a pale veil. Further in, it takes exactly the colour of the
+	// sky behind, so trees dissolve into the air instead of standing out as white shapes.
+	vec3 fogDir = normalize(vFogWorld - cameraPosition);
+	vec3 skyHor = texture2D(uSkyTex, vec2(0.25, 0.5)).rgb;
+	vec3 skyTop = texture2D(uSkyTex, vec2(0.75, 0.5)).rgb;
+	vec3 skyBehind = mix(skyHor, skyTop, pow(clamp(fogDir.y, 0.0, 1.0), 0.5));
+	// (a trace of mist is kept even at full depth, so the mountain's foot fades out rather than floating)
+	vec3 veil = mix(mix(skyHor, skyBehind, 0.5) * 1.03 + vec3(0.02), mix(skyBehind, skyHor * 1.03 + vec3(0.02), 0.13), smoothstep(0.45, 0.97, murk));
+	gl_FragColor.rgb = mix(gl_FragColor.rgb, veil, murk);`,
 );
 // built-in materials copy their uniforms from ShaderLib, so the mask goes in there
 for (const lib of Object.values(THREE.ShaderLib)) {
-  if (lib.uniforms && 'fogColor' in lib.uniforms) (lib.uniforms as Record<string, THREE.IUniform>).uFogMask = { value: fogMask };
+  if (lib.uniforms && 'fogColor' in lib.uniforms) {
+    (lib.uniforms as Record<string, THREE.IUniform>).uFogMask = { value: fogMask };
+    (lib.uniforms as Record<string, THREE.IUniform>).uSkyTex = { value: skyTex };
+  }
 }
 
 /** Uniforms shared by every animated material (wind, water, grass…). */

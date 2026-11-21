@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { clamp, smoothstep } from '../core/math';
 import { SKY_HORIZON, SKY_TOP } from './Sky';
-import { SUN_DIR, globalUniforms } from './shared';
+import { SUN_DIR, globalUniforms, setFogSky } from './shared';
 
 interface Key {
   h: number;
@@ -79,6 +79,7 @@ export class DayCycle {
       globalUniforms.uDayLight.value *= 1 - 0.22 * rain;
     }
     fog.density = 0.00105 + 0.0016 * rain;
+    setFogSky(SKY_HORIZON, SKY_TOP);
   }
 
   get label(): string {

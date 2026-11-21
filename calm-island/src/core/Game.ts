@@ -102,6 +102,9 @@ export class Game {
   private bestSkips = 0;
   private waterNear = 0;
   private waterCheck = 0;
+  private stride = 0;
+  private wasAir = false;
+  private musicClock = 0;
   private reveals: number[][] = [[0, 6, 34]];
   /** circles of fog still rolling back: x, z, final radius, seconds elapsed */
   private lifting: number[][] = [];
@@ -259,7 +262,7 @@ export class Game {
 
     await step(0.25, 'Planting trees and wildflowers…');
     const base = import.meta.env.BASE_URL;
-    const models = this.settings.quality === 'low' || this.opts.plainPlants ? null : await loadNatureModels(base);
+    const models = this.opts.plainPlants ? null : await loadNatureModels(base);
     this.vegetation = new Vegetation(this.island, models, base);
     this.scene.add(this.vegetation.group);
 
@@ -289,7 +292,7 @@ export class Game {
     this.skimming = new Skimming(this.island);
     this.fishing = new Fishing(this.island);
     this.home = new Home(this.island);
-    this.vegetation.colliders.add(this.home.x, this.home.z, 3.1);
+    this.vegetation.colliders.add(this.home.x, this.home.z, 3.7);
     this.scene.add(this.fishing.group, this.home.group);
     this.viewpoints = new Viewpoints(this.island);
     this.cairns = new Cairns(this.island);
@@ -468,6 +471,7 @@ export class Game {
       this.updateFriendship(dt);
       this.updatePractice(dt);
       this.updateShore(dt);
+      this.updateFootsteps(dt);
       this.updateFishing(dt);
       this.updateSleep(dt);
       if (this.input.kitePressed()) {
@@ -859,6 +863,34 @@ export class Game {
     }
     this.home.show(this.keepsakes);
   }
+
+  /** Footsteps that match the ground, a thump on landing, and music that comes and goes. */
+  private updateFootsteps(dt: number): void {
+    const pl = this.player;
+    const p = pl.pos;
+    const I = this.island;
+    if (this.wasAir && pl.grounded) this.ambience.land(0.7);
+    this.wasAir = !pl.grounded && !pl.swimming;
+    if (pl.grounded && pl.speed > 0.6) {
+      this.stride += pl.speed * dt;
+      const length = 0.72 + Math.min(pl.speed, 8) * 0.07; // longer strides at a run
+      if (this.stride >= length) {
+        this.stride = 0;
+        const ground = I.heightAt(p.x, p.z);
+        const surface =
+          I.waterLevelAt(p.x, p.z) > ground + 0.08 ? 'water'
+          : I.sample(I.sand, p.x, p.z) > 0.5 || ground > 104 ? 'sand'
+          : I.sample(I.path, p.x, p.z) > 0.4 ? 'path'
+          : I.gradientAt(p.x, p.z, this.footGrad) > 0.75 ? 'rock'
+          : 'grass';
+        this.ambience.step(surface, Math.min(1, pl.speed / 8));
+      }
+    } else if (pl.speed < 0.3) this.stride = 0.5; // the first step lands soon after setting off
+    // like a good walk, the music is not constant: four minutes on, two and a half of quiet
+    this.musicClock += dt;
+    this.music.rest(this.musicClock % 390 > 240);
+  }
+  private footGrad = { x: 0, z: 0 };
 
   /** How close water is (for sound and skimming), and stones thrown across it. */
   private updateShore(dt: number): void {
@@ -1405,6 +1437,7 @@ export class Game {
       skips: this.skimming.skips,
       stoneFlying: this.skimming.flying,
       birdCalls: this.ambience.calls,
+      footsteps: this.ambience.steps,
       absent: this.npcs.filter((n) => n.absent).map((n) => n.who.id),
       hour: this.day.hour,
       vy: this.player.vel.y,
