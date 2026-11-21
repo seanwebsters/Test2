@@ -84,6 +84,7 @@ export class Grass {
           attribute vec4 aOffset;
           varying vec3 vGrassCol;
           varying float vBladeY;
+          varying float vSheen;
           ${WORLD_UV_GLSL}`,
         )
         .replace(
@@ -112,7 +113,11 @@ export class Grass {
           local.xz += away / max(pd, 0.001) * push * 0.45 * bend;
           local.y *= 1.0 - push * 0.55;
           vec3 transformed = vec3(base.x, groundY, base.y) + local;
-          vGrassCol = ground.rgb;
+          // each blade its own shade; a few go to seed and turn straw-gold
+          vGrassCol = ground.rgb * (0.86 + 0.28 * aOffset.z);
+          vGrassCol = mix(vGrassCol, vGrassCol * vec3(1.25, 1.12, 0.6), step(0.93, fract(aOffset.w * 17.0)) * 0.6);
+          // the crest of each gust catches the light as it rolls across the meadow
+          vSheen = smoothstep(0.35, 1.0, swell) * 0.6 + smoothstep(0.5, 1.0, ripple) * 0.25;
           vBladeY = position.y;`,
         );
       shader.fragmentShader = shader.fragmentShader
@@ -120,12 +125,14 @@ export class Grass {
           '#include <common>',
           `#include <common>
           varying vec3 vGrassCol;
-          varying float vBladeY;`,
+          varying float vBladeY;
+          varying float vSheen;`,
         )
         .replace(
           '#include <color_fragment>',
           /* glsl */ `
-          diffuseColor.rgb = vGrassCol * mix(0.8, 1.28, vBladeY) + vec3(0.05, 0.06, 0.0) * vBladeY * vBladeY;`,
+          diffuseColor.rgb = vGrassCol * mix(0.62, 1.3, vBladeY) + vec3(0.05, 0.06, 0.0) * vBladeY * vBladeY;
+          diffuseColor.rgb += vec3(0.16, 0.19, 0.05) * vSheen * vBladeY * vBladeY;`,
         )
         .replace(
           '#include <normal_fragment_begin>',

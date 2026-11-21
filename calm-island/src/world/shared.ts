@@ -1,6 +1,16 @@
 import * as THREE from 'three';
 import { GRID, WORLD_SIZE, type Island } from './islandMap';
 
+// Aerial perspective for everything that uses fog: besides the far fade to the
+// horizon colour, a thin cool haze builds up over the first few hundred metres,
+// so each line of hills and trees sits a little paler than the one in front.
+THREE.ShaderChunk.fog_fragment = THREE.ShaderChunk.fog_fragment.replace(
+  'gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );',
+  `float hazeAmt = (1.0 - exp(-vFogDepth * 0.0035)) * 0.34;
+	gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor * vec3(0.86, 0.95, 1.1), hazeAmt);
+	gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );`,
+);
+
 /** Uniforms shared by every animated material (wind, water, grass…). */
 export const globalUniforms = {
   uTime: { value: 0 },

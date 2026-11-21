@@ -38,6 +38,7 @@ function foliageMaterial(sway: number, base: number, doubleSide = false, leafy =
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = globalUniforms.uTime;
     shader.uniforms.uPlayer = globalUniforms.uPlayer;
+    shader.uniforms.uSunDirW = globalUniforms.uSunDir;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform vec3 uPlayer;')
       .replace(
@@ -73,6 +74,7 @@ function foliageMaterial(sway: number, base: number, doubleSide = false, leafy =
           '#include <common>',
           /* glsl */ `#include <common>
           varying vec3 vLeafPos;
+          uniform vec3 uSunDirW;
           float leafHash(vec3 p) {
             p = fract(p * vec3(0.1031, 0.1030, 0.0973));
             p += dot(p, p.yxz + 33.33);
@@ -92,7 +94,13 @@ function foliageMaterial(sway: number, base: number, doubleSide = false, leafy =
           '#include <color_fragment>',
           /* glsl */ `#include <color_fragment>
           float clump = leafNoise(vLeafPos * 1.9) * 0.6 + leafNoise(vLeafPos * 5.3 + 7.0) * 0.4;
-          diffuseColor.rgb *= mix(0.8, 1.14, smoothstep(0.32, 0.7, clump));`,
+          diffuseColor.rgb *= mix(0.74, 1.16, smoothstep(0.3, 0.7, clump));
+          // looking toward the sun, light glows through the leaves
+          vec3 toEye = normalize(cameraPosition - vLeafPos);
+          float glow = pow(max(dot(-toEye, uSunDirW), 0.0), 2.5);
+          diffuseColor.rgb += diffuseColor.rgb * vec3(1.0, 0.95, 0.6) * glow * 0.7;
+          // tiny bright flecks, like individual leaves catching the light
+          diffuseColor.rgb *= 1.0 + step(0.86, leafNoise(vLeafPos * 14.0)) * 0.22;`,
         );
     }
   };
