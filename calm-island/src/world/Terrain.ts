@@ -14,8 +14,8 @@ const mix3 = (a: RGB, b: RGB, t: number, out: RGB): RGB => {
   return out;
 };
 
-const GRASS_A = hex(0x6fa845);
-const GRASS_B = hex(0x4a8a3d);
+const GRASS_A = hex(0x6a9f4c);
+const GRASS_B = hex(0x4a8546);
 const GRASS_SUN = hex(0x9dbd5a);
 const GRASS_FOREST = hex(0x336b35);
 const ALPINE = hex(0x8fa878);

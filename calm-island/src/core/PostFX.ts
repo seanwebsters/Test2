@@ -25,6 +25,8 @@ class LightPass extends Pass {
     uRays: { value: 0 },
     uSun: { value: new THREE.Vector2(0.5, 0.8) },
     uSunColor: { value: new THREE.Color(1, 0.86, 0.6) },
+    uDof: { value: 0 },
+    uFocus: { value: 8 },
   };
   private quad: FullScreenQuad;
 
@@ -43,6 +45,7 @@ class LightPass extends Pass {
           uniform float uNear, uFar, uAspect, uTan, uAo, uRays;
           uniform vec2 uSun;
           uniform vec3 uSunColor;
+          uniform float uDof, uFocus;
           varying vec2 vUv;
           float lin(float d) { float z = d * 2.0 - 1.0; return 2.0 * uNear * uFar / (uFar + uNear - z * (uFar - uNear)); }
           float depthAt(vec2 uv) { return lin(texture2D(tDepth, uv).r); }
@@ -51,6 +54,24 @@ class LightPass extends Pass {
           void main() {
             vec4 c = texture2D(tDiffuse, vUv);
             float z = depthAt(vUv);
+            if (uDof > 0.0) {
+              // a long lens: the far distance and anything right against the glass soften a little
+              float coc = max(smoothstep(uFocus * 5.0, uFocus * 28.0, z), 1.0 - smoothstep(0.0, uFocus * 0.22, z)) * uDof;
+              if (coc > 0.02) {
+                vec3 sum = c.rgb;
+                float wsum = 1.0;
+                for (int i = 0; i < 8; i++) {
+                  float a = float(i) * 0.7854 + 0.4;
+                  vec2 o = vec2(cos(a), sin(a)) * uTexel * (2.2 + mod(float(i), 2.0) * 1.8) * coc * 2.6;
+                  // only gather from things that are themselves out of focus, so sharp edges do not bleed
+                  float zs = depthAt(vUv + o);
+                  float ws = max(smoothstep(uFocus * 5.0, uFocus * 28.0, zs), 1.0 - smoothstep(0.0, uFocus * 0.22, zs)) + 0.05;
+                  sum += texture2D(tDiffuse, vUv + o).rgb * ws;
+                  wsum += ws;
+                }
+                c.rgb = sum / wsum;
+              }
+            }
             if (uAo > 0.0 && z < 150.0) {
               vec3 p = viewPos(vUv, z);
               // the surface's facing, rebuilt from its neighbours in the depth buffer
@@ -130,7 +151,7 @@ const GradeShader = {
       if (!(c.r >= 0.0 && c.g >= 0.0 && c.b >= 0.0)) c = vec3(0.5, 0.6, 0.7);
       float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));
       // a little more colour, with sunlit areas leaning warm and shade leaning cool
-      c = mix(vec3(luma), c, 1.08);
+      c = mix(vec3(luma), c, 1.02);
       c *= mix(vec3(0.94, 0.98, 1.09), vec3(1.07, 1.02, 0.93), smoothstep(0.15, 0.8, luma));
       // gentle S-curve for depth without crushing anything
       c = mix(c, c * c * (3.0 - 2.0 * c), 0.28);
@@ -155,6 +176,9 @@ export class PostFX {
   /** how strong the ambient occlusion and the sun shafts are (0 turns each off) */
   ao = 0;
   rays = 0;
+  dof = 0;
+  /** how far away the Calmling is, which is where the lens is focused */
+  focus = 8;
   private sunNdc = new THREE.Vector3();
 
   constructor(private renderer: THREE.WebGLRenderer, private scene: THREE.Scene, private camera: THREE.Camera) {
@@ -187,11 +211,13 @@ export class PostFX {
     u.uSunColor.value.copy(color);
     u.uRays.value = behind ? 0 : this.rays * strength;
     u.uAo.value = this.ao;
+    u.uDof.value = this.dof;
+    u.uFocus.value = this.focus;
     u.uNear.value = cam.near;
     u.uFar.value = cam.far;
     u.uAspect.value = cam.aspect;
     u.uTan.value = Math.tan((cam.fov * Math.PI) / 360);
-    this.light.enabled = this.ao > 0 || this.rays > 0;
+    this.light.enabled = this.ao > 0 || this.rays > 0 || this.dof > 0;
   }
 
   render(): void {

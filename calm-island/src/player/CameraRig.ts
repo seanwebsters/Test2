@@ -42,7 +42,7 @@ export class CameraRig {
     this.dist = clamp(this.dist * Math.exp(input.wheel * 0.0012), 2.8, 18);
 
     // follow tightly sideways, a little lazily in height so hops feel bouncy
-    const k = 1 - Math.exp(-14 * dt);
+    const k = 1 - Math.exp(-9 * dt); // a breath of lag, so turns and stops feel soft
     this.target.x += (player.pos.x - this.target.x) * k;
     this.target.z += (player.pos.z - this.target.z) * k;
     this.target.y = damp(this.target.y, player.pos.y + 1.0, player.grounded ? 9 : 5, dt);

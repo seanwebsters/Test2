@@ -463,7 +463,25 @@ export class UI {
     this.toast(kicker, title, blurb, true);
   }
 
+  private toastQueue: [string, string, string, boolean][] = [];
+  private toastBusyUntil = 0;
+
+  /**
+   * Messages take turns. A new one waits until the one on screen has had its
+   * time (a big moment is never cut short), and only the latest two are kept
+   * waiting, so the screen stays quiet instead of flickering through a backlog.
+   */
   toast(kicker: string, title: string, blurb: string, big = false): void {
+    const now = performance.now();
+    if (now < this.toastBusyUntil) {
+      if (!big) this.toastQueue = this.toastQueue.filter((t) => t[3]).concat(this.toastQueue.filter((t) => !t[3]).slice(-1));
+      this.toastQueue.push([kicker, title, blurb, big]);
+      return;
+    }
+    this.showToast(kicker, title, blurb, big);
+  }
+
+  private showToast(kicker: string, title: string, blurb: string, big: boolean): void {
     const el = $('toast');
     el.classList.toggle('moment', big);
     el.querySelector('.toast-kicker')!.textContent = kicker;
@@ -471,7 +489,14 @@ export class UI {
     el.querySelector('.toast-blurb')!.textContent = blurb;
     el.classList.add('show');
     clearTimeout(this.toastTimer);
-    this.toastTimer = window.setTimeout(() => el.classList.remove('show'), big ? 8200 : 4600);
+    const hold = big ? 8200 : 4600;
+    this.toastBusyUntil = performance.now() + (big ? 7000 : 3200);
+    this.toastTimer = window.setTimeout(() => {
+      el.classList.remove('show');
+      const next = this.toastQueue.shift();
+      if (next) window.setTimeout(() => this.showToast(...next), 900);
+      else this.toastBusyUntil = 0;
+    }, hold);
   }
 
   fps(text: string): void {
