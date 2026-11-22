@@ -105,7 +105,7 @@ export class Grass {
           // the meadow rolls between cropped lawn and long, lush drifts
           float drift = gNoise2(base * 0.035) * 0.65 + gNoise2(base * 0.11 + 9.0) * 0.35;
           float lush = smoothstep(0.38, 0.72, drift);
-          float hgt = uBladeH * (0.55 + 0.9 * aOffset.z) * grow * mix(0.55, 1.75, lush);
+          float hgt = uBladeH * (0.55 + 0.9 * aOffset.z) * grow * mix(0.55, 1.3, lush);
           float ang = aOffset.w * 6.2831 + aOffset.z * 40.0;
           float bend = position.y * position.y;
           vec3 local = vec3(cos(ang) * position.x, position.y * hgt, sin(ang) * position.x);

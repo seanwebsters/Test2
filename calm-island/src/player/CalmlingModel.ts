@@ -20,7 +20,13 @@ export interface CalmlingPose {
   breath: number;
   gliding: boolean;
   sleeping?: boolean;
+  /** a mindful activity being done on the spot */
+  act?: CalmlingAct | null;
+  eyesClosed?: boolean;
 }
+
+/** stretch: arms high, swaying · open: arms wide to the wind · dance · lie: on the back · reach: lying, one arm up · tend: hands busy in front · listen: head tilted */
+export type CalmlingAct = 'stretch' | 'open' | 'dance' | 'lie' | 'reach' | 'tend' | 'listen';
 
 /** Everything that makes one Calmling look different from another. */
 export interface CalmlingLook {
@@ -93,6 +99,8 @@ export class CalmlingModel {
   private glide = 0;
   private sleep = 0;
   private leaf: THREE.Group | null = null;
+  private actW = 0;
+  private actKind: CalmlingAct = 'stretch';
 
   constructor(readonly look: CalmlingLook = BLUE_LOOK, hero = true) {
     const base = new THREE.Color(0xffffff);
@@ -369,7 +377,7 @@ export class CalmlingModel {
     this.sit = damp(this.sit, pose.sitting ? 1 : 0, 5, dt);
     this.breath = damp(this.breath, pose.sitting ? pose.breath : 0, 10, dt);
     this.sleep = damp(this.sleep, pose.sleeping ? 1 : 0, 1.5, dt);
-    this.eyesShut = damp(this.eyesShut, pose.sleeping || (pose.sitting && pose.breath > 0.001) ? 1 : 0, 3, dt);
+    this.eyesShut = damp(this.eyesShut, pose.sleeping || pose.eyesClosed || (pose.sitting && pose.breath > 0.001) ? 1 : 0, 3, dt);
 
     // steps keep pace with the ground so feet never skate
     this.phase += dt * (pose.swimming ? 5 : pose.speed * lerp(2.9, 1.75, this.run));
@@ -427,6 +435,45 @@ export class CalmlingModel {
     this.armR.rotation.x -= 0.35 * this.sit;
     this.armL.rotation.z = -(0.14 + lift + idleSway + this.breath * 0.12);
     this.armR.rotation.z = 0.14 + lift + idleSway + this.breath * 0.12;
+
+    // mindful activities: each eases in over the ordinary pose and out again
+    if (pose.act) this.actKind = pose.act;
+    this.actW = damp(this.actW, pose.act ? 1 : 0, 2.5, dt);
+    const w = this.actW;
+    if (w > 0.002) {
+      const k = this.actKind;
+      const arms = (z: number): void => {
+        this.armL.rotation.z = lerp(this.armL.rotation.z, -z, w);
+        this.armR.rotation.z = lerp(this.armR.rotation.z, z, w);
+      };
+      if (k === 'stretch') {
+        arms(2.45 + Math.sin(t * 0.8) * 0.3);
+        this.tilt.rotation.z += Math.sin(t * 0.5) * 0.14 * w;
+        this.body.position.y += (Math.sin(t * 0.8) * 0.5 + 0.5) * 0.05 * w;
+      } else if (k === 'open') {
+        arms(1.42 + Math.sin(t * 0.7) * 0.07);
+        this.tilt.rotation.x -= 0.13 * w;
+      } else if (k === 'dance') {
+        arms(1.15 + Math.sin(t * 5) * 0.55);
+        this.body.position.y += Math.abs(Math.sin(t * 5)) * 0.13 * w;
+        this.tilt.rotation.z += Math.sin(t * 5) * 0.15 * w;
+      } else if (k === 'lie' || k === 'reach') {
+        this.tilt.rotation.x = lerp(this.tilt.rotation.x, -1.32, w);
+        arms(0.95);
+        this.legL.rotation.x = lerp(this.legL.rotation.x, -0.25 + Math.sin(t * 0.6) * 0.08, w);
+        this.legR.rotation.x = lerp(this.legR.rotation.x, -0.25 - Math.sin(t * 0.6) * 0.08, w);
+        if (k === 'reach') {
+          this.armR.rotation.z = lerp(this.armR.rotation.z, 0.3, w);
+          this.armR.rotation.x = lerp(this.armR.rotation.x, -1.75 + Math.sin(t * 0.9) * 0.25, w);
+        }
+      } else if (k === 'tend') {
+        this.armL.rotation.x = lerp(this.armL.rotation.x, -1.05 + Math.sin(t * 2.1) * 0.32, w);
+        this.armR.rotation.x = lerp(this.armR.rotation.x, -1.05 + Math.sin(t * 2.1 + 2.2) * 0.32, w);
+        this.tilt.rotation.x += 0.2 * w;
+      } else if (k === 'listen') {
+        this.tilt.rotation.z += (0.17 + Math.sin(t * 0.4) * 0.04) * w;
+      }
+    }
 
     // blinking and a glance into turns
     this.blinkIn -= dt;

@@ -154,6 +154,7 @@ export class Game {
   private restWeek = -1;
   private intents: { key: string; ids: string[]; done: boolean[] } = { key: '', ids: [], done: [] };
   private introduced = new Set<string>();
+  private toldDoing = new Map<string, string>();
   private shop!: Shop;
   private wild!: WildFruit;
   /** the springs in the order the chapters visit them: nearest home first, then on round the island */
@@ -465,6 +466,7 @@ export class Game {
       const npc = new Npc(who, this.island, i);
       this.npcs.push(npc);
       this.scene.add(npc.model.root);
+      if (npc.prop) this.scene.add(npc.prop);
     });
     this.pickDaily();
     // one friend lives close by, down the earth path by the river: the first you are sent to find
@@ -1080,6 +1082,25 @@ export class Game {
       this.gatherTold = true;
       this.flags.add('gathering');
       this.ui.toast('Evening at home', arrived === 1 ? `${guests[0].who.name} has come by` : `${arrived} friends have come by`, home.lit ? 'The fire is warm. Sit with them a while' : 'Light the fire and sit with them a while');
+    }
+    // friends are found doing calm things; sit down near one and you are keeping them company
+    for (const npc of this.npcs) {
+      if (npc.absent || !npc.doing || !this.met.has(npc.who.id)) {
+        if (!npc.doing) this.toldDoing.delete(npc.who.id);
+        continue;
+      }
+      const d = Math.hypot(npc.pos.x - p.x, npc.pos.z - p.z);
+      if (d < 9 && this.toldDoing.get(npc.who.id) !== npc.doing && this.tut >= 9) {
+        this.toldDoing.set(npc.who.id, npc.doing);
+        this.ui.toast('', `${npc.who.name} is ${npc.doing}`, this.ui.touch ? 'Sit down beside them for a while' : 'Sit down beside them for a while (B)');
+      }
+      if (d < 5.5 && this.player.sitting) {
+        this.bonds.set(npc.who.id, (this.bonds.get(npc.who.id) ?? 0) + 2.5);
+        if (!this.flags.has('together')) {
+          this.flags.add('together');
+          this.ui.toast('', 'Sitting together', `Time spent beside ${npc.who.name} counts as time with a friend`);
+        }
+      }
     }
     if (this.player.sitting && this.waterNear > 0.12) this.did('water');
     if (this.companion && this.player.speed > 1) this.did('friend');
@@ -1947,6 +1968,7 @@ export class Game {
       { title: `Today’s moment: find ${this.daily.npc.who.name}`, hint: `Near ${this.nearestRegionName(this.daily.npc.home.x, this.daily.npc.home.z)}. A new one each day`, done: this.dailyDone === this.daily.key },
       { title: 'Take three deep breaths', hint: 'Press B anywhere', done: this.breathsDone > 0 },
       { title: 'Say hello to a Calmling', hint: 'Walk up to one and press E', done: this.met.size > 0 },
+      { title: 'Sit with a friend while they do their calm thing', hint: 'Each Calmling has their own. Sit down beside them', done: this.flags.has('together') },
       { title: 'Go for a walk with a friend', hint: 'Press E again to invite them', done: best >= 1 },
       { title: 'Hear a friend’s story', hint: 'Keep walking together until two hearts fill', done: best >= 2 },
       { title: 'Learn a practice', hint: 'Press Q beside a Calmling you have met', done: this.learned.size > 0 },
