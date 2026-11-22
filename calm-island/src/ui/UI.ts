@@ -101,7 +101,7 @@ export class UI {
       $('menu').classList.remove('hidden');
       $('resume').textContent = 'Back';
     });
-    for (const [id, hour] of [['time-dawn', 6.6], ['time-day', 13], ['time-night', 22]] as [string, number][]) $(id).addEventListener('click', () => handlers.onTitleTime(hour));
+    for (const [id, hour] of [['time-dawn', 6.6], ['time-day', 13], ['time-night', 18.2]] as [string, number][]) $(id).addEventListener('click', () => handlers.onTitleTime(hour));
     $('resume').addEventListener('click', () => {
       if (this.fromTitle) {
         // opened from the title screen: Back returns there instead of starting the game

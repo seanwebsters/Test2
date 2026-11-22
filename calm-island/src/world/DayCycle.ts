@@ -36,7 +36,10 @@ const a = new THREE.Color();
 const b = new THREE.Color();
 const mix = (out: THREE.Color, x: number, y: number, t: number): THREE.Color => out.copy(a.set(x)).lerp(b.set(y), t);
 
-/** A whole day passes in twenty minutes: sunrise, noon, sunset, moonlit night. */
+const DAWN = 6.5;
+const DUSK = 18.6;
+
+/** A whole day passes in about ten minutes: sunrise, noon, the golden afternoon, sunset, and round to sunrise again. */
 export class DayCycle {
   /** 0–24 */
   hour = 15.4;
@@ -47,6 +50,8 @@ export class DayCycle {
 
   update(dt: number, sun: THREE.DirectionalLight, hemi: THREE.HemisphereLight, fog: THREE.FogExp2, rain = 0): void {
     this.hour = (this.hour + dt * this.rate) % 24;
+    // there is no night on the island: as the sun touches the sea the day turns straight over to dawn
+    if (this.hour >= DUSK || this.hour < DAWN) this.hour = DAWN;
     const h = this.hour;
     let i = 0;
     while (i < KEYS.length - 2 && KEYS[i + 1].h <= h) i++;

@@ -352,10 +352,7 @@ export class Game {
       } else if (e.code === 'KeyM') {
         if (this.playing) this.openMap();
         else if (this.ui.logOpen && !this.photo) this.play();
-      } else if (e.code === 'KeyP') {
-        if (this.playing) this.enterPhoto();
-        else if (this.photo) this.play();
-      } else if (e.code === 'Enter' && this.photo) this.savePhoto();
+      }
     });
     window.addEventListener('keydown', (e) => {
       if (e.code !== 'KeyL' || !this.ready || e.repeat) return;
@@ -754,7 +751,7 @@ export class Game {
         if (this.kite.flying) this.flags.add('kite');
       }
       if (this.player.gliding) this.flags.add('glide');
-      if (this.day.night > 0.9) this.flags.add('night');
+      if (this.day.hour > 18.2) this.flags.add('night');
       if (this.player.swimming) this.kite.flying = false;
       const seed = this.seeds.update(globalUniforms.uTime.value, this.player.pos);
       if (seed >= 0) {
@@ -1520,7 +1517,7 @@ export class Game {
           if (!target && d < 140) target = sp;
         }
         if (this.wayTarget && Math.hypot(this.wayTarget.x - p.x, this.wayTarget.z - p.z) < 6) this.wayTarget = null;
-        if (!target) target = this.wayTarget;
+        if (this.wayTarget) target = this.wayTarget;
         this.trailTarget = target;
         // after the introduction the screen stays quiet: the sparkles, the Today button and the chapter bar say enough
         void text;
@@ -1727,7 +1724,7 @@ export class Game {
     else this.ui.breath('Waiting…', 0.22 + Math.sin(time * 1.2) * 0.08, 0, 0);
   }
 
-  /** At night, or at home, lie down and let the hours pass until morning. */
+  /** At home, lie down and let the hours pass until morning. */
   private updateSleep(dt: number): void {
     const can = !this.sleeping && this.player.grounded && !this.practice && !this.breathing.active && !this.fishing.active && (this.day.night > 0.5 || this.inside || this.home.near(this.player.pos));
     this.ui.sleepButton(can);
@@ -1735,7 +1732,7 @@ export class Game {
       if (!this.input.sleepPressed() && !this.wantSleep) return;
       this.wantSleep = false;
       if (!can) {
-        this.ui.toast('', 'Not sleepy yet', 'Sleep comes after dark, or any time at your nook');
+        this.ui.toast('', 'Not sleepy yet', 'You can rest any time at your nook');
         return;
       }
       if (!this.player.sit()) return;
@@ -1782,7 +1779,7 @@ export class Game {
     const earned: [string, boolean][] = [
       ['lantern', this.seeds.foundIds.length >= 5], ['bloom', this.garden.blooms > 0], ['stones', this.cairns.tallest >= this.cairns.max],
       ['kite', this.flags.has('kite')], ['skimmer', this.bestSkips >= 3], ['shell', this.discovered.has('bay')],
-      ['feather', this.rested.has('summit')], ['garland', best >= 2], ['bowl', this.flags.has('fish')], ['picture', this.flags.has('photo')],
+      ['feather', this.rested.has('summit')], ['garland', best >= 2], ['bowl', this.flags.has('fish')], ['picture', this.discovered.size >= 4],
     ];
     for (const [id, ok] of earned) {
       if (!ok || this.keepsakes.has(id)) continue;
@@ -1901,6 +1898,22 @@ export class Game {
     const canvas = this.ui.showMap(`${this.discovered.size} of ${this.island.regions.length} places · ${this.seeds.foundIds.length} of ${this.seeds.spots.length} calm seeds · ${this.day.label}. Sit and breathe to clear more mist.`);
     const S = canvas.width;
     const ctx = canvas.getContext('2d')!;
+    if (!canvas.dataset.pin) {
+      // tap the map to drop a pin: the sparkles lead there. Tap the pin again to lift it.
+      canvas.dataset.pin = '1';
+      canvas.style.cursor = 'pointer';
+      canvas.addEventListener('click', (e) => {
+        const r = canvas.getBoundingClientRect();
+        const MV = 418;
+        const x = ((e.clientX - r.left) / r.width) * 2 * MV - MV;
+        const z = ((e.clientY - r.top) / r.height) * 2 * MV - MV;
+        if (this.wayTarget && Math.hypot(this.wayTarget.x - x, this.wayTarget.z - z) < 26) this.wayTarget = null;
+        else if (this.island.heightAt(x, z) >= 0.15) this.wayTarget = { x, z };
+        else return;
+        this.nextCheck = 0; // the sparkles turn toward it straight away
+        this.openMap();
+      });
+    }
     if (!this.mapBase) {
       // Painted once: a storybook map. Each biome has its own flat colour, hills are softly shaded,
       // the coast drops away as a little cliff so the island looks like a model sitting in the sea.
@@ -2164,6 +2177,31 @@ export class Game {
       ctx.lineWidth = 4;
       ctx.stroke();
     }
+    if (this.wayTarget) {
+      // your pin
+      const [wx2, wy2] = at(this.wayTarget.x, this.wayTarget.z);
+      ctx.save();
+      ctx.translate(wx2, wy2);
+      ctx.beginPath();
+      ctx.ellipse(0, 2, 9, 4, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(40,30,60,.3)';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.bezierCurveTo(-20, -22, -15, -44, 0, -44);
+      ctx.bezierCurveTo(15, -44, 20, -22, 0, 0);
+      ctx.closePath();
+      ctx.fillStyle = '#ff5d7a';
+      ctx.fill();
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = '#fff';
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, -28, 6, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+      ctx.restore();
+    }
     const p = this.player.pos;
     const [px, py] = at(p.x, p.z);
     ctx.save();
@@ -2256,8 +2294,7 @@ export class Game {
       { title: this.currentChapter() >= 0 ? `Chapter ${this.currentChapter() + 1} of ${this.chapters.length}: ${this.springs.spots[this.chapters[this.currentChapter()]].name}` : 'Every chapter told', hint: this.currentChapter() >= 0 ? 'A spring is sleeping there. Wake it and a letter will lead you on' : 'All eight springs are awake', done: this.currentChapter() < 0 },
       { title: 'Pick wild fruit', hint: `Bushes grow in every region: ${this.wild.count} across the island`, done: this.flags.has('wild') },
       { title: 'Wake a calm spring', hint: `${this.springs.awakeCount} of ${this.springs.spots.length} awake. Breathe beside the ring of stones in each place`, done: this.springs.awakeCount > 0 },
-      { title: 'Watch night fall', hint: 'Stay sitting and the day drifts by', done: this.flags.has('night') },
-      { title: 'Take a photo', hint: 'Press P, frame it, press Enter', done: this.flags.has('photo') },
+      { title: 'Watch the sun set', hint: 'Stay sitting and the day drifts by', done: this.flags.has('night') },
       { title: 'Visit every corner of the island', hint: 'Eight places to discover', done: this.discovered.size >= this.island.regions.length },
     ]);
   }

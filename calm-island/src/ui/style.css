@@ -906,3 +906,6 @@ body:not(.is-touch) #btn-surf { display: none; }
 .map-key { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 4px 0 0; font-size: 13.5px; font-weight: 500; color: var(--soft); align-items: center; }
 .map-key i { display: inline-block; width: 13px; height: 13px; border-radius: 50%; margin-right: -7px; vertical-align: -2px; box-shadow: 0 0 0 2px #fff, 0 1px 3px rgba(0,0,0,.3); }
 .k-you { background: #3d9fea; } .k-home { background: #f2cf66; border-radius: 3px !important; } .k-friend { background: #ff9cc0; } .k-star { background: #ffd24a; } .k-q { background: #24407e; }
+
+/* map pin tip */
+.map-tip { margin: 6px 0 0; font-size: 13.5px; font-weight: 600; color: #e0486a; }
