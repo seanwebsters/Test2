@@ -73,10 +73,13 @@ export interface SculptRig {
   z?: [number, number];
   /** the file carries its own hand-and-foot weights (attribute _rigw), so long fur is left alone */
   baked?: boolean;
+  /** legs only count in front of this depth and inside this width, so a cloak hanging behind stays still */
+  legBox?: [number, number];
 }
 export const BLUE_RIG: SculptRig = { armX: 0.53, armTop: -0.29, armBottom: -0.72, shoulder: [0.64, -0.3], hip: [0.3, -0.68] };
 export const ORANGE_RIG: SculptRig = { armX: 0.53, armTop: -0.29, armBottom: -0.72, shoulder: [0.64, -0.3], hip: [0.3, -0.78] };
 export const YETI_RIG: SculptRig = { armX: 0.34, armTop: -0.28, armBottom: -0.7, shoulder: [0.52, -0.4], hip: [0.25, -0.72], z: [0.42, 0.25], baked: true };
+export const HOODED_RIG: SculptRig = { ...BLUE_RIG, legBox: [-0.25, 0.46] };
 export const PINK_RIG: SculptRig = { armX: 0.5, armTop: -0.22, armBottom: -0.74, shoulder: [0.6, -0.24], hip: [0.33, -0.66] };
 
 export class CalmlingModel {
@@ -405,6 +408,7 @@ export class CalmlingModel {
       const mesh = skin as THREE.Mesh;
       const S = mesh.scale.x.toFixed(4);
       const f = (n: number): string => n.toFixed(3);
+      const box = r.legBox ? ` * smoothstep(${f(r.legBox[0])}, ${f(r.legBox[0] + 0.13)}, p.z) * (1.0 - smoothstep(${f(r.legBox[1])}, ${f(r.legBox[1] + 0.08)}, abs(p.x)))` : '';
       const limb = r.baked && mesh.geometry.getAttribute('_rigw') ? ' * _rigw' : '';
       (mesh.material as THREE.Material).onBeforeCompile = (sh) => {
         Object.assign(sh.uniforms, u);
@@ -427,7 +431,7 @@ export class CalmlingModel {
               vec3 shoulder = vec3(side * ${f(r.shoulder[0])}, ${f(r.shoulder[1])}, ${f(r.z?.[0] ?? 0)});
               vec3 a = rigZ(rigX(p, shoulder, side < 0.0 ? uArmL : uArmR), shoulder, side * (side < 0.0 ? uLiftL : uLiftR));
               p = mix(p, a, wArm);
-              float wLeg = (1.0 - smoothstep(${f(r.hip[1] - 0.06)}, ${f(r.hip[1])}, p.y)) * (1.0 - wArm)${limb};
+              float wLeg = (1.0 - smoothstep(${f(r.hip[1] - 0.06)}, ${f(r.hip[1])}, p.y)) * (1.0 - wArm)${limb}${box};
               p = mix(p, rigX(p, vec3(side * ${f(r.hip[0])}, ${f(r.hip[1])}, ${f(r.z?.[1] ?? 0)}), side < 0.0 ? uLegL : uLegR), wLeg);
               transformed = p / ${S};
             }`,
