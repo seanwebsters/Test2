@@ -14,7 +14,7 @@ const REGROW = 8 * 60 * 1000;
  */
 export class WildFruit {
   readonly group = new THREE.Group();
-  private bushes: { kind: number; x: number; z: number; fruits: THREE.Group; t: number }[] = [];
+  private bushes: { kind: number; x: number; z: number; fruits: THREE.Group; t: number; root: THREE.Group }[] = [];
 
   constructor(island: Island, colliders: Colliders, avoid: { x: number; z: number; r: number }[]) {
     const grad = { x: 0, z: 0 };
@@ -53,7 +53,7 @@ export class WildFruit {
         g.position.set(x, island.heightAt(x, z), z);
         this.group.add(g);
         colliders.add(x, z, 0.55);
-        this.bushes.push({ kind, x, z, fruits, t: 0 });
+        this.bushes.push({ kind, x, z, fruits, t: 0, root: g });
       }
     });
   }
@@ -90,8 +90,11 @@ export class WildFruit {
     this.bushes.forEach((b, i) => (b.t = typeof times?.[i] === 'number' ? times[i] : 0));
   }
 
-  update(_time: number, _night: number, now: number): void {
+  update(_time: number, _night: number, now: number, eye?: THREE.Vector3): void {
     for (const b of this.bushes) {
+      // a bush is a few dozen pieces: only the ones within sight are drawn at all
+      b.root.visible = !eye || Math.hypot(b.x - eye.x, b.z - eye.z) < 150;
+      if (!b.root.visible) continue;
       const since = now - b.t;
       if (since < 520) {
         const k = since / 520;

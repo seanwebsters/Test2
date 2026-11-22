@@ -3,6 +3,7 @@ import { CalmlingModel, type CalmlingLook, type CalmlingPose } from '../player/C
 import type { Colliders } from './Colliders';
 import type { Island } from './islandMap';
 import type { Kit } from './Kit';
+import { bakeStatic } from './bake';
 
 /** What Sampoyoshi sells. Costs are in starberries, moon melons and sun pods. */
 export interface ShopItem {
@@ -229,6 +230,8 @@ export class Shop {
     this.group.add(this.keeper.root);
     this.pose = { speed: 0, walkSpeed: 3.6, runSpeed: 7.8, grounded: true, swimming: false, verticalSpeed: 0, turnRate: 0, accel: new THREE.Vector3(), yaw: this.facing, sitting: false, breath: 0, gliding: false };
 
+    this.keeper.root.userData.live = true;
+    bakeStatic(this.group);
     colliders.add(x, z, 1.7);
     colliders.add(x + 1.5, z, 1.2);
     colliders.add(x - 1.5, z, 1.2);

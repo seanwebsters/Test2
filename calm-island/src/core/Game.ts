@@ -2210,7 +2210,7 @@ export class Game {
     const falling = this.started && !!this.player?.arriving;
     this.arrivalClouds.update(dt, falling, this.player.pos, this.island.heightAt(this.player.pos.x, this.player.pos.z), globalUniforms.uDayLight.value);
     this.ui.arriving(falling);
-    this.wild.update(globalUniforms.uTime.value, this.day.night, Date.now());
+    this.wild.update(globalUniforms.uTime.value, this.day.night, Date.now(), this.camera.position);
     this.springs.update(globalUniforms.uTime.value, this.day.night);
     // the music hushes for sleep, and beside a lit fire
     const hush = this.sleeping || (this.home.lit && !!this.player && Math.hypot(this.home.fireSpot.x - p.x, this.home.fireSpot.z - p.z) < 14);

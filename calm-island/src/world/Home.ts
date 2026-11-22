@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { Island } from './islandMap';
 import type { Kit } from './Kit';
+import { bakeStatic } from './bake';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { MAT, basket as fruitBasket, flowerPot, fruit as fruitModel, fruitPlant, fruitSkins, leafMound, stone as roundStone, wateringCan } from './Props';
 import { glowDot } from './Trail';
@@ -1042,6 +1043,9 @@ export class Home {
     frame.rotation.x = -0.25;
     place('picture', 9, frame, 0.24);
     for (const [, o] of this.items) o.lookAt(0, o.position.y, 0);
+    // The house is hundreds of separate boards, reeds and props that never move: weld them.
+    this.swing.userData.live = true;
+    bakeStatic(this.group);
   }
 
   near(p: THREE.Vector3): boolean {
