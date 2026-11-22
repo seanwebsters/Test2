@@ -28,6 +28,7 @@ import { SKY_HORIZON, Sky } from '../world/Sky';
 import { Terrain, bakeGroundTexture } from '../world/Terrain';
 import { loadNatureModels } from '../world/NatureModels';
 import { loadKit } from '../world/Kit';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { Vegetation } from '../world/Vegetation';
 import { Water } from '../world/Water';
 import { SUN_DIR, clearFog, fogClearAt, globalUniforms, makeHeightTexture, resetFog, paintCanopy } from '../world/shared';
@@ -474,6 +475,15 @@ export class Game {
     await step(0.95, 'Waking your Calmling…');
     this.player = new Player(this.island, this.vegetation.colliders);
     this.scene.add(this.player.model.root);
+    if (!this.opts.plainPlants) {
+      // the sculpted Calmling; if it cannot be loaded the built-in one simply stays
+      try {
+        const sculpt = await new GLTFLoader().loadAsync(`${base}models/calmling/blue.glb`);
+        this.player.model.useSculpt(sculpt.scene);
+      } catch (err) {
+        console.info('Sculpted Calmling unavailable, using the built-in one:', err);
+      }
+    }
     this.rig = new CameraRig(this.camera, this.island);
     RESIDENTS.forEach((who, i) => {
       const npc = new Npc(who, this.island, i);
