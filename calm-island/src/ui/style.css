@@ -788,3 +788,8 @@ body.is-touch #hud-logo { top: auto; bottom: max(8px, env(safe-area-inset-bottom
 #next { margin-top: 4px; }
 #jewels { gap: 20px; }
 @media (orientation: portrait) { #jewels { gap: 28px; } }
+
+/* the Friends button shows a friend's face */
+#j-friends > .in { overflow: hidden; background: radial-gradient(circle at 50% 30%, #fff0f6, #ffc9de); }
+#j-friends > .in::after { display: none; }
+#j-friends img { width: 100%; height: 100%; object-fit: contain; margin-top: 5%; }
