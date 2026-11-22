@@ -256,6 +256,7 @@ export class Game {
       onToday: () => this.openToday(),
       onSkipIntro: () => {
         this.tut = 99;
+        document.getElementById('j-merge')?.classList.remove('nudge');
         this.ui.introRunning(false);
         this.pickIntents();
         this.save();
@@ -1576,7 +1577,7 @@ export class Game {
       case 3:
         text = 'Make yourself at home';
         if (this.tutTimer > 2.2 || !this.inside) {
-          go(4);
+          go(3.25);
           this.playing = false;
           this.input.enabled = false;
           this.input.releaseLock();
@@ -1584,11 +1585,30 @@ export class Game {
           this.ui.showLetter('A letter, left on your bed', [
             'Dear new neighbour,',
             'Welcome to Calm Island. I saw you float down and hoped you would find the little house. It has been waiting for someone.',
+            'The island went quiet while it waited, and some of its cosy places faded away. You can bring them back: gather the little things glowing in the grass, merge three of a kind, and watch what returns.',
             `I live down by the river, just along the earth path. I would love a visitor. I am very fond of ${fruit.plural}, if any are ripe in your patch.`,
             'No hurry at all.',
             `— ${g.who.name}`,
           ]);
         }
+        break;
+      case 3.25: {
+        // restoring the island, first lesson: gather three of something
+        const have = this.board.count(12);
+        text = this.inside ? `Step outside${key('E')}. Something is glowing in the grass` : `Collect three pieces of wood${key('E')}: ${Math.min(3, have)} of 3`;
+        target = this.inside ? null : this.finds.nearestOf(COSY, p, Date.now());
+        if (have >= 3 || this.board.seen.has(13)) go(3.5);
+        break;
+      }
+      case 3.5:
+        // second lesson: merge them
+        text = 'Now tap the glowing Merge button and merge your three';
+        document.getElementById('j-merge')?.classList.add('nudge');
+        if (this.board.seen.has(13)) {
+          document.getElementById('j-merge')?.classList.remove('nudge');
+          go(4);
+          this.ui.toast('Restore the island', 'A lantern!', 'Keep gathering and merging to bring back the lost campsite');
+        } else if (this.board.count(12) < 3 && !this.mergeUI.isOpen) go(3.25);
         break;
       case 4:
         text = this.inside ? `Step outside${key('E')}, then pick a ${fruit.name} for ${g.who.name}` : `Pick a ${fruit.name} from your patch for ${g.who.name}${key('E')}`;
