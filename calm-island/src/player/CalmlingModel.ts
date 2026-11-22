@@ -85,6 +85,7 @@ export const HOODED_RIG: SculptRig = { ...BLUE_RIG, legBox: [-0.25, 0.46] };
 export const SPARKLY_RIG: SculptRig = { ...BLUE_RIG, hip: [0.3, -0.74] };
 export const ELDER_RIG: SculptRig = { ...BLUE_RIG, legBox: [-9, 0.5], freeArm: 1 };
 export const HORNED_RIG: SculptRig = { ...BLUE_RIG, hip: [0.3, -0.84] };
+export const BANDANA_RIG: SculptRig = { armX: 0.56, armTop: -0.08, armBottom: -0.72, shoulder: [0.62, -0.1], hip: [0.3, -0.8] };
 export const PINK_RIG: SculptRig = { armX: 0.5, armTop: -0.22, armBottom: -0.74, shoulder: [0.6, -0.24], hip: [0.33, -0.66] };
 
 export class CalmlingModel {
