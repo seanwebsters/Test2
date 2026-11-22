@@ -60,7 +60,7 @@
         <button id="btn-log" aria-label="Calmling log">Log</button>
         <button id="btn-map" aria-label="Map">Map</button>
         <button id="btn-journal" aria-label="Journal">Tips</button>
-        <button id="btn-photo" aria-label="Photo mode">Photo</button>
+        <button id="btn-photo" aria-label="Photo mode" hidden style="display:none">Photo</button>
         <button id="btn-kite" aria-label="Kite">Kite</button>
         <button id="btn-hop">Hop</button>
       </div>
@@ -115,7 +115,7 @@
       <div class="title-times" role="group" aria-label="Time of day">
         <button id="time-dawn" class="title-time" aria-label="Sunrise" title="Sunrise">◐</button>
         <button id="time-day" class="title-time" aria-label="Day" title="Day">☀</button>
-        <button id="time-night" class="title-time" aria-label="Night" title="Night">☾</button>
+        <button id="time-night" class="title-time" aria-label="Sunset" title="Sunset">◐</button>
       </div>
       <div class="title-foot">Calmlings: Calm Island · no goals, no clock, just an island to wander</div>
       <div class="title-keys"><kbd>↑</kbd><kbd>↓</kbd> move <kbd>Enter</kbd> select</div>
@@ -133,11 +133,10 @@
           <span class="desk"><kbd>L</kbd> Calmling log</span>
           <span class="desk"><kbd>F</kbd> skim a stone across water</span>
           <span class="desk"><kbd>R</kbd> fish, beside water</span>
-          <span class="desk"><kbd>Z</kbd> sleep, at night or at home</span>
+          <span class="desk"><kbd>Z</kbd> sleep, at home</span>
           <span class="desk"><kbd>K</kbd> fly a kite</span>
           <span class="desk"><kbd>J</kbd> journal of little things to try</span>
           <span class="desk"><kbd>M</kbd> map</span>
-          <span class="desk"><kbd>P</kbd> photo mode</span>
           <span class="desk"><kbd>Esc</kbd> menu</span>
           <span class="touch">Left thumb stick to wander</span>
           <span class="touch">Drag the view to look around</span>
@@ -218,7 +217,7 @@
     <div id="map" class="screen hidden">
       <div class="card map-card">
         <div class="log-head">
-          <div><h2>Calm Island</h2><p class="lead" id="map-count"></p><p class="map-key"><i class="k-you"></i>You <i class="k-home"></i>Home <i class="k-friend"></i>Friends <i class="k-star"></i>Found <i class="k-q"></i>To find</p></div>
+          <div><h2>Calm Island</h2><p class="lead" id="map-count"></p><p class="map-key"><i class="k-you"></i>You <i class="k-home"></i>Home <i class="k-friend"></i>Friends <i class="k-star"></i>Found <i class="k-q"></i>To find</p><p class="map-tip">Tap the map to drop a pin. The sparkles will lead you there.</p></div>
           <button id="map-close" class="primary">Back to the island</button>
         </div>
         <canvas id="map-canvas" width="720" height="720"></canvas>

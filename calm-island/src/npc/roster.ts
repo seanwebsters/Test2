@@ -162,10 +162,10 @@ export const RESIDENTS: Resident[] = [
     look: { fur: 0xc4424f, limbs: 0xc4424f, paws: 0xfaf3f3, iris: 0xb05a9c, style: 'fluffy', extras: ['heart'] },
   },
   {
-    id: 'mangata', name: 'Mångata', home: [-58, 296], hours: [19.5, 5.5],
+    id: 'mangata', name: 'Mångata', home: [-58, 296], hours: [16.5, 18.7],
     meaning: 'Swedish: the road of moonlight across water',
-    hello: 'Come back at night. The sea lays out a path.',
-    story: "On clear nights I walk the moon's road as far as the tide lets me.",
+    hello: 'Come at sunset. The sea lays out a path.',
+    story: "On clear evenings I walk the sun's last road as far as the tide lets me.",
     practice: { type: 'still', title: "Watching the water", lines: ["Follow one wave all the way in.", "Notice the moment it turns back.", "Let the next one arrive by itself."], thing: "" },
     look: { fur: 0xeeedf2, limbs: 0xe2e0ea, iris: 0x6a4a9c, style: 'smooth', extras: ['antlersPale', 'smallEars'] },
   },
