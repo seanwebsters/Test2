@@ -117,7 +117,9 @@ export class CalmlingModel {
     };
     const limbColor = new THREE.Color(look.limbs ?? look.furLow ?? look.fur).multiplyScalar(0.88);
     const has = (x: string): boolean => !!look.extras?.includes(x);
-    const furMat = new THREE.MeshStandardMaterial({ color: base, roughness: 0.95, metalness: 0, vertexColors: true });
+    // (physically shaded with a sheen layer: the soft bright fringe that makes fur and felt read as fibres, not paint)
+    const sheenColor = new THREE.Color(look.tip ?? look.fur).lerp(new THREE.Color(look.fur), 0.35);
+    const furMat = new THREE.MeshPhysicalMaterial({ color: base, roughness: 0.92, metalness: 0, vertexColors: true, sheen: 0.6, sheenRoughness: 0.55, sheenColor });
     furMat.onBeforeCompile = (shader) => {
       shader.uniforms.uTime = globalUniforms.uTime;
       shader.uniforms.uFurSway = this.furUniforms.uFurSway;
@@ -190,14 +192,15 @@ export class CalmlingModel {
           #include <opaque_fragment>`,
         );
     };
-    const limbMat = new THREE.MeshStandardMaterial({ color: limbColor, roughness: 0.85 });
-    const pawMat = look.paws !== undefined ? new THREE.MeshStandardMaterial({ color: look.paws, roughness: 0.85 }) : limbMat;
+    const felt = (color: THREE.ColorRepresentation): THREE.MeshPhysicalMaterial => new THREE.MeshPhysicalMaterial({ color, roughness: 0.88, sheen: 0.7, sheenRoughness: 0.6, sheenColor: new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.35) });
+    const limbMat = felt(limbColor);
+    const pawMat = look.paws !== undefined ? felt(look.paws) : limbMat;
 
     // ---- body + fur ------------------------------------------------------
-    const fur = new THREE.Mesh(buildFur(hero ? 18 : 9, hero, colorAt), furMat);
+    const fur = new THREE.Mesh(buildFur(hero ? 26 : 12, hero, colorAt), furMat);
     fur.receiveShadow = true;
     this.body.add(fur);
-    const tuftMat = new THREE.MeshStandardMaterial({ color: base, roughness: 0.95, vertexColors: true });
+    const tuftMat = new THREE.MeshPhysicalMaterial({ color: base, roughness: 0.9, vertexColors: true, sheen: 0.42, sheenRoughness: 0.55, sheenColor });
     tuftMat.onBeforeCompile = (shader) => {
       shader.uniforms.uTime = globalUniforms.uTime;
       shader.uniforms.uFurSway = this.furUniforms.uFurSway;
@@ -274,6 +277,8 @@ export class CalmlingModel {
     glossy(white, 0.3);
     const iris = new THREE.MeshStandardMaterial({ color: look.iris ?? 0x4a9cf0, roughness: 0.1, emissive: new THREE.Color(look.iris ?? 0x4a9cf0).multiplyScalar(0.35) });
     const pupil = new THREE.MeshStandardMaterial({ color: 0x0a1638, roughness: 0.06 });
+    iris.map = irisTexture();
+    const corneaMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.1, roughness: 0.02, clearcoat: 1, clearcoatRoughness: 0.02, depthWrite: false });
     glossy(iris, 0.42);
     const shine = this.shine;
     for (const side of [-1, 1]) {
@@ -286,7 +291,7 @@ export class CalmlingModel {
       eye.add(ball);
       const look = new THREE.Group();
       look.position.set(-side * 0.05, -0.02, 0.095);
-      const irisMesh = new THREE.Mesh(new THREE.SphereGeometry(0.112, 24, 16), iris);
+      const irisMesh = new THREE.Mesh(irisDome(), iris);
       irisMesh.scale.set(1, 1, 0.42);
       const pupilMesh = new THREE.Mesh(new THREE.SphereGeometry(0.076, 20, 14), pupil);
       pupilMesh.scale.set(1, 1, 0.42);
@@ -296,6 +301,11 @@ export class CalmlingModel {
       const glint2 = new THREE.Mesh(new THREE.SphereGeometry(0.009, 8, 6), shine);
       glint2.position.set(-0.03, -0.034, 0.05);
       look.add(irisMesh, pupilMesh, glint, glint2);
+      // the cornea: a clear dome over the whole eye that takes the sharp highlights
+      const cornea = new THREE.Mesh(ball.geometry, corneaMat);
+      cornea.scale.set(1.025, 1.055, 0.69);
+      cornea.renderOrder = 2;
+      eye.add(cornea);
       this.glints.push(glint);
       eye.add(look);
       this.pupils.push(look);
@@ -318,7 +328,7 @@ export class CalmlingModel {
     this.body.add(smile);
 
     // ---- limbs -----------------------------------------------------------
-    const armGeo = new THREE.CapsuleGeometry(0.108, 0.19, 6, 14).translate(0, -0.17, 0);
+    const armGeo = new THREE.CapsuleGeometry(0.108, 0.19, 10, 22).translate(0, -0.17, 0);
     for (const [arm, side] of [[this.armL, -1], [this.armR, 1]] as const) {
       arm.position.set(side * 0.53, -0.15, 0.04);
       const mesh = new THREE.Mesh(armGeo, limbMat);
@@ -327,8 +337,8 @@ export class CalmlingModel {
       arm.add(mesh);
       this.body.add(arm);
     }
-    const legGeo = new THREE.CapsuleGeometry(0.165, 0.12, 8, 18).translate(0, -0.15, 0);
-    const footGeo = new THREE.SphereGeometry(1, 16, 12).scale(0.185, 0.1, 0.2).translate(0, -0.27, 0.025);
+    const legGeo = new THREE.CapsuleGeometry(0.165, 0.12, 12, 26).translate(0, -0.15, 0);
+    const footGeo = new THREE.SphereGeometry(1, 28, 18).scale(0.185, 0.1, 0.2).translate(0, -0.27, 0.025);
     for (const [leg, side] of [[this.legL, -1], [this.legR, 1]] as const) {
       leg.position.set(side * 0.2, 0.37, 0);
       const mesh = new THREE.Mesh(legGeo, limbMat);
@@ -401,6 +411,8 @@ export class CalmlingModel {
     const idle = (1 - this.move) * (1 - this.sit) * (1 - this.air) * (1 - this.swim);
     const shift = Math.sin(t * 0.55) * idle;
     this.body.position.x = shift * 0.022;
+    // now and then the whole body turns a little to look about, the way a small animal does
+    this.body.rotation.y = Math.sin(t * 0.31) * Math.sin(t * 0.13 + 1.3) * 0.2 * idle;
     this.tilt.rotation.z = s * lerp(0.075, 0.04, this.run) * this.move - clamp(pose.turnRate * 0.035, -0.22, 0.22) * this.move + shift * 0.03;
     this.blob.visible = this.air < 0.6 && this.swim < 0.5;
     (this.blob.material as THREE.MeshBasicMaterial).opacity = 0.5 * (1 - this.air) * (0.35 + 0.65 * globalUniforms.uDayLight.value);
@@ -412,6 +424,9 @@ export class CalmlingModel {
     // sitting: legs swing out in front, feet up, arms resting
     this.legL.rotation.x = lerp(this.legL.rotation.x, -1.38, this.sit);
     this.legR.rotation.x = lerp(this.legR.rotation.x, -1.38, this.sit);
+    // feet roll from heel to toe through each stride
+    this.legL.rotation.x += Math.max(0, c) * 0.22 * this.move * (1 - this.sit) * (1 - this.air);
+    this.legR.rotation.x += Math.max(0, -c) * 0.22 * this.move * (1 - this.sit) * (1 - this.air);
     this.legL.rotation.z = -0.22 * this.sit;
     this.legR.rotation.z = 0.22 * this.sit;
     this.legL.position.z = this.legR.position.z = 0.14 * this.sit;
@@ -508,6 +523,42 @@ export class CalmlingModel {
     this.furUniforms.uFurSway.value.copy(this.furOffset);
     void smoothstep;
   }
+}
+
+let irisGeo: THREE.BufferGeometry | null = null;
+/** A shallow dome whose pole faces forward, so a texture can run from the pupil out to the rim. */
+function irisDome(): THREE.BufferGeometry {
+  return (irisGeo ??= new THREE.SphereGeometry(0.112, 36, 12, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(Math.PI / 2));
+}
+let irisTex: THREE.CanvasTexture | null = null;
+/** Greyscale iris detail, multiplied over each Calmling's own eye colour: a bright inner ring, fine radial fibres, a dark rim. */
+function irisTexture(): THREE.CanvasTexture {
+  if (irisTex) return irisTex;
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 128;
+  const ctx = c.getContext('2d')!;
+  const g = ctx.createLinearGradient(0, 0, 0, 128); // top = centre of the eye, bottom = rim
+  g.addColorStop(0, '#ffffff');
+  g.addColorStop(0.3, '#f4f4f4');
+  g.addColorStop(0.62, '#c8c8c8');
+  g.addColorStop(0.86, '#8a8a8a');
+  g.addColorStop(1, '#3c3c3c');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 256, 128);
+  for (let i = 0; i < 90; i++) {
+    const x = (Math.sin(i * 91.7) * 0.5 + 0.5) * 256;
+    ctx.strokeStyle = i % 3 ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.2)';
+    ctx.lineWidth = 1 + (i % 3);
+    ctx.beginPath();
+    ctx.moveTo(x, 18);
+    ctx.lineTo(x + Math.sin(i) * 5, 118);
+    ctx.stroke();
+  }
+  irisTex = new THREE.CanvasTexture(c);
+  irisTex.colorSpace = THREE.SRGBColorSpace;
+  irisTex.wrapS = THREE.RepeatWrapping;
+  return irisTex;
 }
 
 const blobGeo = new THREE.PlaneGeometry(1.7, 1.7);
@@ -733,7 +784,7 @@ function tuftBase(style: keyof typeof TUFT_STYLES): TuftBase {
   const rnd = mulberry32(21);
   const COUNT = S.count;
   const meta: number[] = [];
-  const RINGS = 6;
+  const RINGS = 8;
   const SIDES = 8;
   const pos: number[] = [];
   const nor: number[] = [];
