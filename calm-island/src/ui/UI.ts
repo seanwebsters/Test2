@@ -53,6 +53,8 @@ export interface UIHandlers {
   onArrive(): void;
   onEat(kind: number): void;
   onSkipIntro(): void;
+  onPause(): void;
+  onToday(): void;
   /** the title screen's time-of-day buttons */
   onTitleTime(hour: number): void;
   onReset(): void;
@@ -123,6 +125,7 @@ export class UI {
     $('btn-map').addEventListener('click', () => handlers.onMap());
     $('home').addEventListener('click', () => handlers.onHome());
     $('arrive').addEventListener('click', () => handlers.onArrive());
+    for (const [id, fn] of [['hud-ava', handlers.onPause], ['j-today', handlers.onToday], ['j-friends', handlers.onLog], ['j-map', handlers.onMap], ['j-journal', handlers.onJournal]] as [string, () => void][]) $(id).addEventListener('click', () => fn());
     $('skip-tut').addEventListener('click', () => handlers.onSkipIntro());
     $('letter-close').addEventListener('click', () => handlers.onLogClose());
     $('choices-close').addEventListener('click', () => handlers.onLogClose());
@@ -437,13 +440,30 @@ export class UI {
     const key = counts.join() + '|' + effects.map((e) => Math.ceil(e)).join();
     if (key === this.basketKey) return;
     this.basketKey = key;
-    $('basket').classList.toggle('hidden', counts.every((c) => c === 0) && effects.every((e) => e <= 0));
     for (let i = 0; i < 3; i++) {
       const el = $(`eat${i}`);
-      el.textContent = effects[i] > 0 ? `${counts[i]} · ${Math.ceil(effects[i])}s` : this.touch ? `${counts[i]}` : `${counts[i]}  [${i + 1}]`;
-      el.classList.toggle('empty', counts[i] === 0 && effects[i] <= 0);
+      el.querySelector('span')!.textContent = effects[i] > 0 ? `${counts[i]} · ${Math.ceil(effects[i])}s` : `${counts[i]}`;
       el.classList.toggle('on', effects[i] > 0);
     }
+  }
+
+  private hudKey = '';
+
+  /** The top bar and the round buttons: which day it is, where the story has reached, and what is waiting. */
+  hud(day: number, chapter: string, progress: number, todayLeft: number, friendsWaiting: number): void {
+    const key = [day, chapter, progress.toFixed(2), todayLeft, friendsWaiting].join('|');
+    if (key === this.hudKey) return;
+    this.hudKey = key;
+    $('hud-day').textContent = `Day ${day}`;
+    $('chap-text').textContent = chapter;
+    $('chap-fill').style.width = `calc(${Math.round(progress * 100)}% - 6px)`;
+    const dot = (id: string, n: number): void => {
+      const el = $(id).querySelector('.dot')!;
+      el.classList.toggle('hidden', n <= 0);
+      el.textContent = n > 9 ? '9+' : String(n);
+    };
+    dot('j-today', todayLeft);
+    dot('j-friends', friendsWaiting);
   }
 
   seeds(found: number, total: number): void {

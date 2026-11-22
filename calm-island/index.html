@@ -8,6 +8,24 @@
   </head>
   <body>
     <canvas id="game"></canvas>
+    <svg width="0" height="0" style="position:absolute"><defs>
+<radialGradient id="gR" cx=".35" cy=".3"><stop offset="0" stop-color="#ff9aa8"/><stop offset=".55" stop-color="#f23a55"/><stop offset="1" stop-color="#b8173a"/></radialGradient>
+<radialGradient id="gA" cx=".35" cy=".3"><stop offset="0" stop-color="#eaffff"/><stop offset=".6" stop-color="#7fe3f5"/><stop offset="1" stop-color="#2fa8c8"/></radialGradient>
+<radialGradient id="gO" cx=".35" cy=".3"><stop offset="0" stop-color="#ffe9a0"/><stop offset=".55" stop-color="#ffab2e"/><stop offset="1" stop-color="#d9701a"/></radialGradient>
+<radialGradient id="gB" cx=".4" cy=".3"><stop offset="0" stop-color="#a8dcff"/><stop offset=".6" stop-color="#3f9de4"/><stop offset="1" stop-color="#2a78c8"/></radialGradient>
+<linearGradient id="gG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3a8"/><stop offset=".5" stop-color="#ffc93c"/><stop offset="1" stop-color="#e8921a"/></linearGradient>
+<linearGradient id="gL" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9be86a"/><stop offset="1" stop-color="#3fa83a"/></linearGradient>
+<symbol id="berry" viewBox="0 0 48 48"><path d="M24 44C12 38 6 28 8 18c2-7 9-8 16-6 7-2 14-1 16 6 2 10-4 20-16 26z" fill="url(#gR)" stroke="#8a1030" stroke-width="2"/><g fill="#ffe08a"><circle cx="17" cy="22" r="1.5"/><circle cx="24" cy="26" r="1.5"/><circle cx="31" cy="22" r="1.5"/><circle cx="20" cy="31" r="1.5"/><circle cx="28" cy="33" r="1.5"/></g><path d="M24 15c-4-6-10-6-13-3 4 0 6 2 8 4-4-1-8 1-9 4 4-2 9-1 14 0 5-1 10-2 14 0-1-3-5-5-9-4 2-2 4-4 8-4-3-3-9-3-13 3z" fill="url(#gL)" stroke="#2d7a2a" stroke-width="1.6" stroke-linejoin="round"/><ellipse cx="16" cy="21" rx="4" ry="6" fill="#fff" opacity=".28" transform="rotate(-25 16 21)"/></symbol>
+<symbol id="melon" viewBox="0 0 48 48"><circle cx="24" cy="26" r="18" fill="url(#gA)" stroke="#1f7f9a" stroke-width="2"/><g fill="none" stroke="#2fa8c8" stroke-width="2.4" opacity=".7"><path d="M24 8c-7 6-7 30 0 36"/><path d="M24 8c7 6 7 30 0 36"/><path d="M12 13c-6 9-6 18 0 27"/><path d="M36 13c6 9 6 18 0 27"/></g><path d="M24 9c0-4 3-6 6-6" fill="none" stroke="#2d7a2a" stroke-width="3" stroke-linecap="round"/><ellipse cx="17" cy="19" rx="5" ry="7" fill="#fff" opacity=".45" transform="rotate(-25 17 19)"/></symbol>
+<symbol id="pod" viewBox="0 0 48 48"><ellipse cx="13" cy="27" rx="9" ry="14" fill="url(#gO)" stroke="#a8500e" stroke-width="2"/><ellipse cx="35" cy="27" rx="9" ry="14" fill="url(#gO)" stroke="#a8500e" stroke-width="2"/><ellipse cx="24" cy="27" rx="10" ry="16" fill="url(#gO)" stroke="#a8500e" stroke-width="2"/><path d="M24 11c-1-5 2-8 6-8" fill="none" stroke="#2d7a2a" stroke-width="3.4" stroke-linecap="round"/><ellipse cx="20" cy="20" rx="3" ry="6" fill="#fff" opacity=".4" transform="rotate(-15 20 20)"/></symbol>
+<symbol id="star" viewBox="0 0 48 48"><path d="M24 4l6 12 13 2-9.500 9 2.500 13-12-6.500L12 40l2.500-13L5 18l13-2z" fill="url(#gG)" stroke="#b86a0a" stroke-width="2.4" stroke-linejoin="round"/><path d="M24 9l4 8.500 9 1.300" fill="none" stroke="#fff" stroke-width="2.200" opacity=".7" stroke-linecap="round"/></symbol>
+<symbol id="heart" viewBox="0 0 48 48"><path d="M24 42C8 31 4 22 7 14c3-7 12-8 17-1 5-7 14-6 17 1 3 8-1 17-17 28z" fill="url(#gR)" stroke="#8a1030" stroke-width="2.4"/><ellipse cx="15" cy="17" rx="4" ry="6" fill="#fff" opacity=".45" transform="rotate(-30 15 17)"/></symbol>
+<symbol id="stall" viewBox="0 0 48 48"><rect x="9" y="22" width="30" height="20" rx="3" fill="#e8b878" stroke="#8a5a2c" stroke-width="2"/><rect x="20" y="28" width="9" height="14" rx="2" fill="#8a5a2c"/><path d="M5 22l4-14h30l4 14z" fill="#f2f2ff" stroke="#5a3ab0" stroke-width="2" stroke-linejoin="round"/><g fill="#8f66e8"><path d="M9 8h6l-2 14H5z"/><path d="M21 8h6l1 14h-8z"/><path d="M33 8h6l4 14h-8z"/></g><path d="M5 22c2 4 6 4 7.600 0 2 4 6 4 7.600 0 2 4 6 4 7.600 0 2 4 6 4 7.600 0 2 4 6 4 7.600 0" fill="#fff" stroke="#5a3ab0" stroke-width="2"/></symbol>
+<symbol id="book" viewBox="0 0 48 48"><rect x="8" y="6" width="32" height="38" rx="5" fill="#c8743a" stroke="#6a3a16" stroke-width="2.400"/><rect x="13" y="6" width="27" height="33" rx="3" fill="#fff7e6" stroke="#6a3a16" stroke-width="1.600"/><path d="M19 17l4 4 8-9" fill="none" stroke="#4fbf3a" stroke-width="3.400" stroke-linecap="round" stroke-linejoin="round"/><g stroke="#c9a877" stroke-width="2.400" stroke-linecap="round"><path d="M19 28h15"/><path d="M19 33h10"/></g></symbol>
+<symbol id="drop" viewBox="0 0 48 48"><path d="M24 4c8 11 14 18 14 26a14 14 0 01-28 0c0-8 6-15 14-26z" fill="url(#gA)" stroke="#1f7f9a" stroke-width="2.400"/><ellipse cx="18" cy="28" rx="3.500" ry="6" fill="#fff" opacity=".6" transform="rotate(-15 18 28)"/></symbol>
+<symbol id="lantern" viewBox="0 0 48 48"><rect x="18" y="5" width="12" height="6" rx="2" fill="#8a5a2c"/><ellipse cx="24" cy="27" rx="13" ry="16" fill="url(#gG)" stroke="#b86a0a" stroke-width="2.400"/><path d="M24 12v30M15 16c-3 7-3 15 0 22M33 16c3 7 3 15 0 22" fill="none" stroke="#e8921a" stroke-width="1.800"/><ellipse cx="19" cy="21" rx="3" ry="5" fill="#fff" opacity=".6"/></symbol>
+<symbol id="calm" viewBox="0 0 64 64"><path d="M32 3l5 9 8-6 1 10 10-3-3 10 9 2-7 7 7 7-9 3 2 10-10-2-2 9-8-6-5 8-5-8-8 6-2-9-10 2 2-10-9-3 7-7-7-7 9-2-3-10 10 3 1-10 8 6z" fill="#bfe6ff" stroke="#2a78c8" stroke-width="2" stroke-linejoin="round"/><circle cx="32" cy="34" r="20" fill="url(#gB)"/><circle cx="24" cy="30" r="8" fill="#fff"/><circle cx="40" cy="30" r="8" fill="#fff"/><circle cx="26" cy="31" r="4.500" fill="#16305c"/><circle cx="38" cy="31" r="4.500" fill="#16305c"/><circle cx="27.500" cy="29.500" r="1.600" fill="#fff"/><circle cx="39.500" cy="29.500" r="1.600" fill="#fff"/><path d="M27 43c3 3 7 3 10 0" fill="none" stroke="#16305c" stroke-width="2.200" stroke-linecap="round"/></symbol>
+<symbol id="ico-map" viewBox="0 0 48 48"><path d="M6 12l12-4 12 4 12-4v28l-12 4-12-4-12 4z" fill="#fff7e6" stroke="#6a3a16" stroke-width="2.4" stroke-linejoin="round"/><path d="M18 8v28M30 12v28" stroke="#c9a877" stroke-width="2"/><path d="M13 27c4-6 8 4 12-2s6-4 9-7" fill="none" stroke="#e23a36" stroke-width="2.6" stroke-dasharray="3 3" stroke-linecap="round"/></symbol></defs></svg>
 
     <div id="hud" class="hidden">
       <div id="toast"><div class="toast-kicker"></div><div class="toast-title"></div><div class="toast-blurb"></div></div>
@@ -47,10 +65,20 @@
       <img id="hud-logo" src="./brand/calmlings-logo.png" alt="Calmlings" />
       <button id="next" class="hidden" aria-label="Dismiss suggestion"></button>
       <div id="seeds" class="hidden"></div>
-      <div id="basket" class="hidden">
-        <button id="eat0" class="fruit f-star" aria-label="Eat a starberry"></button>
-        <button id="eat1" class="fruit f-moon" aria-label="Eat a moon melon"></button>
-        <button id="eat2" class="fruit f-sun" aria-label="Eat a sun pod"></button>
+      <div id="topbar">
+        <button id="hud-ava" class="rim" aria-label="Menu"><span class="in"><img src="./brand/calmling-head.webp" alt="" /></span><span class="tag" id="hud-day">Day 1</span></button>
+        <div class="rim plate"><div class="in ink">
+          <button id="eat0" class="cnt" aria-label="Eat a starberry"><svg width="38" height="38" aria-hidden="true"><use href="#berry"/></svg><span>0</span></button><i class="sep"></i>
+          <button id="eat1" class="cnt" aria-label="Eat a moon melon"><svg width="38" height="38" aria-hidden="true"><use href="#melon"/></svg><span>0</span></button><i class="sep"></i>
+          <button id="eat2" class="cnt" aria-label="Eat a sun pod"><svg width="38" height="38" aria-hidden="true"><use href="#pod"/></svg><span>0</span></button>
+        </div></div>
+        <div class="rim chap"><div class="in ink"><b id="chap-fill"></b><span id="chap-text"></span></div></div>
+      </div>
+      <div id="jewels">
+        <button id="j-today" class="rim jew" aria-label="Today"><span class="in gold"><svg width="40" height="40" aria-hidden="true"><use href="#star"/></svg></span><span class="dot hidden"></span><span class="lbl">Today</span></button>
+        <button id="j-friends" class="rim jew" aria-label="Friends"><span class="in rose"><svg width="36" height="36" aria-hidden="true"><use href="#heart"/></svg></span><span class="dot hidden"></span><span class="lbl">Friends</span></button>
+        <button id="j-map" class="rim jew" aria-label="Map"><span class="in leaf"><svg width="36" height="36" aria-hidden="true"><use href="#ico-map"/></svg></span><span class="lbl">Map</span></button>
+        <button id="j-journal" class="rim jew" aria-label="Journal"><span class="in sky"><svg width="36" height="36" aria-hidden="true"><use href="#book"/></svg></span><span class="lbl">Journal</span></button>
       </div>
       <div id="fps" class="hidden"></div>
     </div>
