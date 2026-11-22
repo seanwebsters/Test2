@@ -793,3 +793,20 @@ body.is-touch #hud-logo { top: auto; bottom: max(8px, env(safe-area-inset-bottom
 #j-friends > .in { overflow: hidden; background: radial-gradient(circle at 50% 30%, #fff0f6, #ffc9de); }
 #j-friends > .in::after { display: none; }
 #j-friends img { width: 100%; height: 100%; object-fit: contain; margin-top: 5%; }
+/* ---- phone, upright: messages get their own lane and nothing sits on top of them ---- */
+@media (orientation: portrait) {
+  /* photo and kite move down beside the thumb stick, out of the reading area */
+  body #touch #btn-photo, body #touch #btn-kite { top: auto !important; bottom: calc(max(34px, env(safe-area-inset-bottom)) + 150px); width: 44px; height: 44px; border-radius: 50%; }
+  body #touch #btn-photo { left: max(20px, env(safe-area-inset-left)) !important; }
+  body #touch #btn-kite { left: calc(max(20px, env(safe-area-inset-left)) + 56px) !important; bottom: calc(max(34px, env(safe-area-inset-bottom)) + 150px); }
+  /* the message sits in the clear column left of the round buttons, sized to fit it */
+  body.is-touch #toast { left: max(14px, env(safe-area-inset-left)); right: 92px; width: auto; top: calc(max(12px, env(safe-area-inset-top)) + 176px); transform: translateY(-10px); text-align: left; }
+  body.is-touch #toast.show { transform: none; }
+  body.is-touch .toast-title { font-size: 27px; -webkit-text-stroke-width: 5.5px; line-height: 1.15; }
+  body.is-touch .toast-kicker { font-size: 13px; min-height: 0; }
+  body.is-touch .toast-blurb { font-size: 15px; -webkit-text-stroke-width: 4px; }
+  body.is-touch #next { max-width: calc(100vw - 106px); }
+  /* slightly smaller round buttons, so the column is narrower */
+  .jew { width: 54px; height: 54px; }
+  #jewels { gap: 26px; }
+}
