@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import type { Island } from './islandMap';
 import type { Kit } from './Kit';
 import { glowDot } from './Trail';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 /** Where home stands, so the forest can leave a clearing around it. */
 export const HOME_SPOT = { x: 34, z: 30 };
@@ -140,7 +139,7 @@ export class Home {
       }
       stump.computeVertexNormals();
     }
-    const stumpMat = kit?.barkDark ? new THREE.MeshLambertMaterial({ map: kit.barkDark, color: 0xffffff, emissive: 0x4a2c16, emissiveMap: kit.barkDark }) : bark;
+    const stumpMat = kit?.barkDark ? new THREE.MeshLambertMaterial({ map: kit.bark, color: 0xe9d6bc, emissive: 0x241a10 }) : bark;
     if (kit?.barkDark) {
       const uv = stump.attributes.uv;
       for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 5, uv.getY(i) * 1.6);
@@ -207,35 +206,11 @@ export class Home {
 
     // ---- the hut: every wall is a row of hand-cut planks, no two quite alike
     const HY = DECK + 0.12;
-    const KS = 0.85; // the model pieces are built for people; the house is Calmling-sized
     const HW = 2.55; // half width
     const HD = 1.7; // half depth
-    const HH = kit ? 2.65 : 2.1; // wall height
+    const HH = 2.3; // wall height
     const tones = [plank, L(0xd4aa72), L(0xb98c58), plankDark];
     let seed = 1;
-    /** A plank wall from a to b. `gap(u, yLow, yHigh)` says where a doorway or window leaves a hole. */
-    const wall = (ax: number, az: number, bx: number, bz: number, gap: (u: number) => [number, number] | null): void => {
-      const len = Math.hypot(bx - ax, bz - az);
-      const ry = -Math.atan2(bz - az, bx - ax);
-      const n = Math.round(len / 0.27);
-      for (let i = 0; i < n; i++) {
-        const u = (i + 0.5) / n;
-        const px = ax + (bx - ax) * u;
-        const pz = az + (bz - az) * u;
-        const top = HH + rnd(seed) * 0.07;
-        const mat = tones[Math.floor(rnd(seed + 7) * tones.length)];
-        const w = len / n - 0.012;
-        const hole = gap(u * len - len / 2);
-        const span = (y0: number, y1: number): void => {
-          if (y1 - y0 > 0.04) piece(unitBox, mat, px, HY + (y0 + y1) / 2, pz, w, y1 - y0, 0.09 + rnd(seed + 3) * 0.02, 0, ry, (rnd(seed + 5) - 0.5) * 0.012);
-        };
-        if (hole) {
-          span(0, hole[0]);
-          span(hole[1], top);
-        } else span(0, top);
-        seed += 11;
-      }
-    };
     const DOOR = 0.66; // half width of the doorway
     const WZ0 = -0.25; // the window, along the right-hand wall
     const WZ1 = 0.95;
@@ -247,125 +222,37 @@ export class Home {
     const DROP = 0.42; // how far the eaves hang below the top of the walls
     const SLOPE = Math.atan2(RISE + DROP, RUN);
     const SLEN = Math.hypot(RISE + DROP, RUN);
-    const ROWS = 7;
     const RIDGE = RY + RISE;
-    if (kit) {
-      // ---- a cabin of whole logs, bark still on, notched together at the corners.
-      // The door, the windows and their shutters are carpentered pieces set into the log walls.
-      const sides: THREE.BufferGeometry[] = [];
-      const ends: THREE.BufferGeometry[] = [];
-      const LR = 0.138; // log radius
-      const logM = new THREE.Matrix4();
-      /** One log from a to b (house space), with pale sawn ends. */
-      const log = (ax: number, ay: number, az: number, bx: number, by: number, bz: number, r = LR): void => {
-        const d = new THREE.Vector3(bx - ax, by - ay, bz - az);
-        const len = d.length();
-        if (len < 0.12) return;
-        const rr = r * (0.94 + rnd(seed++) * 0.12);
-        const g = new THREE.CylinderGeometry(rr, rr * (0.95 + rnd(seed++) * 0.08), len, 10, 1, true);
-        const uv = g.attributes.uv;
-        const turn = rnd(seed++);
-        for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 0.5 + turn, uv.getY(i) * len * 0.32 + turn);
-        logM.compose(new THREE.Vector3((ax + bx) / 2, (ay + by) / 2, (az + bz) / 2), new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()), new THREE.Vector3(1, 1, 1));
-        sides.push(g.applyMatrix4(logM));
-        for (const s2 of [-1, 1]) {
-          const cap = new THREE.CircleGeometry(rr, 10);
-          cap.rotateX(-s2 * Math.PI / 2);
-          cap.translate(0, (s2 * len) / 2, 0);
-          ends.push(cap.applyMatrix4(logM));
-        }
-      };
-      type Hole = [number, number, number, number]; // along the wall from..to, and from..to in height
-      const DOORW = 0.6;
-      const WINW = 0.6;
-      const WY0 = 0.86;
-      const WY1 = 2.36;
-      /** A wall of stacked logs along one axis, leaving the holes open. */
-      const logWall = (alongX: boolean, fixed: number, half: number, lift: number, holes: Hole[], rows: number): void => {
-        for (let k = 0; k < rows; k++) {
-          const yy = HY + LR + lift + k * LR * 1.9;
-          const cut = holes.filter((h) => yy - HY > h[2] - 0.06 && yy - HY < h[3] + 0.06).sort((p1, p2) => p1[0] - p2[0]);
-          let from = -half - 0.24 - rnd(seed++) * 0.1;
-          const end = half + 0.24 + rnd(seed++) * 0.1;
-          for (const h of [...cut, [end, end, 0, 0] as Hole]) {
-            const to = h[0];
-            if (alongX) log(from, yy, fixed, to, yy, fixed);
-            else log(fixed, yy, from, fixed, yy, to);
-            from = h[1];
+    // Walls of broad boards laid one above another, each a slightly different honey brown,
+    // none quite straight. `holes` are doorways and windows: along the wall from..to, and from..to in height.
+    const honey = [L(0xcf9f62), L(0xdcae70), L(0xbf8d52), L(0xc8975a), L(0xb5834a)];
+    const boards = (alongX: boolean, fixed: number, half: number, holes: [number, number, number, number][]): void => {
+      const BH = 0.255;
+      for (let k = 0; k * BH < HH; k++) {
+        const y0 = k * BH;
+        const cut = holes.filter((h) => y0 + BH * 0.5 > h[2] && y0 + BH * 0.5 < h[3]).sort((p1, p2) => p1[0] - p2[0]);
+        let from = -half;
+        for (const h of [...cut, [half, half, 0, 0] as [number, number, number, number]]) {
+          const len = h[0] - from;
+          if (len > 0.08) {
+            const mid = from + len / 2;
+            const mat = honey[Math.floor(rnd(seed++) * honey.length)];
+            const thick = 0.1 + rnd(seed++) * 0.025;
+            const tilt = (rnd(seed++) - 0.5) * 0.014;
+            if (alongX) piece(unitBox, mat, mid, HY + y0 + BH / 2, fixed, len + 0.02, BH - 0.018, thick, 0, 0, tilt);
+            else piece(unitBox, mat, fixed, HY + y0 + BH / 2, mid, thick, BH - 0.018, len + 0.02, tilt, 0, 0);
           }
-        }
-      };
-      const ROWSL = Math.floor((HH - 0.05) / (LR * 1.9));
-      logWall(true, HD, HW, 0, [[-1.7 - WINW, -1.7 + WINW, WY0, WY1], [-DOORW, DOORW, 0, 2.2], [1.7 - WINW, 1.7 + WINW, WY0, WY1]], ROWSL);
-      logWall(true, -HD, HW, 0, [[-WINW, WINW, WY0, WY1]], ROWSL);
-      logWall(false, -HW, HD, LR * 0.95, [[0.85 - WINW, 0.85 + WINW, WY0, WY1]], ROWSL);
-      logWall(false, HW, HD, LR * 0.95, [], ROWSL);
-      // the gable ends carry on up in shorter and shorter logs to the ridge
-      const RYK = HY + HH + 0.12;
-      for (const sx of [-HW, HW]) {
-        for (let yy = HY + LR * 0.95 + ROWSL * LR * 1.9 + LR; yy < RYK + 2.35 - 0.2; yy += LR * 1.9) {
-          const halfLen = Math.max(0, (HD + 0.5) * (1 - (yy - RYK) / 2.35));
-          log(sx, yy, -Math.min(halfLen, HD + 0.3), sx, yy, Math.min(halfLen, HD + 0.3));
+          from = h[1];
         }
       }
-      // the deck is edged with a ring of logs and carried on joists that run out under it
-      for (let i = 0; i < 10; i++) {
-        const a0 = (i / 10) * Math.PI * 2;
-        const a1 = ((i + 1) / 10) * Math.PI * 2;
-        log(Math.cos(a0) * 4.24, DECK + 0.04, Math.sin(a0) * 4.24, Math.cos(a1) * 4.24, DECK + 0.04, Math.sin(a1) * 4.24, 0.13);
-      }
-      for (let i = 0; i < 8; i++) {
-        const a0 = (i / 8) * Math.PI * 2 + 0.2;
-        log(Math.cos(a0) * 2.3, DECK - 0.24, Math.sin(a0) * 2.3, Math.cos(a0) * 4.45, DECK - 0.2, Math.sin(a0) * 4.45, 0.1);
-      }
-      // upright posts either side of the door and windows hide the cut ends
-      for (const dx of [-DOORW - 0.02, DOORW + 0.02]) log(dx, HY, HD, dx, HY + 2.3, HD, 0.1);
-      const barkMat = new THREE.MeshLambertMaterial({ map: kit.bark, color: 0xf2d2b0 });
-      const endMat = new THREE.MeshLambertMaterial({ color: 0xe6c08e });
-      for (const [list, mat] of [[sides, barkMat], [ends, endMat]] as [THREE.BufferGeometry[], THREE.Material][]) {
-        const m = new THREE.Mesh(mergeGeometries(list), mat);
-        m.castShadow = m.receiveShadow = true;
-        this.group.add(m);
-      }
-      // carpentered pieces, laid out in the kit's own 4 m by 6 m plan and turned to face the ladder
-      const cot = new THREE.Group();
-      cot.position.y = HY;
-      cot.scale.setScalar(KS);
-      cot.rotation.y = -Math.PI / 2;
-      const put = (name: string, x: number, yy: number, z: number, ry = 0, parent: THREE.Object3D = cot): THREE.Group => {
-        const g = kit.make(name);
-        g.position.set(x, yy, z);
-        g.rotation.y = ry;
-        parent.add(g);
-        return g;
-      };
-      const Q = Math.PI / 2;
-      for (const cx of [-1, 1]) for (const cz of [-2, 0, 2]) put('Floor_WoodLight', cx, 0.012, cz);
-      const windowAt = (x: number, z: number, ry: number, shutters: boolean): void => {
-        put('Window_Wide_Round1', x, 0, z, ry);
-        if (shutters) put('WindowShutters_Wide_Round_Open', x, 0, z, ry);
-      };
-      windowAt(2, -2, Q, true);
-      windowAt(2, 2, Q, true);
-      windowAt(-2, 0, -Q, false);
-      windowAt(1, 3, 0, true);
-      const frame = put('DoorFrame_Round_WoodDark', 2, 0, 0, Q);
-      const door = put('Door_1_Round', -0.56, 0, 0.06, 0, frame);
-      door.rotation.y = -1.95; // standing open
-      // vines find their way up the logs and over the eaves
-      put('Prop_Vine1', 2.2, 2.95, 1.05, Q);
-      put('Prop_Vine4', 2.2, 2.9, -2.8, Q);
-      put('Prop_Vine1', 0.2, 2.95, 3.2, 0);
-      put('Prop_Vine4', -2.2, 2.9, -1.1, -Q);
-      put('Prop_Vine1', -1.2, 3.3, -3.2, Math.PI);
-      this.group.add(cot);
-    } else {
-    wall(-HW, -HD, HW, -HD, () => null);
-    wall(-HW, HD, HW, HD, (u) => (Math.abs(u) < DOOR ? [0, 1.72] : null));
-    wall(-HW, -HD, -HW, HD, () => null);
-    wall(HW, -HD, HW, HD, (u) => (u > WZ0 && u < WZ1 ? [0.82, 1.62] : null));
+    };
+    boards(true, -HD, HW, []);
+    boards(true, HD, HW, [[-DOOR, DOOR, 0, 1.86]]);
+    boards(false, -HW, HD, []);
+    boards(false, HW, HD, [[WZ0, WZ1, 0.82, 1.62]]);
     // log posts at the corners, and a beam tying the walls together
-    for (const sx of [-HW, HW]) for (const sz of [-HD, HD]) piece(reed, bark, sx, HY + (HH + 0.16) / 2, sz, 0.34, HH + 0.16, 0.34);
+    const frameWood = L(0x9a6838);
+    for (const sx of [-HW, HW]) for (const sz of [-HD, HD]) piece(unitBox, frameWood, sx, HY + (HH + 0.16) / 2, sz, 0.3, HH + 0.16, 0.3, 0, 0, (rnd(seed++) - 0.5) * 0.02);
     for (const sz of [-HD, HD]) piece(unitBox, beam, 0, HY + HH + 0.06, sz, HW * 2 + 0.3, 0.16, 0.2);
     for (const sx of [-HW, HW]) piece(unitBox, beam, sx, HY + HH + 0.06, 0, 0.2, 0.16, HD * 2 + 0.3);
     // skirting log round the foot of the walls
@@ -374,29 +261,9 @@ export class Home {
       else if (side > 0) piece(unitBox, barkDark, 0, HY + 0.07, sz, HW * 2, 0.14, 0.12);
     }
     // the doorway: a stout frame, an arched top, and the door standing open
-    for (const sx of [-DOOR - 0.07, DOOR + 0.07]) piece(unitBox, beam, sx, HY + 0.9, HD + 0.02, 0.15, 1.8, 0.24);
-    piece(unitBox, beam, 0, HY + 1.8, HD + 0.02, DOOR * 2 + 0.44, 0.17, 0.26);
-    {
-      const leaf = new THREE.Group();
-      for (let i = 0; i < 4; i++) {
-        const b2 = new THREE.Mesh(unitBox, tones[(i + 1) % 3]);
-        b2.scale.set(0.31, 1.66, 0.07);
-        b2.position.set(0.17 + i * 0.32, 0.86, 0);
-        leaf.add(b2);
-      }
-      for (const yy of [0.35, 1.35]) {
-        const bar = new THREE.Mesh(unitBox, beam);
-        bar.scale.set(1.26, 0.1, 0.1);
-        bar.position.set(0.66, yy, 0.05);
-        leaf.add(bar);
-      }
-      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), L(0xd9a441));
-      knob.position.set(1.14, 0.86, 0.09);
-      leaf.add(knob);
-      leaf.position.set(-DOOR, HY + 0.03, HD + 0.1);
-      leaf.rotation.y = 2.05; // swung right back against the wall
-      add(leaf);
-    }
+    // (broad, slightly crooked posts and a heavy lintel, like something built by small determined paws)
+    for (const sx of [-DOOR - 0.12, DOOR + 0.12]) piece(unitBox, frameWood, sx, HY + 0.97, HD + 0.04, 0.26, 1.94, 0.3, 0, 0, sx > 0 ? -0.02 : 0.025);
+    piece(unitBox, frameWood, 0, HY + 1.98, HD + 0.05, DOOR * 2 + 0.74, 0.24, 0.34, 0, 0, 0.015);
     // the window: frame, cross bars, a pair of painted shutters
     const teal = L(0x4f9aa8);
     for (const zz of [WZ0 - 0.05, WZ1 + 0.05]) piece(unitBox, beam, WX, HY + 1.22, zz, 0.16, 0.98, 0.11);
@@ -422,39 +289,44 @@ export class Home {
       gable.rotation.y = Math.PI / 2;
       add(gable);
     }
-    // a stone chimney through the back slope
-    for (let i = 0; i < 7; i++) piece(unitBox, L([0x9a958e, 0xb3aca0, 0x847f79][i % 3]), -1.5 + (rnd(seed++) - 0.5) * 0.04, RY + 0.9 + i * 0.3, -1.25, 0.62 - (i > 5 ? -0.12 : 0), 0.31, 0.62 - (i > 5 ? -0.12 : 0), 0, (rnd(seed++) - 0.5) * 0.12, 0);
-    }
+    // Three deep tiers of thatch, each a thick shaggy layer lying over the one below,
+    // under a heavy ridge beam that sweeps up at both ends.
+    const thatchLight = L(0xf7dc7c);
+    const straw = [thatch, thatchLight, thatch, thatchDark];
+    const TIERS = 3;
     for (const side of [-1, 1]) {
-      for (let c = 0; c < ROWS; c++) {
-        const t = (c + 0.5) / ROWS;
-        const cols = 20;
+      for (let tier = 0; tier < TIERS; tier++) {
+        const mid = (tier + 0.5) / TIERS + 0.02;
+        const lift = 0.16 + (TIERS - 1 - tier) * 0.19;
+        const cols = 15;
         for (let j = 0; j < cols; j++) {
           const r1 = rnd(seed++);
           const r2 = rnd(seed++);
-          const x = -HW - 0.62 + ((j + 0.5 + (c % 2) * 0.5) / cols) * (HW * 2 + 1.24);
-          const along = t + (r1 - 0.5) * 0.03;
-          const lift = 0.1 + (ROWS - c) * 0.012 + r2 * 0.05;
-          const yy = RIDGE - along * (RISE + DROP) + Math.cos(SLOPE) * lift;
-          const zz = side * (along * RUN + Math.sin(SLOPE) * lift);
-          piece(reed, (j + c) % 3 === 0 ? thatchDark : thatch, x, yy, zz, 0.36 + r2 * 0.06, (SLEN / ROWS) * (1.5 + r1 * 0.25), 0.3, side * (Math.PI / 2 + SLOPE - 0.07), 0, (r1 - 0.5) * 0.1);
+          const x = -HW - 0.72 + ((j + 0.5) / cols) * (HW * 2 + 1.44) + (r1 - 0.5) * 0.05;
+          const yy = RIDGE - mid * (RISE + DROP) + Math.cos(SLOPE) * lift;
+          const zz = side * (mid * RUN + Math.sin(SLOPE) * lift);
+          piece(reed, straw[(j + tier) % 4], x, yy, zz, 0.5 + r2 * 0.08, (SLEN / TIERS) * (1.2 + r2 * 0.12), 0.44, side * (Math.PI / 2 + SLOPE - 0.05), 0, (r1 - 0.5) * 0.07);
+        }
+        // the ragged lower edge of each tier
+        const edge = (tier + 1) / TIERS + 0.07;
+        for (let k = 0; k < 24; k++) {
+          const r1 = rnd(seed++);
+          piece(tuft, k % 3 ? thatchDark : thatch, -HW - 0.7 + (k / 23) * (HW * 2 + 1.4), RIDGE - edge * (RISE + DROP) + Math.cos(SLOPE) * (lift + 0.02), side * (edge * RUN + Math.sin(SLOPE) * (lift + 0.02)), 0.38, 0.5 + r1 * 0.3, 0.38, Math.PI + side * 0.8, 0, 0);
         }
       }
-      // a ragged fringe along the eaves
-      for (let k = 0; k < 26; k++) {
-        const r1 = rnd(seed++);
-        piece(tuft, k % 2 ? thatch : thatchDark, -HW - 0.6 + (k / 25) * (HW * 2 + 1.2), RY - DROP - 0.12, side * (RUN + 0.08), 0.36, 0.55 + r1 * 0.3, 0.36, Math.PI + side * 0.75, 0, 0);
-      }
       // barge boards finishing the gable ends
-      for (const sx of [-HW - 0.6, HW + 0.6]) piece(unitBox, beam, sx, RIDGE - (RISE + DROP) / 2 + 0.05, side * (RUN / 2), 0.1, 0.2, SLEN + 0.2, side * SLOPE, 0, 0);
+      for (const sx of [-HW - 0.62, HW + 0.62]) piece(unitBox, frameWood, sx, RIDGE - (RISE + DROP) / 2 + 0.05, side * (RUN / 2), 0.12, 0.24, SLEN + 0.2, side * SLOPE, 0, 0);
     }
-    // the ridge: a pole with a cap of short reeds folded over it
-    piece(reed, beam, 0, RIDGE + 0.2, 0, 0.22, HW * 2 + 1.7, 0.22, 0, 0, Math.PI / 2);
-    for (let k = 0; k < 24; k++) piece(reed, k % 2 ? thatchDark : thatch, -HW - 0.55 + (k / 23) * (HW * 2 + 1.1), RIDGE + 0.1, 0, 0.3, 0.75, 0.42, Math.PI / 2, 0, (rnd(seed++) - 0.5) * 0.2);
+    const ridgeWood = L(0xa9703c);
+    piece(unitBox, ridgeWood, 0, RIDGE + 0.46, 0, HW * 2 + 1.5, 0.3, 0.46);
+    for (const sx of [-1, 1]) piece(unitBox, ridgeWood, sx * (HW + 1.18), RIDGE + 0.62, 0, 1.15, 0.28, 0.42, 0, 0, sx * 0.32);
+    // a couple of boards nailed over a thin patch, as on any roof that has seen a few storms
+    piece(unitBox, plankDark, 1.25, RIDGE - 0.42 * (RISE + DROP) + Math.cos(SLOPE) * 0.62, 0.42 * RUN + Math.sin(SLOPE) * 0.62, 0.34, 0.07, 1.0, SLOPE, 0.12, 0);
+    piece(unitBox, plank, 1.05, RIDGE - 0.47 * (RISE + DROP) + Math.cos(SLOPE) * 0.68, 0.47 * RUN + Math.sin(SLOPE) * 0.68, 0.9, 0.07, 0.3, SLOPE, 0.3, 0);
     // moss and a few self-sown plants have settled into the thatch
     const mossGeo = new THREE.SphereGeometry(1, 8, 6);
     const mossy = [L(0x7f8f3a), L(0x8f9a44), L(0x6a7f34)];
-    for (let k = 0; k < 18; k++) {
+    for (let k = 0; k < 8; k++) {
       const side = k % 2 ? 1 : -1;
       const along = 0.08 + rnd(seed++) * 0.84;
       const mx = (rnd(seed++) - 0.5) * (HW * 2 + 0.8);
@@ -898,7 +770,7 @@ export class Home {
         };
         const pane = new THREE.MeshBasicMaterial({ color: 0xffb84a, fog: false, side: THREE.DoubleSide, transparent: true, opacity: 0.2, depthWrite: false });
         this.pane = pane;
-        for (const [px, pz, ry] of [[-1.7, HD - 0.1, 0], [1.7, HD - 0.1, 0], [0, -HD + 0.1, 0], [-HW + 0.1, 0.85, Math.PI / 2]]) rm(mesh(new THREE.PlaneGeometry(0.95, 1.2), pane), px, 1.6, pz, ry);
+        rm(mesh(new THREE.PlaneGeometry(WZ1 - WZ0, 0.8), pane), HW + 0.02, 1.22, WC, Math.PI / 2);
         // the rug: two rings
         rm(mesh(cyl, this.rugMat, 1.3, 0.03, 1.0), 0.15, 0.04, 0.2);
         rm(mesh(cyl, this.rugMat2, 1.0, 0.034, 0.76), 0.15, 0.042, 0.2);
@@ -1046,10 +918,7 @@ export class Home {
         boxG.add(mesh(ball, leaf, 0.1, 0.1, 0.1).translateY(0.24).translateZ(-0.6 + k * 0.2));
         boxG.add(mesh(ball, L([0xff8fb8, 0xffd65a, 0xb9a0ff][k % 3]), 0.065, 0.065, 0.065).translateY(0.34).translateZ(-0.6 + k * 0.2).translateX(0.04));
       }
-      if (kit) {
-        boxG.position.set(-1.7, HY + 0.7, HD + 0.26);
-        boxG.rotation.y = Math.PI / 2;
-      } else boxG.position.set(HW + 0.24, HY + 0.56, WC);
+      boxG.position.set(HW + 0.24, HY + 0.56, WC);
       const bunt = new THREE.Group();
       for (let i = 0; i < 16; i++) {
         const a2 = Math.PI / 2 + 0.5 + (i / 15) * (Math.PI * 2 - 1.0);
@@ -1061,7 +930,7 @@ export class Home {
       const wreath = new THREE.Group();
       wreath.add(mesh(new THREE.TorusGeometry(0.24, 0.07, 8, 18), leaf));
       for (let k = 0; k < 6; k++) wreath.add(mesh(ball, L([0xff8fb8, 0xffd65a][k % 2]), 0.05, 0.05, 0.05).translateX(Math.cos(k * 1.05) * 0.24).translateY(Math.sin(k * 1.05) * 0.24).translateZ(0.06));
-      wreath.position.set(0, HY + (kit ? 2.42 : 2.02), HD + (kit ? 0.2 : 0.16));
+      wreath.position.set(0, HY + 2.32, HD + 0.24);
       for (const [id, g] of [['windowbox', boxG], ['bunting', bunt], ['wreath', wreath]] as [string, THREE.Group][]) {
         g.visible = false;
         this.group.add(g);
