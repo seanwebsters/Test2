@@ -3,6 +3,7 @@ import { Npc } from '../npc/Npc';
 import { RESIDENTS } from '../npc/roster';
 import { CameraRig } from '../player/CameraRig';
 import { Player } from '../player/Player';
+import { PINK_RIG } from '../player/CalmlingModel';
 import { UI, type LogEntry } from '../ui/UI';
 import { Ambient } from '../world/Ambient';
 import { DayCycle } from '../world/DayCycle';
@@ -491,6 +492,14 @@ export class Game {
       this.scene.add(npc.model.root);
       if (npc.prop) this.scene.add(npc.prop);
     });
+    if (!this.opts.plainPlants) {
+      try {
+        const pink = await new GLTFLoader().loadAsync(`${base}models/calmling/pink.glb`);
+        this.npcs.find((n) => n.who.id === 'dadirri')?.model.useSculpt(pink.scene, PINK_RIG);
+      } catch (err) {
+        console.info('Sculpted Dadirri unavailable, using the built-in one:', err);
+      }
+    }
     this.pickDaily();
     // one friend lives close by, down the earth path by the river: the first you are sent to find
     {

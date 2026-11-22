@@ -66,6 +66,11 @@ const RZ = 0.46;
  * sheet — `root` can be swapped for an imported GLB with the same pivots.
  * Feet rest on y = 0 and the character looks down +z.
  */
+/** Where a one-piece sculpt bends, in its own units: arms start beyond armX and between armBottom and armTop; legs hang below the hip. */
+export interface SculptRig { armX: number; armTop: number; armBottom: number; shoulder: [number, number]; hip: [number, number] }
+export const BLUE_RIG: SculptRig = { armX: 0.53, armTop: -0.29, armBottom: -0.72, shoulder: [0.64, -0.3], hip: [0.3, -0.68] };
+export const PINK_RIG: SculptRig = { armX: 0.5, armTop: -0.22, armBottom: -0.74, shoulder: [0.6, -0.24], hip: [0.33, -0.66] };
+
 export class CalmlingModel {
   readonly root = new THREE.Group();
   private tilt = new THREE.Group();
@@ -379,7 +384,7 @@ export class CalmlingModel {
    * face and limbs; everything that moves him (bounce, squash, lean, sitting,
    * breathing, the leaf) carries on driving it exactly as before.
    */
-  useSculpt(model: THREE.Object3D): void {
+  useSculpt(model: THREE.Object3D, r: SculptRig = BLUE_RIG): void {
     // A one-piece sculpt has no bones, so it is bent in the shader instead: everything
     // outside the belly and below the cheeks is an arm, everything under the hem of the fur a leg.
     const u: Record<string, { value: number }> = { uArmL: { value: 0 }, uArmR: { value: 0 }, uLiftL: { value: 0 }, uLiftR: { value: 0 }, uLegL: { value: 0 }, uLegR: { value: 0 } };
@@ -391,6 +396,7 @@ export class CalmlingModel {
     if (skin) {
       const mesh = skin as THREE.Mesh;
       const S = mesh.scale.x.toFixed(4);
+      const f = (n: number): string => n.toFixed(3);
       (mesh.material as THREE.Material).onBeforeCompile = (sh) => {
         Object.assign(sh.uniforms, u);
         sh.vertexShader = sh.vertexShader
@@ -407,12 +413,12 @@ export class CalmlingModel {
             {
               vec3 p = transformed * ${S};
               float side = sign(p.x);
-              float wArm = smoothstep(0.53, 0.61, abs(p.x)) * (1.0 - smoothstep(-0.37, -0.29, p.y)) * smoothstep(-0.84, -0.72, p.y);
-              vec3 shoulder = vec3(side * 0.64, -0.3, 0.0);
+              float wArm = smoothstep(${f(r.armX)}, ${f(r.armX + 0.08)}, abs(p.x)) * (1.0 - smoothstep(${f(r.armTop - 0.08)}, ${f(r.armTop)}, p.y)) * smoothstep(${f(r.armBottom - 0.12)}, ${f(r.armBottom)}, p.y);
+              vec3 shoulder = vec3(side * ${f(r.shoulder[0])}, ${f(r.shoulder[1])}, 0.0);
               vec3 a = rigZ(rigX(p, shoulder, side < 0.0 ? uArmL : uArmR), shoulder, side * (side < 0.0 ? uLiftL : uLiftR));
               p = mix(p, a, wArm);
-              float wLeg = (1.0 - smoothstep(-0.74, -0.68, p.y)) * (1.0 - wArm);
-              p = mix(p, rigX(p, vec3(side * 0.3, -0.68, 0.0), side < 0.0 ? uLegL : uLegR), wLeg);
+              float wLeg = (1.0 - smoothstep(${f(r.hip[1] - 0.06)}, ${f(r.hip[1])}, p.y)) * (1.0 - wArm);
+              p = mix(p, rigX(p, vec3(side * ${f(r.hip[0])}, ${f(r.hip[1])}, 0.0), side < 0.0 ? uLegL : uLegR), wLeg);
               transformed = p / ${S};
             }`,
           );
