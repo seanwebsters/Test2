@@ -129,7 +129,7 @@ export class UI {
     $('btn-map').addEventListener('click', () => handlers.onMap());
     $('home').addEventListener('click', () => handlers.onHome());
     $('arrive').addEventListener('click', () => handlers.onArrive());
-    for (const [id, fn] of [['hud-ava', handlers.onPause], ['j-today', handlers.onToday], ['j-friends', handlers.onLog], ['j-map', handlers.onMap], ['j-journal', handlers.onJournal]] as [string, () => void][]) $(id).addEventListener('click', () => fn());
+    for (const [id, fn] of [['btn-gear', handlers.onPause], ['j-today', handlers.onToday], ['j-friends', handlers.onLog], ['j-map', handlers.onMap], ['j-journal', handlers.onJournal]] as [string, () => void][]) $(id).addEventListener('click', () => fn());
     $('skip-tut').addEventListener('click', () => handlers.onSkipIntro());
     $('letter-close').addEventListener('click', () => handlers.onLogClose());
     $('choices-close').addEventListener('click', () => handlers.onLogClose());
@@ -478,7 +478,7 @@ export class UI {
     const key = [day, chapter, progress.toFixed(2), todayLeft, friendsWaiting].join('|');
     if (key === this.hudKey) return;
     this.hudKey = key;
-    $('hud-day').textContent = `Day ${day}`;
+    $('hud-day').textContent = this.calmName || `Day ${day}`;
     $('chap-text').textContent = chapter;
     $('chap-fill').style.width = `calc(${Math.round(progress * 100)}% - 6px)`;
     const dot = (id: string, n: number): void => {
@@ -494,6 +494,9 @@ export class UI {
     $('seeds').classList.toggle('hidden', found === 0);
     $('seeds').textContent = `✦ ${found} of ${total} calm seeds`;
   }
+
+  /** what the player has called their Calmling; shown under the portrait in place of the day */
+  calmName = '';
 
   showMap(caption: string): HTMLCanvasElement {
     $('menu').classList.add('hidden');

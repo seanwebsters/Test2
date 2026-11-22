@@ -174,6 +174,7 @@ export class Game {
   private mergeUI!: MergeScreen;
   /** seconds into the campsite's arrival, or -1 */
   private campShow = -1;
+  private calmName = '';
   /** the player has taken hold of the camera during the fall in */
   private arriveLook = false;
   /** the springs in the order the chapters visit them: nearest home first, then on round the island */
@@ -481,6 +482,33 @@ export class Game {
           this.closeMerge();
         },
       });
+      // the portrait is where you name him
+      const namer = document.getElementById('namer')!;
+      const field = document.getElementById('namer-input') as HTMLInputElement;
+      const done = (): void => {
+        if (namer.classList.contains('hidden')) return;
+        this.calmName = field.value.trim().slice(0, 14);
+        this.ui.calmName = this.calmName;
+        document.getElementById('hud-day')!.textContent = this.calmName || `Day ${Math.max(1, this.days)}`;
+        namer.classList.add('hidden');
+        field.blur();
+        this.save();
+        this.play();
+      };
+      document.getElementById('hud-ava')!.addEventListener('click', () => {
+        if (!this.ready || !this.playing || this.campShow >= 0 || this.player.arriving) return;
+        this.openCard();
+        field.value = this.calmName;
+        namer.classList.remove('hidden');
+      });
+      document.getElementById('namer-save')!.addEventListener('click', done);
+      field.addEventListener('keydown', (e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') done();
+      });
+      namer.addEventListener('click', (e) => {
+        if (e.target === namer) done();
+      });
       (document.getElementById('j-merge-img') as HTMLImageElement).src = icons[1] ?? '';
       document.getElementById('j-merge')!.addEventListener('click', () => this.openMerge());
     }
@@ -612,6 +640,8 @@ export class Game {
       this.tut = save.tut ?? 99;
       this.wild.load(save.wild);
       this.finds.load(save.finds);
+      this.calmName = typeof save.name === 'string' ? save.name.slice(0, 14) : '';
+      this.ui.calmName = this.calmName;
       this.board.load(save.merge);
       if (save.camp || this.board.done[COSY]) this.camp.unlock(false);
       this.mergeBadge();
@@ -2765,6 +2795,7 @@ export class Game {
       springs: this.springs.serialize(),
       wild: this.wild.serialize(),
       finds: this.finds.serialize(),
+      name: this.calmName,
       merge: this.board.serialize(),
       camp: this.camp.unlocked,
       owned: [...this.owned],

@@ -1046,3 +1046,16 @@ body.is-touch #touch #btn-fish { top: auto !important; right: auto !important; l
   bottom: calc(max(26px, env(safe-area-inset-bottom)) + 150px) !important; }
 @media (orientation: portrait) { body.is-touch #touch #btn-fish { bottom: calc(max(40px, env(safe-area-inset-bottom)) + 196px) !important; } }
 @media (orientation: landscape) and (max-height: 520px) { body.is-touch #touch #btn-fish { bottom: calc(max(26px, env(safe-area-inset-bottom)) + 8px) !important; height: 44px !important; } }
+
+/* a little settings cog in the top right; the portrait is for naming him */
+#btn-gear { position: absolute; right: max(14px, env(safe-area-inset-right)); top: max(14px, env(safe-area-inset-top)); width: 40px; height: 40px; padding: 0; margin: 0; border: 0; border-radius: 50%; display: grid; place-items: center; pointer-events: auto; cursor: pointer; color: #8a6a3a; -webkit-text-stroke: 0; text-shadow: none; transform: none;
+  background: linear-gradient(180deg, #fffdf6, #f6e3bb); box-shadow: 0 0 0 2px #ffe9ad, 0 0 0 3.5px #e9b95a, 0 6px 12px rgba(30,40,90,.25); transition: opacity 1s ease; }
+#btn-gear:hover { background: linear-gradient(180deg, #fffdf6, #f6e3bb); transform: none; }
+#btn-gear:active { transform: scale(.93); }
+#hud.arriving #btn-gear { opacity: 0; pointer-events: none; }
+@media (orientation: landscape) { #jewels { right: calc(max(14px, env(safe-area-inset-right)) + 54px); } }
+.namer-card { width: min(360px, 100%); padding: 26px 26px 24px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.namer-card img { width: 96px; height: 96px; object-fit: contain; filter: drop-shadow(0 6px 8px rgba(60,110,180,.3)); }
+.namer-card h2 { margin: 0; }
+#namer-input { width: 100%; box-sizing: border-box; padding: 13px 16px; border-radius: 16px; border: 0; font: 600 20px var(--ui); text-align: center; color: #5b3b1f; background: #fff; box-shadow: inset 0 2px 5px rgba(140,95,40,.25), 0 0 0 2px #e9b95a; outline: none; }
+#namer-input:focus { box-shadow: inset 0 2px 5px rgba(140,95,40,.25), 0 0 0 3px #7cc4f8; }
