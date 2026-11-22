@@ -810,3 +810,48 @@ body.is-touch #hud-logo { top: auto; bottom: max(8px, env(safe-area-inset-bottom
   .jew { width: 54px; height: 54px; }
   #jewels { gap: 26px; }
 }
+/* ==================================================================
+   Softer pass: less outline, gentler light, warmer shadows.
+   Shapes read by soft shading, the way a moulded toy does.
+   ================================================================== */
+:root { --rim: linear-gradient(170deg, #fffdf2 0%, #ffe9ad 40%, #e9b95a 100%); --k: #24407e; --soft-shadow: 0 14px 26px rgba(30,40,90,.28), 0 3px 6px rgba(30,40,90,.18); }
+.rim, #topbar button.rim, #jewels button.rim { padding: 3px; box-shadow: var(--soft-shadow); }
+.ink { background: radial-gradient(120% 140% at 50% 0%, #a9dcff 0%, #6fb9f5 55%, #4f9be8 100%); box-shadow: inset 0 3px 6px rgba(255,255,255,.55), inset 0 -8px 14px rgba(30,70,150,.22); }
+#topbar .cnt, #chap-text { -webkit-text-stroke: 0; text-shadow: 0 1px 0 rgba(20,50,110,.55), 0 2px 6px rgba(20,50,110,.45); }
+#topbar .cnt { font-size: 20px; font-weight: 600; }
+#topbar .cnt svg, .jew svg { filter: drop-shadow(0 3px 3px rgba(20,40,90,.3)); }
+.sep { background: linear-gradient(transparent, rgba(255,255,255,.4), transparent); }
+#chap-text { font-size: 12.5px; letter-spacing: .09em; font-weight: 600; }
+#chap-fill { background: radial-gradient(120% 160% at 50% 0%, #e2ffc0, #7bd35e 60%, #58bb4a); box-shadow: inset 0 2px 3px rgba(255,255,255,.7), 0 0 10px rgba(140,230,110,.55); }
+#chap-fill::after { display: none; }
+#hud-ava > .in { background: radial-gradient(circle at 50% 25%, #ffffff, #cfe9ff 70%, #a9d4f7); box-shadow: inset 0 -6px 10px rgba(60,110,180,.18); }
+#hud-ava .tag { color: #6a4310; font-weight: 600; background: linear-gradient(#fff8d8, #ffd978); box-shadow: 0 0 0 1.5px rgba(200,140,40,.7), 0 4px 8px rgba(30,40,90,.25); }
+/* jewels: frosted candy rather than hard enamel */
+.jew > .in { background: radial-gradient(circle at 50% 22%, #fff 0%, var(--a) 26%, var(--b) 78%, var(--c) 100%); box-shadow: inset 0 4px 8px rgba(255,255,255,.6), inset 0 -9px 14px rgba(0,0,0,.14); }
+.jew > .in::after { left: 20%; top: 9%; width: 60%; height: 30%; background: linear-gradient(rgba(255,255,255,.55), rgba(255,255,255,0)); transform: none; }
+.gold { --a: #fff2b8; --b: #ffcc52; --c: #f0a62a; } .rose { --a: #ffe0ec; --b: #ff9cc0; --c: #ee6f9f; } .sky { --a: #dcf0ff; --b: #7cc4f8; --c: #4a9fe8; } .leaf { --a: #e2fbc4; --b: #86d86a; --c: #58bb4a; }
+.jew .lbl { margin-top: 5px; padding: 1px 9px 2px; border-radius: 99px; font-size: 11.5px; font-weight: 600; color: #5a3a1c; -webkit-text-stroke: 0; text-shadow: none; background: linear-gradient(#fffaf0, #f8e7c6); box-shadow: 0 3px 8px rgba(30,40,90,.25); }
+.jew .dot { background: radial-gradient(circle at 40% 30%, #ff9c8c, #ee4a44); box-shadow: 0 0 0 2.5px #fffaf0, 0 4px 8px rgba(30,40,90,.3); font-weight: 600; }
+#jewels { gap: 34px; }
+@media (orientation: portrait) { #jewels { gap: 36px; } }
+/* buttons: soft moulded shapes, lettering with a gentle shadow in place of a hard outline */
+button, #touch button, #prompt { -webkit-text-stroke: 0 !important; text-shadow: 0 1px 0 rgba(0,0,0,.18), 0 2px 5px rgba(0,0,0,.22); }
+button.quiet, .cnt, #next, #basket .fruit { text-shadow: none; }
+#prompt, body #touch #btn-hello, button.primary, #play { background: radial-gradient(130% 150% at 50% 0%, #d8fbb0 0%, #84d862 48%, #58bb4a 100%) !important; box-shadow: inset 0 4px 8px rgba(255,255,255,.6), inset 0 -8px 14px rgba(30,110,40,.2), 0 0 0 3px #fff6d0, 0 0 0 4.5px #e9b95a, 0 14px 24px rgba(30,60,40,.32) !important; }
+button, button.title-item { background: radial-gradient(130% 150% at 50% 0%, #cdeaff 0%, #7cc4f8 50%, #4a9fe8 100%); box-shadow: inset 0 4px 8px rgba(255,255,255,.6), inset 0 -8px 14px rgba(30,80,160,.2), 0 10px 18px rgba(30,40,90,.28); }
+button:active, #touch button:active { transform: scale(.96); box-shadow: inset 0 4px 8px rgba(255,255,255,.5), inset 0 -4px 8px rgba(30,80,160,.2), 0 4px 8px rgba(30,40,90,.25); }
+body.is-touch #btn-hop, body.is-touch #btn-skim, body.is-touch #btn-fish { background: radial-gradient(circle at 50% 20%, #fff 0%, #cdeaff 22%, #7cc4f8 72%, #4a9fe8 100%); box-shadow: inset 0 4px 8px rgba(255,255,255,.6), inset 0 -10px 16px rgba(30,80,160,.18), 0 0 0 3px #fff6d0, 0 0 0 4.5px #e9b95a, var(--soft-shadow); }
+body.is-touch #btn-breathe { background: radial-gradient(circle at 50% 20%, #fff 0%, #eadfff 22%, #b79af2 72%, #8f6fe0 100%); box-shadow: inset 0 4px 8px rgba(255,255,255,.6), inset 0 -10px 16px rgba(70,40,150,.18), 0 0 0 3px #fff6d0, 0 0 0 4.5px #e9b95a, var(--soft-shadow); }
+body #touch #btn-photo, body #touch #btn-kite { background: linear-gradient(#fffaf0, #f8e7c6); box-shadow: 0 0 0 2px #e9b95a, 0 8px 14px rgba(30,40,90,.25); }
+#joy { background: radial-gradient(circle, rgba(255,255,255,.14), rgba(40,60,120,.3)); box-shadow: 0 0 0 2.5px rgba(255,240,200,.9), inset 0 0 20px rgba(255,255,255,.2), var(--soft-shadow); }
+#joy-thumb { background: radial-gradient(circle at 40% 25%, #fff, #e6efff 65%, #c3d4f2); box-shadow: 0 0 0 2px #ffe9ad, 0 8px 14px rgba(30,40,90,.35); }
+/* cream pieces */
+#next, #prompt2, #hints { background: linear-gradient(#fffaf0, #f8e7c6); box-shadow: inset 0 2px 0 rgba(255,255,255,.8), 0 8px 16px rgba(30,40,90,.22); font-weight: 500; }
+.card { box-shadow: inset 0 0 0 3px rgba(255,255,255,.8), 0 0 0 3px #ffe9ad, 0 0 0 4.5px #e9b95a, 0 30px 60px rgba(20,30,80,.45); }
+/* words over the world: thinner edge, soft glow */
+.toast-title, button.title-item, .title-sub, .intro-title, #breath-label { -webkit-text-stroke: 0 !important; text-shadow: 0 2px 0 rgba(26,42,85,.85), 0 0 2px rgba(26,42,85,.9), 0 6px 18px rgba(10,20,60,.55) !important; }
+.toast-kicker, .toast-blurb, .intro #loading-text { -webkit-text-stroke: 0; text-shadow: 0 1px 0 rgba(26,42,85,.9), 0 0 2px rgba(26,42,85,.9), 0 4px 12px rgba(10,20,60,.55); }
+.toast-kicker { color: #ffe9a0; letter-spacing: .14em; }
+.toast-title { font-weight: 600; }
+#play, #play:hover, #play:focus-visible, button.title-item { text-shadow: 0 1px 0 rgba(0,0,0,.18), 0 2px 5px rgba(0,0,0,.22) !important; }
+#title-credits, #title-credits:hover { background: none !important; box-shadow: none !important; text-shadow: 0 1px 0 rgba(26,42,85,.9), 0 4px 12px rgba(10,20,60,.6) !important; }
