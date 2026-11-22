@@ -690,3 +690,27 @@ body #touch #btn-practise { font-size: 15px; max-width: 94vw; }
   .intro .intro-logo { top: calc(max(26px, env(safe-area-inset-top)) + 5vh); }
   .intro .intro-title { top: calc(max(26px, env(safe-area-inset-top)) + 5vh + min(118px, 24vw)); }
 }
+/* ---- title screen: the artwork behind, logo above, stacked buttons below ---- */
+.title { background: #17305a url(/brand/loading.webp) center / cover no-repeat; }
+.title::before { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(10,24,54,.62), rgba(10,24,54,.12) 46%, rgba(10,24,54,0) 70%), linear-gradient(0deg, rgba(10,24,54,.5), rgba(10,24,54,0) 30%); }
+.title-times { display: none; }
+.title-side { z-index: 1; }
+.title-sub { margin-bottom: clamp(18px, 5vh, 40px); }
+.title-menu { width: min(300px, 74vw); gap: 15px; justify-items: stretch; }
+button.title-item, button.title-item:hover, button.title-item:focus-visible { width: 100%; margin: 0; padding: 0 20px 3px; height: 54px; border-radius: 18px; font-size: 21px; font-weight: 600; color: #fff; text-shadow: none; transform: none;
+  background: linear-gradient(#7fd0ff, #3a9fea); -webkit-text-stroke: 3px #1f6fb8; paint-order: stroke fill; box-shadow: inset 0 3px 0 rgba(255,255,255,.45), 0 5px 0 #1f6fb8, 0 10px 14px rgba(0,0,0,.3); }
+button.title-item::before { display: none; }
+button.title-item:focus-visible { outline: 3px solid #ffe98a; outline-offset: 3px; }
+button.title-item:active { transform: translateY(4px); box-shadow: inset 0 3px 0 rgba(255,255,255,.45), 0 1px 0 #1f6fb8, 0 3px 6px rgba(0,0,0,.25); }
+#play, #play:hover, #play:focus-visible { height: 64px; font-size: 26px; background: linear-gradient(#8fe35a, #4fbf3a); -webkit-text-stroke: 4px #2d7a2a; box-shadow: inset 0 3px 0 rgba(255,255,255,.45), 0 6px 0 #2d7a2a, 0 12px 16px rgba(0,0,0,.3); }
+#play:active { box-shadow: inset 0 3px 0 rgba(255,255,255,.45), 0 1px 0 #2d7a2a, 0 3px 6px rgba(0,0,0,.25); }
+#title-credits, #title-credits:hover, #title-credits:focus-visible { height: auto; padding: 2px 0; font-size: 16px; background: none; box-shadow: none; -webkit-text-stroke: 5px var(--navy); text-shadow: 0 3px 0 var(--navy); }
+@media (orientation: portrait) {
+  .title { background-image: url(/brand/loading-tall.webp); }
+  .title::before { background: linear-gradient(180deg, rgba(10,24,54,.38), rgba(10,24,54,0) 30%, rgba(10,24,54,0) 50%, rgba(10,24,54,.62)); }
+  .title-side { inset: 0; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; padding: calc(max(26px, env(safe-area-inset-top)) + 5vh) 0 calc(max(26px, env(safe-area-inset-bottom)) + 4vh); }
+  .title-logo { width: min(300px, 66vw); }
+  .title-sub { margin: 4px 0 0; }
+  .title-menu { margin-top: auto; }
+  .title-foot { display: none; }
+}
