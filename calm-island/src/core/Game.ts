@@ -235,6 +235,8 @@ export class Game {
       onTitleTime: (hour) => {
         this.day.hour = hour;
       },
+      onPause: () => this.pause(),
+      onToday: () => this.openToday(),
       onSkipIntro: () => {
         this.tut = 99;
         this.ui.introRunning(false);
@@ -1041,6 +1043,13 @@ export class Game {
     this.glow.position.copy(this.player.pos);
     this.glow.position.y += 1.1;
     this.ui.basket(this.basket, this.effects);
+    {
+      const ch = this.currentChapter();
+      const left = this.tut >= 9 ? this.intents.done.filter((d) => !d).length : 0;
+      let waiting = 0;
+      for (const n of this.npcs) if (this.met.has(n.who.id) && !this.gifted.has(n.who.id)) waiting++;
+      this.ui.hud(Math.max(1, this.days), ch >= 0 ? `Chapter ${ch + 1} · ${this.springs.spots[this.chapters[ch]].name}` : 'Every spring is awake', this.springs.awakeCount / Math.max(1, this.springs.spots.length), this.lastDay === this.dayKey() && left < 3 ? 0 : left, waiting);
+    }
   }
 
   /** Evening at the treehouse: friends come to sit by the fire, which crackles; springs give a hint. */
@@ -1153,6 +1162,24 @@ export class Game {
         this.save();
         this.openShop();
       },
+    );
+  }
+
+  /** Today's three intentions, from the gold star. */
+  openToday(): void {
+    if (!this.ready || !this.playing) return;
+    this.openCard();
+    if (this.tut < 9) {
+      this.ui.showChoices('Today', 'Your first day is the introduction. Three small intentions arrive once it is done.', [], () => {});
+      return;
+    }
+    this.pickIntents();
+    const kept = this.intents.done.filter(Boolean).length;
+    this.ui.showChoices(
+      'Today',
+      kept ? `${kept} of 3 kept. Day ${Math.max(1, this.days)} is counted, and the vine has its leaf.` : 'Keep any one of these and your vine grows a leaf.',
+      this.intents.ids.map((id, i) => ({ id, name: INTENTS[id], note: 'One of today’s three intentions', color: ['#ffd65a', '#ff9cc0', '#8fe0f0'][i], action: this.intents.done[i] ? 'Kept' : 'To do', enabled: false })),
+      () => {},
     );
   }
 
