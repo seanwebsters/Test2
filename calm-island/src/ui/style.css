@@ -1037,3 +1037,12 @@ body:not(.is-touch) #btn-surf { display: none; }
 @keyframes mg-nudge { 50% { transform: scale(1.16); } }
 @keyframes mg-ring { from { transform: scale(.8); opacity: 1; } to { transform: scale(1.45); opacity: 0; } }
 @media (orientation: landscape) and (max-height: 560px) { #mg-goal { grid-column: 2; margin: 4px 40px 2px 0; } }
+
+/* Skim and Fish have no buttons of their own: the passing prompts at the water's edge offer them.
+   The one exception is a pill to reel in, shown only while a line is out. */
+#btn-skim { display: none !important; }
+body.is-touch #touch #btn-fish { top: auto !important; right: auto !important; left: 50% !important; transform: translateX(-50%) !important; width: auto !important; height: 50px !important; padding: 0 26px 2px !important; border-radius: 999px !important; font: 600 18px var(--ui) !important; color: #fff !important; white-space: nowrap; -webkit-text-stroke: 0 !important; text-shadow: 0 1px 0 rgba(30,90,160,.5);
+  background: radial-gradient(130% 150% at 50% 0%, #e2f4ff 0%, #86c9f8 48%, #4aa6ee 100%) !important; box-shadow: inset 0 4px 8px rgba(255,255,255,.6), inset 0 -8px 14px rgba(30,80,160,.2), 0 0 0 3px #fff6d0, 0 0 0 4.5px #e9b95a, 0 12px 20px rgba(30,60,90,.3) !important;
+  bottom: calc(max(26px, env(safe-area-inset-bottom)) + 150px) !important; }
+@media (orientation: portrait) { body.is-touch #touch #btn-fish { bottom: calc(max(40px, env(safe-area-inset-bottom)) + 196px) !important; } }
+@media (orientation: landscape) and (max-height: 520px) { body.is-touch #touch #btn-fish { bottom: calc(max(26px, env(safe-area-inset-bottom)) + 8px) !important; height: 44px !important; } }

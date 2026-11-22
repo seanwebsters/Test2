@@ -2003,7 +2003,8 @@ export class Game {
         if (I.waterLevelAt(x, z) > I.heightAt(x, z) + 0.15 && Math.abs(I.waterLevelAt(x, z) - p.y) < 4) near += i % 2 ? 2 : 1;
       }
       this.waterNear = Math.min(1, near / 7);
-      this.ui.skim(this.waterNear > 0.12 && this.player.grounded && !this.practice && !this.breathing.active && !this.fishing.active, this.fishing.state === 'bite' ? 'Reel!' : this.fishing.active ? 'Reel in' : 'Fish');
+      // (skimming and casting are offered by the passing prompts at the water's edge; the only button of their own is the one to reel in, while a line is out)
+      this.ui.skim(false, this.fishing.state === 'bite' ? 'Reel!' : this.fishing.active ? 'Reel in' : 'Fish');
     }
     if (this.input.skimPressed() && this.waterNear > 0.12 && this.player.grounded && !this.player.sitting) {
       this.skimming.throw(p, this.player.yaw);
