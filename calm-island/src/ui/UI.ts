@@ -273,12 +273,12 @@ export class UI {
         item.append(hearts, q);
         const likes = document.createElement('p');
         likes.textContent = e.gifted ? `✓ Loved the ${e.likes} you brought. Their lantern hangs at your treehouse` : `Loves ${e.likes}. Bring one from your fruit patch`;
-        likes.style.cssText = e.gifted ? 'color:#2f8a5a;font-weight:700' : 'color:#b0668f;font-weight:700';
+        likes.style.cssText = e.gifted ? 'color:#8ff0cf;font-weight:600' : 'color:#ffb3d6;font-weight:600';
         item.append(likes);
         if (e.practice) {
           const pr = document.createElement('p');
           pr.textContent = `✓ Practice learned: ${e.practice}`;
-          pr.style.cssText = 'color:#2f8a5a;font-weight:700';
+          pr.style.cssText = 'color:#8ff0cf;font-weight:600';
           item.append(pr);
         }
       }
