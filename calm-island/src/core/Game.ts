@@ -356,6 +356,13 @@ export class Game {
       if (this.playing) this.openLog();
       else if (this.ui.logOpen) this.play();
     });
+    if (!opts.test) {
+      // Music from the very start. Browsers hold sound back until the first tap, click or key,
+      // so it is asked for now and again on the first touch of anything, loading screen included.
+      void this.music.start();
+      const wake = (): void => void this.music.start();
+      for (const ev of ['pointerdown', 'touchend', 'keydown', 'click']) window.addEventListener(ev, wake, { passive: true });
+    }
     window.addEventListener('beforeunload', () => this.save());
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) this.save();
