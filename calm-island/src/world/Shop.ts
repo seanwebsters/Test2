@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CalmlingModel, type CalmlingLook, type CalmlingPose } from '../player/CalmlingModel';
+import { CalmlingModel, type CalmlingLook, type CalmlingPose, type SculptRig } from '../player/CalmlingModel';
 import type { Colliders } from './Colliders';
 import type { Island } from './islandMap';
 import type { Kit } from './Kit';
@@ -42,6 +42,11 @@ export class Shop {
   readonly x: number;
   readonly z: number;
   private keeper = new CalmlingModel(SAMPOYOSHI, false);
+
+  /** Swap the shopkeeper's built-in body for his sculpted one. */
+  useSculpt(model: THREE.Object3D, rig: SculptRig): void {
+    this.keeper.useSculpt(model, rig);
+  }
   private pose: CalmlingPose;
   private lamps: THREE.MeshBasicMaterial[] = [];
   private facing = 0;

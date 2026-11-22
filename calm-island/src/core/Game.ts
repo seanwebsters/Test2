@@ -3,7 +3,7 @@ import { Npc } from '../npc/Npc';
 import { RESIDENTS } from '../npc/roster';
 import { CameraRig } from '../player/CameraRig';
 import { Player } from '../player/Player';
-import { BLUE_RIG, ELDER_RIG, HOODED_RIG, HORNED_RIG, SPARKLY_RIG, ORANGE_RIG, PINK_RIG, YETI_RIG } from '../player/CalmlingModel';
+import { BANDANA_RIG, BLUE_RIG, ELDER_RIG, HOODED_RIG, HORNED_RIG, SPARKLY_RIG, ORANGE_RIG, PINK_RIG, YETI_RIG } from '../player/CalmlingModel';
 import { UI, type LogEntry } from '../ui/UI';
 import { Ambient } from '../world/Ambient';
 import { DayCycle } from '../world/DayCycle';
@@ -492,6 +492,14 @@ export class Game {
       this.scene.add(npc.model.root);
       if (npc.prop) this.scene.add(npc.prop);
     });
+    if (!this.opts.plainPlants) {
+      try {
+        const glb = await new GLTFLoader().loadAsync(`${base}models/calmling/bandana.glb`);
+        this.shop.useSculpt(glb.scene, BANDANA_RIG);
+      } catch (err) {
+        console.info('Sculpted Sampoyoshi unavailable, using the built-in one:', err);
+      }
+    }
     if (!this.opts.plainPlants) {
       // friends who have a sculpted model; anyone whose file cannot be loaded keeps the built-in one
       await Promise.all(
