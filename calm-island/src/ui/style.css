@@ -684,3 +684,9 @@ body #touch #btn-practise { font-size: 15px; max-width: 94vw; }
   .intro .intro-logo { top: calc(max(26px, env(safe-area-inset-top)) + 9vh); width: min(300px, 66vw); }
   .intro .intro-title { top: calc(max(26px, env(safe-area-inset-top)) + 9vh + min(118px, 24vw)); }
 }
+/* phones held upright get the tall artwork, with the logo up in its sky */
+@media (orientation: portrait) {
+  .ld-art { background-image: url(/brand/loading-tall.webp); background-position: center; }
+  .intro .intro-logo { top: calc(max(26px, env(safe-area-inset-top)) + 5vh); }
+  .intro .intro-title { top: calc(max(26px, env(safe-area-inset-top)) + 5vh + min(118px, 24vw)); }
+}
