@@ -24,7 +24,9 @@ const KEYS: Key[] = [
   { h: 5, ...NIGHT },
   { h: 6.5, top: 0x4f86d8, horizon: 0xffc8a0, sun: 0xffb27a, sunI: 2.2, hemiSky: 0xd8dcff, hemiGround: 0xa8a878, hemiI: 1.35, light: 0.88, stars: 0 },
   { h: 8.5, ...DAY },
-  { h: 16.5, ...DAY },
+  { h: 14.5, ...DAY },
+  // the long golden afternoon: low warm sun, peach along the horizon, cooler lilac in the shade
+  { h: 16.6, top: 0x2f80e6, horizon: 0xd6e6fa, sun: 0xffc98a, sunI: 3.3, hemiSky: 0xcdd6ff, hemiGround: 0xb9b070, hemiI: 1.75, light: 0.98, stars: 0 },
   { h: 18.6, top: 0x3a4fa0, horizon: 0xff9c6e, sun: 0xff8a50, sunI: 2.1, hemiSky: 0xdcc4ee, hemiGround: 0x9a8a66, hemiI: 1.25, light: 0.82, stars: 0.1 },
   { h: 20, ...NIGHT },
   { h: 24, ...NIGHT },
@@ -37,7 +39,7 @@ const mix = (out: THREE.Color, x: number, y: number, t: number): THREE.Color => 
 /** A whole day passes in twenty minutes: sunrise, noon, sunset, moonlit night. */
 export class DayCycle {
   /** 0–24 */
-  hour = 9;
+  hour = 15.4;
   /** game hours per real second */
   rate = 24 / (20 * 60);
   /** 0 by day, 1 in the middle of the night */

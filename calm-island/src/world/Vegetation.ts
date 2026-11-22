@@ -266,7 +266,7 @@ export class Vegetation {
               ? foliageMaterial(opts.sway ?? 0.012, opts.base ?? 2.2, true, leaves && (opts.crown ?? 0) > 0, false, map, leaves ? opts.crown ?? 0 : 0)
               : /Rock/.test(name) ? mossy(new THREE.MeshLambertMaterial({ map })) : new THREE.MeshLambertMaterial({ map });
             // the reds and pinks are dusty and warm, never neon
-            if (leaves && opts.leaf === 'red') (material as THREE.MeshLambertMaterial).color.setRGB(0.82, 0.62, 0.6);
+            if (leaves && opts.leaf === 'red') (material as THREE.MeshLambertMaterial).color.setRGB(0.6, 0.36, 0.4); // deep crimson, with the lighter leaves doing the glowing
             else if (leaves && (opts.leaf === 'pink' || opts.blossom)) (material as THREE.MeshLambertMaterial).color.setRGB(0.98, 0.9, 0.92);
             mats.set(key, material);
           }
