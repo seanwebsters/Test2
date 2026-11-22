@@ -1,5 +1,4 @@
-import '@fontsource-variable/inter';
-import '@fontsource-variable/fraunces/full.css';
+import '@fontsource-variable/fredoka';
 import { Game } from './core/Game';
 import { fogClearAt } from './world/shared';
 import type { Quality } from './core/Settings';
