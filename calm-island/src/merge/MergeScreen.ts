@@ -147,6 +147,20 @@ export class MergeScreen {
         seek.classList.remove('hidden');
       } else $('mg-lead').textContent = `Three ${itemPlural(code)} make ${an(itemName(code + 1))}.`;
     }
+    // what all this merging is for: the next place to bring back
+    const goal = $('mg-goal');
+    if (b.done[COSY]) {
+      goal.classList.add('done');
+      $('mg-goal-text').textContent = 'Campsite restored';
+      $('mg-goal-fill').style.width = '100%';
+    } else {
+      // everything in the Cosy collection, counted in pieces of wood
+      const worth = [...b.cells, ...b.bag].reduce((n, c) => n + (c >> 2 === COSY && c >= 0 ? 3 ** (c & 3) : 0), 0);
+      goal.classList.remove('done');
+      $('mg-goal-text').textContent = 'Restore the campsite';
+      $('mg-goal-fill').style.width = `${Math.min(100, Math.round((worth / 27) * 100))}%`;
+    }
+    $<HTMLImageElement>('mg-goal-img').src = this.icons[COSY * 4 + 3] ?? '';
     $('mg-bag').textContent = b.bag.length ? `+${b.bag.length} waiting for room` : '';
     // the four collections, with what has been discovered so far
     $('mg-chains').replaceChildren(
