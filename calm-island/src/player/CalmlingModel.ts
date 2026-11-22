@@ -390,7 +390,7 @@ export class CalmlingModel {
     this.sit = damp(this.sit, pose.sitting ? 1 : 0, 5, dt);
     this.breath = damp(this.breath, pose.sitting ? pose.breath : 0, 10, dt);
     this.sleep = damp(this.sleep, pose.sleeping ? 1 : 0, 1.5, dt);
-    this.eyesShut = damp(this.eyesShut, pose.sleeping || pose.eyesClosed || (pose.sitting && pose.breath > 0.001) ? 1 : 0, 3, dt);
+    this.eyesShut = damp(this.eyesShut, pose.sleeping ? 1 : pose.eyesClosed ? 0.5 : 0, 3, dt); // eyes stay open and soft while breathing
 
     // steps keep pace with the ground so feet never skate
     this.phase += dt * (pose.swimming ? 5 : pose.speed * lerp(2.9, 1.75, this.run));
@@ -404,12 +404,13 @@ export class CalmlingModel {
     const sy = 1 + this.squash + breathe + this.air * 0.04 * clamp(pose.verticalSpeed / 8, -1, 1);
     const sxz = 1 / Math.sqrt(Math.max(0.5, sy));
     // a deep breath fills the whole body
-    const swell = 1 + this.breath * 0.075;
-    this.body.scale.set(sxz * swell, sy * swell, sxz * swell);
+    // (the chest and belly round out and lift on the in-breath, and settle on the out-breath)
+    const swell = 1 + this.breath * 0.1;
+    this.body.scale.set(sxz * swell, sy * (1 + this.breath * 0.15), sxz * (1 + this.breath * 0.13));
 
     const stride = lerp(0.62, 1.0, this.run) * this.move;
     const bounce = Math.abs(c) * lerp(0.035, 0.085, this.run) * this.move;
-    this.body.position.y = BODY_Y + bounce + (sy - 1) * 0.3 + Math.sin(t * 2.2) * 0.03 * this.swim - this.sit * 0.27 + this.breath * 0.04;
+    this.body.position.y = BODY_Y + bounce + (sy - 1) * 0.3 + Math.sin(t * 2.2) * 0.03 * this.swim - this.sit * 0.27 + this.breath * 0.085;
     // standing still, the weight drifts slowly from one foot to the other
     const idle = (1 - this.move) * (1 - this.sit) * (1 - this.air) * (1 - this.swim);
     const shift = Math.sin(t * 0.55) * idle;
@@ -419,7 +420,7 @@ export class CalmlingModel {
     this.tilt.rotation.z = s * lerp(0.075, 0.04, this.run) * this.move - clamp(pose.turnRate * 0.035, -0.22, 0.22) * this.move + shift * 0.03;
     this.blob.visible = this.air < 0.6 && this.swim < 0.5;
     (this.blob.material as THREE.MeshBasicMaterial).opacity = 0.5 * (1 - this.air) * (0.35 + 0.65 * globalUniforms.uDayLight.value);
-    this.tilt.rotation.x = -1.15 * this.sleep - 0.06 * this.sit - 0.03 * this.breath + 0.07 * this.move + 0.15 * this.run + this.air * clamp(-pose.verticalSpeed * 0.02, -0.15, 0.2) + this.swim * 0.25;
+    this.tilt.rotation.x = -1.15 * this.sleep - 0.06 * this.sit + (0.07 - 0.17 * this.breath) * this.sit * Math.min(1, this.breath * 6 + (this.breath > 0 ? 1 : 0)) + 0.07 * this.move + 0.15 * this.run + this.air * clamp(-pose.verticalSpeed * 0.02, -0.15, 0.2) + this.swim * 0.25;
 
     const tuck = this.air * 0.55;
     this.legL.rotation.x = s * stride * (1 - this.air) - tuck + Math.sin(t * 5) * 0.5 * this.swim;
@@ -490,8 +491,9 @@ export class CalmlingModel {
     this.armR.rotation.x = s * armSwing - Math.sin(t * 4) * 0.5 * this.swim;
     this.armL.rotation.x -= 0.35 * this.sit;
     this.armR.rotation.x -= 0.35 * this.sit;
-    this.armL.rotation.z = -(0.14 + lift + idleSway + this.breath * 0.12);
-    this.armR.rotation.z = 0.14 + lift + idleSway + this.breath * 0.12;
+    // arms float out from the sides as the lungs fill, and sink back as they empty
+    this.armL.rotation.z = -(0.14 + lift + idleSway + this.breath * 0.42);
+    this.armR.rotation.z = 0.14 + lift + idleSway + this.breath * 0.42;
 
     // mindful activities: each eases in over the ordinary pose and out again
     if (pose.act) this.actKind = pose.act;
