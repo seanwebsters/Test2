@@ -664,3 +664,17 @@ body #touch #btn-practise { font-size: 15px; max-width: 94vw; }
 @keyframes ld-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
 @media (prefers-reduced-motion: reduce) { .ld-cloud, .ld-calm, .ld-tree::before, .ld-sun { animation: none; } .ld-cloud.c1 { left: 12%; } .ld-cloud.c2 { left: 60%; } .ld-cloud.c3 { left: 38%; } .ld-track, .intro #loading-text { opacity: 1; animation: none; } }
 @media (max-width: 600px) { .ld-tree.t2 { display: none; } .ld-sun { width: 110px; height: 110px; right: 6%; } }
+
+/* ---- loading: the island's key art, slowly drifting, with the bar along the bottom ---- */
+.intro { background: #17305a; display: block; padding: 0; }
+.ld-art { position: absolute; inset: -4%; background: url(/brand/loading.webp) center / cover no-repeat; animation: ld-ken 26s ease-in-out infinite alternate; }
+.ld-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(10,24,54,.5) 0%, rgba(10,24,54,0) 26%, rgba(10,24,54,0) 56%, rgba(10,24,54,.72) 100%); }
+.intro .intro-inner { position: absolute; inset: 0; width: auto; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding: 0 20px max(34px, env(safe-area-inset-bottom)); }
+.intro .intro-logo { position: absolute; top: max(26px, env(safe-area-inset-top)); left: 50%; width: min(300px, 56vw); transform: translateX(-50%) scale(.94); animation: ld-logo 1.4s cubic-bezier(.2,.7,.2,1) .2s forwards; }
+.intro .intro-title { position: absolute; top: calc(max(26px, env(safe-area-inset-top)) + min(108px, 20vw)); left: 0; right: 0; text-align: center; margin: 0; padding-left: .3em; font-size: clamp(13px, 1.8vw, 18px); }
+.intro .ld-track { margin: 0 0 14px; }
+#loading-tip { margin-top: 14px; }
+@keyframes ld-ken { from { transform: scale(1) translate(0, 0); } to { transform: scale(1.09) translate(-1.6%, -1.2%); } }
+@keyframes ld-logo { to { opacity: 1; transform: translateX(-50%) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .ld-art { animation: none; } .intro .intro-logo { animation: none; opacity: 1; transform: translateX(-50%); } }
+@media (orientation: portrait) { .ld-art { background-position: 62% center; } }
