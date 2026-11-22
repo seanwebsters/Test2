@@ -855,3 +855,6 @@ body #touch #btn-photo, body #touch #btn-kite { background: linear-gradient(#fff
 .toast-title { font-weight: 600; }
 #play, #play:hover, #play:focus-visible, button.title-item { text-shadow: 0 1px 0 rgba(0,0,0,.18), 0 2px 5px rgba(0,0,0,.22) !important; }
 #title-credits, #title-credits:hover { background: none !important; box-shadow: none !important; text-shadow: 0 1px 0 rgba(26,42,85,.9), 0 4px 12px rgba(10,20,60,.6) !important; }
+/* the small lines of a message carry no outline at all, only a soft shadow */
+.toast-kicker, .toast-blurb, body.is-touch .toast-kicker, body.is-touch .toast-blurb { -webkit-text-stroke: 0 !important; paint-order: normal; font-weight: 500; text-shadow: 0 1px 2px rgba(16,28,64,.9), 0 3px 12px rgba(10,20,60,.6) !important; }
+body.is-touch .toast-title { -webkit-text-stroke: 0 !important; }
