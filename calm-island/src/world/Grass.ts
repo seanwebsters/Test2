@@ -124,7 +124,7 @@ export class Grass {
           // each blade its own shade; a few go to seed and turn straw-gold
           vGrassCol = ground.rgb * (0.86 + 0.28 * aOffset.z);
           // long grass is deeper and cooler, cropped grass a little sun-bleached
-          vGrassCol *= mix(vec3(1.06, 1.05, 0.86), vec3(0.9, 0.99, 0.93), lush);
+          vGrassCol *= mix(vec3(1.0, 1.0, 0.86), vec3(0.86, 0.95, 0.93), lush);
           // a soft pool of shade where the Calmling stands
           vGrassCol *= 1.0 - 0.42 * (1.0 - smoothstep(0.3, 1.25, pd)) * (1.0 - smoothstep(0.4, 1.6, abs(uPlayer.y - groundY)));
           vGrassCol = mix(vGrassCol, vGrassCol * vec3(1.25, 1.12, 0.6), step(0.93, fract(aOffset.w * 17.0)) * 0.6);

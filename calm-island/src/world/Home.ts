@@ -308,6 +308,16 @@ export class Home {
           log(sx, yy, -Math.min(halfLen, HD + 0.3), sx, yy, Math.min(halfLen, HD + 0.3));
         }
       }
+      // the deck is edged with a ring of logs and carried on joists that run out under it
+      for (let i = 0; i < 10; i++) {
+        const a0 = (i / 10) * Math.PI * 2;
+        const a1 = ((i + 1) / 10) * Math.PI * 2;
+        log(Math.cos(a0) * 4.24, DECK + 0.04, Math.sin(a0) * 4.24, Math.cos(a1) * 4.24, DECK + 0.04, Math.sin(a1) * 4.24, 0.13);
+      }
+      for (let i = 0; i < 8; i++) {
+        const a0 = (i / 8) * Math.PI * 2 + 0.2;
+        log(Math.cos(a0) * 2.3, DECK - 0.24, Math.sin(a0) * 2.3, Math.cos(a0) * 4.45, DECK - 0.2, Math.sin(a0) * 4.45, 0.1);
+      }
       // upright posts either side of the door and windows hide the cut ends
       for (const dx of [-DOORW - 0.02, DOORW + 0.02]) log(dx, HY, HD, dx, HY + 2.3, HD, 0.1);
       const barkMat = new THREE.MeshLambertMaterial({ map: kit.bark, color: 0xf2d2b0 });

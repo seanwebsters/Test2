@@ -265,6 +265,9 @@ export class Vegetation {
             material = p.cutout
               ? foliageMaterial(opts.sway ?? 0.012, opts.base ?? 2.2, true, leaves && (opts.crown ?? 0) > 0, false, map, leaves ? opts.crown ?? 0 : 0)
               : /Rock/.test(name) ? mossy(new THREE.MeshLambertMaterial({ map })) : new THREE.MeshLambertMaterial({ map });
+            // the reds and pinks are dusty and warm, never neon
+            if (leaves && opts.leaf === 'red') (material as THREE.MeshLambertMaterial).color.setRGB(0.82, 0.62, 0.6);
+            else if (leaves && (opts.leaf === 'pink' || opts.blossom)) (material as THREE.MeshLambertMaterial).color.setRGB(0.98, 0.9, 0.92);
             mats.set(key, material);
           }
           return { geo: p.geo, material, shadow: opts.shadow ?? true };
@@ -361,12 +364,24 @@ export class Vegetation {
         this.put(kind, x, I.heightAt(x, z), z, rnd() * 6.3, sMin + rnd() * (sMax - sMin), undefined, pick(tints));
       }
     };
-    bed(11, 14, 0.5, 2.6, lupine, LUPINE_TINTS, 150, 1.0, 1.7);
-    bed(11, 14, 3.4, 5.6, lupine, [0xff8fd0, 0xffb3de, 0xd27bff], 150, 1.0, 1.7);
-    bed(15, 18.5, 0.2, 6.2, daisy, DAISY_TINTS, 420, 0.9, 1.5);
-    bed(19.5, 23, 1.2, 2.9, hibiscus, HIBISCUS_TINTS, 60, 1.0, 1.6);
-    bed(19.5, 23, 4.0, 5.9, hibiscus, HIBISCUS_TINTS, 60, 1.0, 1.6);
-    bed(2, 6.5, 0, 6.28, daisy, [0xffffff, 0xfff4c2], 90, 0.8, 1.2);
+    if (flowerModels.length) {
+      // the garden's beds are planted with the modelled flowers and clover
+      const plain = [0xffffff];
+      bed(11, 14, 0.5, 2.6, flowerModels[0], plain, 46, 0.8, 1.2);
+      bed(11, 14, 3.4, 5.6, flowerModels[1], plain, 46, 0.8, 1.2);
+      bed(15, 18.5, 0.2, 6.2, flowerModels[0], plain, 70, 0.7, 1.1);
+      bed(15, 18.5, 0.2, 6.2, cloverModels[0], plain, 60, 0.8, 1.2);
+      bed(19.5, 23, 1.2, 2.9, flowerModels[1], plain, 30, 0.8, 1.3);
+      bed(19.5, 23, 4.0, 5.9, flowerModels[0], plain, 30, 0.8, 1.3);
+      bed(2, 6.5, 0, 6.28, cloverModels[1], plain, 40, 0.7, 1.0);
+    } else {
+      bed(11, 14, 0.5, 2.6, lupine, LUPINE_TINTS, 150, 1.0, 1.7);
+      bed(11, 14, 3.4, 5.6, lupine, [0xff8fd0, 0xffb3de, 0xd27bff], 150, 1.0, 1.7);
+      bed(15, 18.5, 0.2, 6.2, daisy, DAISY_TINTS, 420, 0.9, 1.5);
+      bed(19.5, 23, 1.2, 2.9, hibiscus, HIBISCUS_TINTS, 60, 1.0, 1.6);
+      bed(19.5, 23, 4.0, 5.9, hibiscus, HIBISCUS_TINTS, 60, 1.0, 1.6);
+      bed(2, 6.5, 0, 6.28, daisy, [0xffffff, 0xfff4c2], 90, 0.8, 1.2);
+    }
     for (const [x, z, s, k] of [[-19, 7, 1.7, 0], [9, 20, 1.2, 1], [22, 5, 1.0, 2], [-5, -22, 1.4, 1], [-20, -9, 0.9, 2], [6.5, -16, 0.8, 0]] as const) {
       this.put(rock[k], x, GARDEN_HEIGHT - 0.1, z, rnd() * 6, s, s * 0.85);
       this.colliders.add(x, z, s * 0.8);
@@ -586,7 +601,7 @@ export class Vegetation {
         }
       }
       // and the same flowers and clover carry on in loose drifts through the open meadows
-      for (let i = 0; i < 9000; i++) {
+      for (let i = 0; i < 20000; i++) {
         const x = (rnd() - 0.5) * 860;
         const z = (rnd() - 0.5) * 860;
         if (nz.simplex(x * 0.013 + 9, z * 0.013 - 4) < 0.18) continue;
@@ -613,7 +628,8 @@ export class Vegetation {
     }
 
     // ---- wildflower drifts ------------------------------------------------
-    for (let i = 0; i < (SEASON === 'winter' ? 0 : SEASON === 'autumn' ? 30000 : 90000); i++) {
+    // (only when the modelled flowers are missing: with them, the hand-built blooms would look like stand-ins)
+    for (let i = 0; i < (flowerModels.length || SEASON === 'winter' ? 0 : SEASON === 'autumn' ? 30000 : 90000); i++) {
       const x = (rnd() - 0.5) * 880;
       const z = (rnd() - 0.5) * 880;
       const a = nz.simplex(x * 0.017, z * 0.017);

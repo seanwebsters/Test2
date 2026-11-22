@@ -624,6 +624,7 @@ export class Game {
       // contact shade and sun shafts come in with the better presets
       this.post.ao = s.quality === 'ultra' ? 1 : s.quality === 'high' ? 0.85 : 0;
       this.post.rays = s.quality === 'ultra' ? 0.5 : s.quality === 'high' ? 0.42 : s.quality === 'medium' ? 0.3 : 0;
+      this.post.dof = s.quality === 'ultra' ? 1 : s.quality === 'high' ? 0.8 : 0;
     }
     this.grassNear?.setDensity(preset.grass * s.grassDensity);
     this.grassFar?.setDensity(preset.grass * s.grassDensity);
@@ -725,6 +726,7 @@ export class Game {
     this.updateWorld(dt);
     this.renderer.info.reset();
     this.drawReflection();
+    this.post.focus = this.started ? Math.max(3, this.camera.position.distanceTo(this.player.pos)) : 18;
     this.post.setSun(SUN_DIR, this.sun.color, this.inside ? 0 : this.day.night > 0.5 ? 0.25 : Math.min(1, this.sun.intensity / 3));
     this.post.render();
 
@@ -1086,11 +1088,10 @@ export class Game {
     // friends are found doing calm things; sit down near one and you are keeping them company
     for (const npc of this.npcs) {
       if (npc.absent || !npc.doing || !this.met.has(npc.who.id)) {
-        if (!npc.doing) this.toldDoing.delete(npc.who.id);
         continue;
       }
       const d = Math.hypot(npc.pos.x - p.x, npc.pos.z - p.z);
-      if (d < 9 && this.toldDoing.get(npc.who.id) !== npc.doing && this.tut >= 9) {
+      if (d < 9 && !this.toldDoing.has(npc.who.id) && this.tut >= 9) {
         this.toldDoing.set(npc.who.id, npc.doing);
         this.ui.toast('', `${npc.who.name} is ${npc.doing}`, this.ui.touch ? 'Sit down beside them for a while' : 'Sit down beside them for a while (B)');
       }

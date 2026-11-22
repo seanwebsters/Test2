@@ -19,8 +19,9 @@ const WANT: Record<string, { height?: number; width?: number }> = {
   Pine_1: { height: 10 }, Pine_2: { height: 10.5 },
   TwistedTree_1: { height: 15 },
   TwistedTree_2: { height: 10.5 }, TwistedTree_3: { height: 9.6 }, TwistedTree_4: { height: 11 }, TwistedTree_5: { height: 9 },
-  Flower_3_Group: { width: 1.5 }, Flower_4_Group: { width: 1.6 }, Clover_1: { width: 1.3 }, Clover_2: { width: 1.5 },
-  Plant_7_Big: { width: 2.4 }, Pebble_Round_1: { width: 0.5 }, Pebble_Round_2: { width: 0.5 }, Pebble_Round_3: { width: 0.5 },
+  // (kept small: these sit at the Calmling's feet, never above his head)
+  Flower_3_Group: { width: 0.8 }, Flower_4_Group: { width: 0.85 }, Clover_1: { width: 0.9 }, Clover_2: { width: 1.0 },
+  Plant_7_Big: { width: 1.5 }, Pebble_Round_1: { width: 0.5 }, Pebble_Round_2: { width: 0.5 }, Pebble_Round_3: { width: 0.5 },
   Bush_Common: { width: 2.3 }, Bush_Common_Flowers: { width: 2.3 },
   Fern_1: { width: 2.6 }, Plant_1_Big: { width: 2.0 },
   Rock_Medium_1: { width: 2.2 }, Rock_Medium_2: { width: 2.2 }, Rock_Medium_3: { width: 2.2 },
