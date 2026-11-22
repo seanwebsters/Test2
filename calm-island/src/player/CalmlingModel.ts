@@ -103,6 +103,8 @@ export class CalmlingModel {
   private actW = 0;
   private surf = 0;
   private board: THREE.Group | null = null;
+  /** set when an authored one-piece model is in use: how far it bends at each shoulder and hip, and its eyelids */
+  private rig: { u: Record<string, { value: number }>; lids: THREE.Object3D[] } | null = null;
   private actKind: CalmlingAct = 'stretch';
 
   constructor(readonly look: CalmlingLook = BLUE_LOOK, hero = true) {
@@ -378,6 +380,45 @@ export class CalmlingModel {
    * breathing, the leaf) carries on driving it exactly as before.
    */
   useSculpt(model: THREE.Object3D): void {
+    // A one-piece sculpt has no bones, so it is bent in the shader instead: everything
+    // outside the belly and below the cheeks is an arm, everything under the hem of the fur a leg.
+    const u: Record<string, { value: number }> = { uArmL: { value: 0 }, uArmR: { value: 0 }, uLiftL: { value: 0 }, uLiftR: { value: 0 }, uLegL: { value: 0 }, uLegR: { value: 0 } };
+    let skin: THREE.Mesh | null = null;
+    model.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) skin = o as THREE.Mesh;
+    });
+    const lids: THREE.Object3D[] = [];
+    if (skin) {
+      const mesh = skin as THREE.Mesh;
+      const S = mesh.scale.x.toFixed(4);
+      (mesh.material as THREE.Material).onBeforeCompile = (sh) => {
+        Object.assign(sh.uniforms, u);
+        sh.vertexShader = sh.vertexShader
+          .replace(
+            '#include <common>',
+            /* glsl */ `#include <common>
+            uniform float uArmL, uArmR, uLiftL, uLiftR, uLegL, uLegR;
+            vec3 rigX(vec3 p, vec3 o, float a) { p -= o; float c = cos(a), s = sin(a); return vec3(p.x, p.y * c - p.z * s, p.y * s + p.z * c) + o; }
+            vec3 rigZ(vec3 p, vec3 o, float a) { p -= o; float c = cos(a), s = sin(a); return vec3(p.x * c - p.y * s, p.x * s + p.y * c, p.z) + o; }`,
+          )
+          .replace(
+            '#include <begin_vertex>',
+            /* glsl */ `#include <begin_vertex>
+            {
+              vec3 p = transformed * ${S};
+              float side = sign(p.x);
+              float wArm = smoothstep(0.53, 0.61, abs(p.x)) * (1.0 - smoothstep(-0.37, -0.29, p.y)) * smoothstep(-0.84, -0.72, p.y);
+              vec3 shoulder = vec3(side * 0.64, -0.3, 0.0);
+              vec3 a = rigZ(rigX(p, shoulder, side < 0.0 ? uArmL : uArmR), shoulder, side * (side < 0.0 ? uLiftL : uLiftR));
+              p = mix(p, a, wArm);
+              float wLeg = (1.0 - smoothstep(-0.74, -0.68, p.y)) * (1.0 - wArm);
+              p = mix(p, rigX(p, vec3(side * 0.3, -0.68, 0.0), side < 0.0 ? uLegL : uLegR), wLeg);
+              transformed = p / ${S};
+            }`,
+          );
+      };
+    }
+    this.rig = { u, lids };
     const box = new THREE.Box3().setFromObject(model);
     const size = box.getSize(new THREE.Vector3());
     const centre = box.getCenter(new THREE.Vector3());
@@ -573,6 +614,20 @@ export class CalmlingModel {
     }
     this.blink = Math.max(0, this.blink - dt);
     const lid = Math.min(this.blink > 0 ? 1 - Math.sin((this.blink / 0.15) * Math.PI) * 0.92 : 1, 1 - this.eyesShut * 0.9);
+    if (this.rig) {
+      // the sculpt follows the same limbs and the same blink
+      const r = this.rig.u;
+      r.uArmL.value = clamp(this.armL.rotation.x * 0.8, -1.2, 1.2);
+      r.uArmR.value = clamp(this.armR.rotation.x * 0.8, -1.2, 1.2);
+      r.uLiftL.value = clamp((-this.armL.rotation.z - 0.14) * 0.85, 0, 1.25);
+      r.uLiftR.value = clamp((this.armR.rotation.z - 0.14) * 0.85, 0, 1.25);
+      r.uLegL.value = clamp(this.legL.rotation.x * 0.75, -1.15, 1.15);
+      r.uLegR.value = clamp(this.legR.rotation.x * 0.75, -1.15, 1.15);
+      for (const l of this.rig.lids) {
+        l.visible = lid < 0.97;
+        l.scale.y = Math.max(0.03, (1 - lid) * 1.55);
+      }
+    }
     this.eyes.scale.y = lid;
     this.eyes.position.y = (1 - lid) * 0.1;
     const glance = this.move > 0.1 ? 0 : Math.sin(t * 0.43) * Math.sin(t * 0.17 + 1) * 0.6;
