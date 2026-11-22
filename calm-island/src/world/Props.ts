@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 /**
  * The shared asset library: one set of physically based materials and modelled
@@ -220,14 +221,18 @@ export function fruit(kind: number, size: number): THREE.Group {
   if (kind === 0) {
     body.scale.setScalar(size);
     body.position.y = -size * 0.5;
-    // a star of small leaves over the shoulders
-    for (let i = 0; i < 6; i++) {
-      const l = new THREE.Mesh(leaf, MAT.leaf(true));
-      l.scale.set(size * 0.5, size * 0.5, size * 0.55);
-      l.rotation.set(0.5, (i / 6) * Math.PI * 2, 0, 'YXZ');
-      l.position.y = -size * 0.02;
-      g.add(l);
-    }
+    // a star of small leaves over the shoulders, welded into one piece
+    const star = new THREE.Mesh(
+      once('geo:calyx', () => {
+        const parts: THREE.BufferGeometry[] = [];
+        for (let i = 0; i < 6; i++) parts.push(leaf.clone().scale(0.5, 0.5, 0.55).applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(0.5, (i / 6) * Math.PI * 2, 0, 'YXZ'))));
+        return mergeGeometries(parts)!;
+      }),
+      MAT.leaf(true),
+    );
+    star.scale.setScalar(size);
+    star.position.y = -size * 0.02;
+    g.add(star);
   } else if (kind === 1) {
     body.scale.setScalar(size * 0.5);
     body.position.y = -size * 0.45;
@@ -292,6 +297,7 @@ export function blossom(color: number, size: number): THREE.Group {
 export function fruitPlant(kind: number, seed: number, scale = 1): { group: THREE.Group; fruits: THREE.Group } {
   const group = new THREE.Group();
   const fruits = new THREE.Group();
+  fruits.userData.live = true; // picked, regrown, never welded into the scenery
   if (kind === 0) {
     // starberries: a low mound of leaves, berries hanging round its skirt, white flowers on top
     group.add(leafMound(30, 0.46, seed, 0.3, 0.9));

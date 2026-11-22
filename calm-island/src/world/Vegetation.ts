@@ -306,8 +306,8 @@ export class Vegetation {
         model(k, use(name, { sway, base: 0.15, shadow: false }));
         return k;
       };
-      flowerModels = [small2('Flower_3_Group', 130), small2('Flower_4_Group', 130)];
-      cloverModels = [small2('Clover_1', 80, 0.015), small2('Clover_2', 80, 0.015)];
+      flowerModels = [small2('Flower_3_Group', 75), small2('Flower_4_Group', 75)];
+      cloverModels = [small2('Clover_1', 55, 0.015), small2('Clover_2', 55, 0.015)];
       bigLeaf = small2('Plant_7_Big', 200, 0.035);
       pebbleModels = ['Pebble_Round_1', 'Pebble_Round_2', 'Pebble_Round_3'].map((n) => small2(n, 90, 0));
       greatTree = { hi: plants.rock(0), material: rockMat, shadow: true, lodDist: 1e9, cullDist: 1e9, tint: false, receive: false };
@@ -601,7 +601,7 @@ export class Vegetation {
         }
       }
       // and the same flowers and clover carry on in loose drifts through the open meadows
-      for (let i = 0; i < 20000; i++) {
+      for (let i = 0; i < 13000; i++) {
         const x = (rnd() - 0.5) * 860;
         const z = (rnd() - 0.5) * 860;
         if (nz.simplex(x * 0.013 + 9, z * 0.013 - 4) < 0.18) continue;
