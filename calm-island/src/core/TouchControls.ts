@@ -86,6 +86,7 @@ export class TouchControls {
     button('btn-practise', 'practise');
     button('btn-skim', 'skim');
     button('btn-kite', 'kite');
+    button('btn-surf', 'surf');
     button('btn-fish', 'fish');
     button('btn-sleep', 'sleep');
     document.getElementById('btn-menu')!.addEventListener('click', onMenu);

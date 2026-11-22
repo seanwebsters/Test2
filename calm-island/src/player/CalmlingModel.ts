@@ -23,6 +23,7 @@ export interface CalmlingPose {
   /** a mindful activity being done on the spot */
   act?: CalmlingAct | null;
   eyesClosed?: boolean;
+  surfing?: boolean;
 }
 
 /** stretch: arms high, swaying · open: arms wide to the wind · dance · lie: on the back · reach: lying, one arm up · tend: hands busy in front · listen: head tilted */
@@ -100,6 +101,8 @@ export class CalmlingModel {
   private sleep = 0;
   private leaf: THREE.Group | null = null;
   private actW = 0;
+  private surf = 0;
+  private board: THREE.Group | null = null;
   private actKind: CalmlingAct = 'stretch';
 
   constructor(readonly look: CalmlingLook = BLUE_LOOK, hero = true) {
@@ -442,7 +445,46 @@ export class CalmlingModel {
       this.leaf.rotation.z = Math.sin(t * 2.1) * 0.08;
       this.leaf.rotation.x = 0.1 + Math.sin(t * 1.6) * 0.05;
     }
-    const lift = this.air * 1.15 + this.run * 0.18 + this.swim * 0.9 + this.glide * 1.5;
+    // riding a leaf: knees bent, arms out for balance, leaning into every turn
+    this.surf = damp(this.surf, pose.surfing ? 1 : 0, 6, dt);
+    if (this.surf > 0.01 && !this.board) {
+      this.board = new THREE.Group();
+      const leafMat = new THREE.MeshStandardMaterial({ color: 0x8fc94a, roughness: 0.7, side: THREE.DoubleSide });
+      const blade = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 10), leafMat);
+      const bp = blade.geometry.attributes.position;
+      for (let i = 0; i < bp.count; i++) {
+        const z = bp.getZ(i);
+        const x = bp.getX(i);
+        // pointed at the nose, cupped across, curling up at both ends
+        bp.setXYZ(i, x * 0.52 * (1 - Math.max(0, z) * Math.max(0, z) * 0.75), bp.getY(i) * 0.03 + Math.abs(x) * 0.16 + z * z * 0.16, z * 1.25);
+      }
+      blade.geometry.computeVertexNormals();
+      blade.castShadow = true;
+      const rib = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.03, 2.5, 6), new THREE.MeshStandardMaterial({ color: 0x5f9a34, roughness: 0.8 }));
+      rib.rotation.x = Math.PI / 2;
+      rib.position.y = 0.02;
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.03, 0.5, 6), rib.material);
+      stem.rotation.x = Math.PI / 2 - 0.5;
+      stem.position.set(0, 0.16, -1.42);
+      this.board.add(blade, rib, stem);
+      this.board.position.y = -0.04;
+      this.tilt.add(this.board);
+    }
+    if (this.board) {
+      this.board.visible = this.surf > 0.01;
+      this.board.scale.setScalar(Math.max(0.001, this.surf));
+      this.board.rotation.x = -0.08 + Math.sin(t * 2.1) * 0.04;
+      const s2 = this.surf;
+      const bank = clamp(pose.turnRate * 0.16, -0.5, 0.5);
+      this.tilt.rotation.z = lerp(this.tilt.rotation.z, -bank, s2);
+      this.tilt.rotation.x = lerp(this.tilt.rotation.x, 0.1 + moving * 0.12, s2);
+      this.body.position.y -= 0.07 * s2;
+      this.legL.rotation.x = lerp(this.legL.rotation.x, 0.35, s2);
+      this.legR.rotation.x = lerp(this.legR.rotation.x, -0.3, s2);
+      this.armL.rotation.x = lerp(this.armL.rotation.x, 0, s2);
+      this.armR.rotation.x = lerp(this.armR.rotation.x, 0, s2);
+    }
+    const lift = this.surf * 1.1 + this.air * 1.15 + this.run * 0.18 + this.swim * 0.9 + this.glide * 1.5;
     const idleSway = Math.sin(t * 1.9) * 0.04 * (1 - this.move);
     this.armL.rotation.x = -s * armSwing + Math.sin(t * 4) * 0.5 * this.swim;
     this.armR.rotation.x = s * armSwing - Math.sin(t * 4) * 0.5 * this.swim;

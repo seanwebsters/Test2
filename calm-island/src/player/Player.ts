@@ -37,6 +37,9 @@ export class Player {
   room: { x: number; z: number; hw: number; hd: number; cos: number; sin: number; y: number; solids: [number, number, number][] } | null = null;
   /** fruit effects: a faster run, and a longer, flatter glide */
   speedBoost = 1;
+  /** riding a big leaf: skimming fast, a little above the ground and the water */
+  surfing = false;
+  private surfT = 0;
   glideBoost = false;
   /** 0..1 lung fill while breathing, read by the model */
   breath = 0;
@@ -134,10 +137,10 @@ export class Player {
     // a gentle push on the thumb stick stays a walk
     this.moveTime = amount > 0.08 ? this.moveTime + dt : 0;
     const run = smoothstep(0.8, 1.7, this.moveTime) * smoothstep(0.6, 0.95, amount);
-    const top = this.swimming ? SWIM : this.gliding ? (this.glideBoost ? 11 : 8.6) : lerp(WALK, RUN, run) * this.speedBoost;
+    const top = this.surfing ? 13.5 : this.swimming ? SWIM : this.gliding ? (this.glideBoost ? 11 : 8.6) : lerp(WALK, RUN, run) * this.speedBoost;
     const hasInput = wx !== 0 || wz !== 0;
     // quick to start, a touch longer to settle: weighty but never sluggish
-    const rate = this.swimming ? 4 : this.grounded ? (hasInput ? 11 : 9) : this.gliding ? 3.2 : 2.5;
+    const rate = this.surfing ? 2.6 : this.swimming ? 4 : this.grounded ? (hasInput ? 11 : 9) : this.gliding ? 3.2 : 2.5;
     this.vel.x = damp(this.vel.x, wx * top, rate, dt);
     this.vel.z = damp(this.vel.z, wz * top, rate, dt);
 
@@ -228,7 +231,16 @@ export class Player {
     const water = I.waterLevelAt(this.pos.x, this.pos.z);
     const floatY = water - FLOAT_DEPTH;
     const deep = ground < floatY - 0.08;
-    if (this.swimming) {
+    if (this.surfing) {
+      // the leaf rides the air just above whatever is below, rising and dipping gently
+      this.surfT += dt;
+      const hover = Math.max(ground, water) + 1.15 + Math.sin(this.surfT * 2.1) * 0.12;
+      this.pos.y = damp(this.pos.y, hover, this.pos.y < hover ? 7 : 3, dt);
+      this.vel.y = 0;
+      this.grounded = false;
+      this.swimming = false;
+      this.gliding = false;
+    } else if (this.swimming) {
       if (!deep) {
         this.swimming = false;
         this.grounded = true;
@@ -249,7 +261,7 @@ export class Player {
         this.vel.y = 0;
       }
     }
-    if (!this.grounded && !this.swimming) {
+    if (!this.grounded && !this.swimming && !this.surfing) {
       // under the leaf the fall eases to a gentle drift instead of accelerating
       this.gliding = (this.arriving || input.jumpHeld()) && this.vel.y < -0.8;
       // arriving: a long fall through the cloud, slowing to a float for the last stretch
@@ -285,12 +297,13 @@ export class Player {
     this.prevVel.copy(this.vel);
 
     this.pose.speed = sp;
-    this.pose.grounded = this.grounded;
+    this.pose.grounded = this.grounded || this.surfing;
+    this.pose.surfing = this.surfing;
     this.pose.swimming = this.swimming;
     this.pose.verticalSpeed = this.vel.y;
     this.pose.turnRate = this.turnRate;
     this.pose.yaw = this.yaw;
-    if (this.grounded || this.swimming) {
+    if (this.grounded || this.swimming || this.surfing) {
       this.gliding = false;
       this.arriving = false;
     }

@@ -692,6 +692,20 @@ export class Game {
       this.updateFruit(dt);
       this.updateEvening(dt);
       this.updateGuide(dt);
+      // V (or the Leaf button): hop onto a big leaf and skim over the island
+      if (this.player.surfing && (this.player.sitting || this.inside || this.sleeping || this.player.arriving)) this.player.surfing = false;
+      if (this.input.surfPressed() && !this.inside && !this.sleeping && !this.player.sitting && !this.player.arriving && !this.fishing.active) {
+        this.player.surfing = !this.player.surfing;
+        this.ambience.plip(0.6);
+        if (this.player.surfing) {
+          this.kite.flying = false;
+          this.player.model.impulse(1.6);
+          if (!this.flags.has('surf')) {
+            this.flags.add('surf');
+            this.ui.toast('', 'Leaf riding', this.ui.touch ? 'Tap Leaf again to hop off' : 'Press V again to hop off');
+          }
+        }
+      }
       if (this.input.kitePressed() && !this.inside) {
         this.kite.flying = !this.kite.flying;
         if (this.kite.flying) this.flags.add('kite');
@@ -1048,7 +1062,7 @@ export class Game {
       const left = this.tut >= 9 ? this.intents.done.filter((d) => !d).length : 0;
       let waiting = 0;
       for (const n of this.npcs) if (this.met.has(n.who.id) && !this.gifted.has(n.who.id)) waiting++;
-      this.ui.hud(Math.max(1, this.days), ch >= 0 ? `Chapter ${ch + 1} · ${this.springs.spots[this.chapters[ch]].name}` : 'Every spring is awake', this.springs.awakeCount / Math.max(1, this.springs.spots.length), this.lastDay === this.dayKey() && left < 3 ? 0 : left, waiting);
+      this.ui.hud(Math.max(1, this.days), ch >= 0 ? this.springs.spots[this.chapters[ch]].name : 'All awake', this.springs.awakeCount / Math.max(1, this.springs.spots.length), this.lastDay === this.dayKey() && left < 3 ? 0 : left, waiting);
     }
   }
 
@@ -1438,7 +1452,9 @@ export class Game {
           if (!target && d < 140) target = sp;
         }
         this.trailTarget = target;
-        this.ui.next(this.inside ? null : text);
+        // after the introduction the screen stays quiet: the sparkles, the Today button and the chapter bar say enough
+        void text;
+        this.ui.next(null);
         this.trail.update(dt, globalUniforms.uTime.value, p, target, this.camera.position);
         return;
       }
@@ -2000,6 +2016,7 @@ export class Game {
       { title: 'Go for a walk with a friend', hint: 'Press E again to invite them', done: best >= 1 },
       { title: 'Hear a friend’s story', hint: 'Keep walking together until two hearts fill', done: best >= 2 },
       { title: 'Learn a practice', hint: 'Press Q beside a Calmling you have met', done: this.learned.size > 0 },
+      { title: 'Ride a leaf', hint: 'Press V, or the Leaf button, and steer', done: this.flags.has('surf') },
       { title: 'Glide', hint: 'Jump from somewhere high and keep holding Space', done: this.flags.has('glide') },
       { title: 'Rest at a viewpoint', hint: 'Look for a mossy log with a view', done: this.rested.size > 0 },
       { title: 'Plant a seed in the garden', hint: 'Find the soil plots near where you began', done: this.garden.serialize().some((g) => g.t > 0) },
