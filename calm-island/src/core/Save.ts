@@ -54,6 +54,8 @@ export interface SaveData {
   introduced?: string[];
   /** the merge board, when each find was last collected, and whether the campsite has been unlocked */
   merge?: MergeSave;
+  /** what the player has called their Calmling */
+  name?: string;
   finds?: number[];
   camp?: boolean;
   /** patches of the map cleared of mist: x, z, radius */

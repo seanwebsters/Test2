@@ -68,7 +68,7 @@
       <button id="next" class="hidden" aria-label="Dismiss suggestion"></button>
       <div id="seeds" class="hidden"></div>
       <div id="topbar">
-        <button id="hud-ava" class="rim" aria-label="Menu"><span class="in"><img src="./brand/calmling-head.webp" alt="" /></span><span class="tag" id="hud-day">Day 1</span></button>
+        <button id="hud-ava" class="rim" aria-label="Name your Calmling"><span class="in"><img src="./brand/calmling-head.webp" alt="" /></span><span class="tag" id="hud-day">Day 1</span></button>
         <div class="rim plate"><div class="in ink">
           <button id="eat0" class="cnt" aria-label="Eat a starberry"><svg width="38" height="38" aria-hidden="true"><use href="#berry"/></svg><span>0</span></button><i class="sep"></i>
           <button id="eat1" class="cnt" aria-label="Eat a moon melon"><svg width="38" height="38" aria-hidden="true"><use href="#melon"/></svg><span>0</span></button><i class="sep"></i>
@@ -76,6 +76,7 @@
         </div></div>
         <div class="rim chap"><div class="in ink"><b id="chap-fill"></b><span id="chap-text"></span></div></div>
       </div>
+      <button id="btn-gear" aria-label="Settings"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.500 7.500 0 0 0-1.700-1L15 3.500h-4l-.3 2.500a7.500 7.500 0 0 0-1.700 1l-2.400-1-2 3.400 2 1.600a7.600 7.600 0 0 0 0 2l-2 1.600 2 3.400 2.400-1a7.500 7.500 0 0 0 1.700 1l.3 2.500h4l.3-2.500a7.500 7.500 0 0 0 1.700-1l2.400 1 2-3.400-2-1.600ZM13 15.200a3.200 3.200 0 1 1 0-6.400 3.200 3.200 0 0 1 0 6.400Z" transform="translate(-1 0)"/></svg></button>
       <div id="jewels">
         <button id="j-today" class="rim jew" aria-label="Today"><span class="in gold"><svg width="40" height="40" aria-hidden="true"><use href="#star"/></svg></span><span class="dot hidden"></span><span class="lbl">Today</span></button>
         <button id="j-friends" class="rim jew" aria-label="Friends"><span class="in rose"><img src="./brand/friend-head.webp" alt="" /></span><span class="dot hidden"></span><span class="lbl">Friends</span></button>
@@ -256,6 +257,15 @@
         <button id="letter-close" class="primary">Fold it away</button>
       </div>
     </div>
+    <div id="namer" class="screen hidden">
+      <div class="card namer-card">
+        <img src="./brand/calmling-head.webp" alt="" />
+        <h2>Name your Calmling</h2>
+        <input id="namer-input" type="text" maxlength="14" placeholder="A name…" autocomplete="off" autocapitalize="words" enterkeyhint="done" />
+        <button id="namer-save" class="primary">That's the one</button>
+      </div>
+    </div>
+
     <div id="choices" class="screen hidden">
       <div class="card log-card" style="width: min(600px, 100%)">
         <div class="log-head">
