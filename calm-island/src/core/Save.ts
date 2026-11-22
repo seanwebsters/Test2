@@ -1,3 +1,5 @@
+import type { MergeSave } from '../merge/board';
+
 export interface SaveData {
   v: 1;
   pos: [number, number, number];
@@ -50,6 +52,10 @@ export interface SaveData {
   intents?: { key: string; ids: string[]; done: boolean[] };
   /** unmet Calmlings a friend has told you about */
   introduced?: string[];
+  /** the merge board, when each find was last collected, and whether the campsite has been unlocked */
+  merge?: MergeSave;
+  finds?: number[];
+  camp?: boolean;
   /** patches of the map cleared of mist: x, z, radius */
   reveals?: number[][];
 }
