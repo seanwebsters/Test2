@@ -2028,8 +2028,23 @@ export class Game {
     // every place: its name once discovered, a question mark on a dark badge until then
     for (const r of this.island.regions) {
       const [cx, cy] = at(r.x, r.z);
-      if (this.discovered.has(r.id)) label(r.name, cx, cy + 34, 17);
-      else {
+      if (this.discovered.has(r.id)) {
+        // discovered: a small gold star, no words
+        ctx.save();
+        ctx.translate(cx, cy - 26);
+        ctx.beginPath();
+        for (let k = 0; k < 10; k++) {
+          const rr = k % 2 ? 4.5 : 10;
+          ctx.lineTo(Math.sin((k / 10) * Math.PI * 2) * rr, -Math.cos((k / 10) * Math.PI * 2) * rr);
+        }
+        ctx.closePath();
+        ctx.fillStyle = '#ffd24a';
+        ctx.fill();
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = '#fff';
+        ctx.stroke();
+        ctx.restore();
+      } else {
         ctx.fillStyle = '#24407e';
         ctx.beginPath();
         ctx.arc(cx, cy, 19, 0, Math.PI * 2);
@@ -2056,7 +2071,8 @@ export class Game {
       const q = npc === this.companion ? npc.pos : npc.home;
       dot(q.x, q.z, 7, `#${npc.who.look.fur.toString(16).padStart(6, '0')}`);
       const [cx, cy] = at(q.x, q.z);
-      label(npc.who.name, cx, cy - 12, 12.5);
+      void cx;
+      void cy;
     }
     {
       // home: a little thatched house
@@ -2074,7 +2090,6 @@ export class Game {
       ctx.strokeStyle = '#6a3a16';
       ctx.stroke();
       ctx.strokeRect(hx - 9, hy - 4, 18, 13);
-      label('Home', hx, hy + 26, 13);
     }
     dot(this.shop.x, this.shop.z, 5, '#ffd65a', '#6f4a8f');
     this.springs.spots.forEach((sp, i) => {
