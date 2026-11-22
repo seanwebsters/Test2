@@ -218,7 +218,7 @@ export class UI {
       }, 1200);
     }, wait);
     $('start').classList.remove('hidden');
-    $('play').textContent = returning ? 'Continue wandering' : 'Begin wandering';
+    $('play').textContent = returning ? 'Continue' : 'Begin';
     $('play').focus();
   }
 
