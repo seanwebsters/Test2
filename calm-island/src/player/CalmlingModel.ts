@@ -372,6 +372,36 @@ export class CalmlingModel {
     this.root.add(this.blob);
   }
 
+  /**
+   * Swap the built-in body for an authored model. The sculpt replaces the fur,
+   * face and limbs; everything that moves him (bounce, squash, lean, sitting,
+   * breathing, the leaf) carries on driving it exactly as before.
+   */
+  useSculpt(model: THREE.Object3D): void {
+    const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    const centre = box.getCenter(new THREE.Vector3());
+    const k = 1.52 / size.y; // as tall as the Calmling he replaces
+    for (const c of [...this.body.children]) c.visible = false;
+    this.legL.visible = this.legR.visible = false;
+    const holder = new THREE.Group();
+    model.position.sub(centre);
+    holder.add(model);
+    holder.scale.setScalar(k);
+    holder.position.y = (size.y * k) / 2 - BODY_Y; // feet on the ground
+    model.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      m.castShadow = true;
+      m.receiveShadow = true;
+      const mat = m.material as THREE.MeshStandardMaterial;
+      mat.metalness = 0;
+      mat.metalnessMap = null;
+      mat.roughness = 0.82;
+    });
+    this.body.add(holder);
+  }
+
   /** Give the fur a kick (landing, jumping). Positive stretches, negative squashes. */
   impulse(amount: number): void {
     this.furVel.y += amount * 0.3; // the fur carries on after the body stops, then settles
