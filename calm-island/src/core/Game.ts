@@ -174,6 +174,8 @@ export class Game {
   private mergeUI!: MergeScreen;
   /** seconds into the campsite's arrival, or -1 */
   private campShow = -1;
+  /** the player has taken hold of the camera during the fall in */
+  private arriveLook = false;
   /** the springs in the order the chapters visit them: nearest home first, then on round the island */
   private chapters: number[] = [];
   private owned = new Set<string>();
@@ -752,13 +754,15 @@ export class Game {
       this.player.update(dt, this.input, this.inside ? this.insideYaw : this.rig.yaw);
       const now = globalUniforms.uTime.value;
       if (this.player.arriving) {
-        // falling in: the view is held on the island and the treehouse, whatever the mouse does
-        // looking down at the treehouse and garden from on high, levelling out as the ground comes up
-        const up = this.player.pos.y - this.island.heightAt(this.player.pos.x, this.player.pos.z);
-        this.rig.yaw = -2.19;
-        this.rig.pitch = Math.min(1.12, Math.max(0.3, Math.atan2(up, 62)));
-        this.rig.dist = 12;
-      }
+        // falling in: the view starts on the island and the treehouse, easing level as the ground comes up,
+        // but it is yours the moment you move it: look anywhere you like on the way down
+        if (this.input.dx !== 0 || this.input.dy !== 0 || this.input.wheel !== 0) this.arriveLook = true;
+        if (!this.arriveLook) {
+          const up = this.player.pos.y - this.island.heightAt(this.player.pos.x, this.player.pos.z);
+          this.rig.pitch = Math.min(1.12, Math.max(0.3, Math.atan2(up, 62)));
+          this.rig.dist = 12;
+        }
+      } else this.arriveLook = false;
       if (this.campShow >= 0) {
         // the campsite arriving: a slow turn around it, the Calmling in front
         this.campShow += dt;
