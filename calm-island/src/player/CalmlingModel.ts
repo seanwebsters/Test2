@@ -23,6 +23,8 @@ export interface CalmlingPose {
   /** a mindful activity being done on the spot */
   act?: CalmlingAct | null;
   eyesClosed?: boolean;
+  /** 0..1: lifting an arm to wave hello */
+  wave?: number;
   surfing?: boolean;
 }
 
@@ -73,6 +75,8 @@ export interface SculptRig {
   z?: [number, number];
   /** the file carries its own hand-and-foot weights (attribute _rigw), so long fur is left alone */
   baked?: boolean;
+  /** sitting down: how far forward and up the feet slide to poke out in front of the belly (default 0.34, 0.05) */
+  sit?: [number, number];
   /** legs only count in front of this depth and inside this width, so a cloak hanging behind stays still */
   legBox?: [number, number];
   /** only this side's arm moves (1 right, -1 left); the other is holding something that must stay straight */
@@ -80,7 +84,7 @@ export interface SculptRig {
 }
 export const BLUE_RIG: SculptRig = { armX: 0.53, armTop: -0.29, armBottom: -0.72, shoulder: [0.64, -0.3], hip: [0.3, -0.68] };
 export const ORANGE_RIG: SculptRig = { armX: 0.53, armTop: -0.29, armBottom: -0.72, shoulder: [0.64, -0.3], hip: [0.3, -0.78] };
-export const YETI_RIG: SculptRig = { armX: 0.34, armTop: -0.28, armBottom: -0.7, shoulder: [0.52, -0.4], hip: [0.25, -0.72], z: [0.42, 0.25], baked: true };
+export const YETI_RIG: SculptRig = { armX: 0.34, armTop: -0.28, armBottom: -0.7, shoulder: [0.52, -0.4], hip: [0.25, -0.72], z: [0.42, 0.25], baked: true, sit: [0.14, 0.04] };
 export const HOODED_RIG: SculptRig = { ...BLUE_RIG, legBox: [-0.25, 0.46] };
 export const SPARKLY_RIG: SculptRig = { ...BLUE_RIG, hip: [0.3, -0.74] };
 export const ELDER_RIG: SculptRig = { ...BLUE_RIG, legBox: [-9, 0.5], freeArm: 1 };
@@ -117,6 +121,7 @@ export class CalmlingModel {
   private furVel = new THREE.Vector3();
   private lookX = 0;
   private sit = 0;
+  private waving = 0;
   private breath = 0;
   private eyesShut = 0;
   private glide = 0;
@@ -404,7 +409,7 @@ export class CalmlingModel {
   useSculpt(model: THREE.Object3D, r: SculptRig = BLUE_RIG): void {
     // A one-piece sculpt has no bones, so it is bent in the shader instead: everything
     // outside the belly and below the cheeks is an arm, everything under the hem of the fur a leg.
-    const u: Record<string, { value: number }> = { uArmL: { value: 0 }, uArmR: { value: 0 }, uLiftL: { value: 0 }, uLiftR: { value: 0 }, uLegL: { value: 0 }, uLegR: { value: 0 } };
+    const u: Record<string, { value: number }> = { uArmL: { value: 0 }, uArmR: { value: 0 }, uLiftL: { value: 0 }, uLiftR: { value: 0 }, uLegL: { value: 0 }, uLegR: { value: 0 }, uSit: { value: 0 } };
     let skin: THREE.Mesh | null = null;
     model.traverse((o) => {
       if ((o as THREE.Mesh).isMesh) skin = o as THREE.Mesh;
@@ -422,7 +427,7 @@ export class CalmlingModel {
           .replace(
             '#include <common>',
             /* glsl */ `#include <common>
-            uniform float uArmL, uArmR, uLiftL, uLiftR, uLegL, uLegR;
+            uniform float uArmL, uArmR, uLiftL, uLiftR, uLegL, uLegR, uSit;
             ${limb ? 'attribute float _rigw;' : ''}
             vec3 rigX(vec3 p, vec3 o, float a) { p -= o; float c = cos(a), s = sin(a); return vec3(p.x, p.y * c - p.z * s, p.y * s + p.z * c) + o; }
             vec3 rigZ(vec3 p, vec3 o, float a) { p -= o; float c = cos(a), s = sin(a); return vec3(p.x * c - p.y * s, p.x * s + p.y * c, p.z) + o; }`,
@@ -439,6 +444,9 @@ export class CalmlingModel {
               p = mix(p, a, wArm);
               float wLeg = (1.0 - smoothstep(${f(r.hip[1] - 0.06)}, ${f(r.hip[1])}, p.y)) * (1.0 - wArm)${limb}${box};
               p = mix(p, rigX(p, vec3(side * ${f(r.hip[0])}, ${f(r.hip[1])}, ${f(r.z?.[1] ?? 0)}), side < 0.0 ? uLegL : uLegR), wLeg);
+              // sitting: the feet slide out from under the belly so they show in front
+              p.z += uSit * ${f(r.sit?.[0] ?? 0.34)} * wLeg;
+              p.y += uSit * ${f(r.sit?.[1] ?? 0.05)} * wLeg;
               transformed = p / ${S};
             }`,
           );
@@ -507,7 +515,8 @@ export class CalmlingModel {
 
     const stride = lerp(0.62, 1.0, this.run) * this.move;
     const bounce = Math.abs(c) * lerp(0.035, 0.085, this.run) * this.move;
-    this.body.position.y = BODY_Y + bounce + (sy - 1) * 0.3 + Math.sin(t * 2.2) * 0.03 * this.swim - this.sit * 0.27 + this.breath * 0.085;
+    // (a sculpt's legs are short: it settles onto its bottom without sinking into the ground)
+    this.body.position.y = BODY_Y + bounce + (sy - 1) * 0.3 + Math.sin(t * 2.2) * 0.03 * this.swim - this.sit * (this.rig ? 0.15 : 0.27) + this.breath * 0.085;
     // standing still, the weight drifts slowly from one foot to the other
     const idle = (1 - this.move) * (1 - this.sit) * (1 - this.air) * (1 - this.swim);
     const shift = Math.sin(t * 0.55) * idle;
@@ -592,6 +601,15 @@ export class CalmlingModel {
     this.armL.rotation.z = -(0.14 + lift + idleSway + this.breath * 0.42);
     this.armR.rotation.z = 0.14 + lift + idleSway + this.breath * 0.42;
 
+    // waving hello: one arm goes up and wags, with a happy little bob
+    this.waving = damp(this.waving, pose.wave ?? 0, 9, dt);
+    if (this.waving > 0.002) {
+      const wv = this.waving;
+      this.armR.rotation.z = lerp(this.armR.rotation.z, 1.75 + Math.sin(t * 12) * 0.38, wv);
+      this.armR.rotation.x = lerp(this.armR.rotation.x, 0, wv);
+      this.body.position.y += Math.abs(Math.sin(t * 6.5)) * 0.06 * wv * (1 - this.sit);
+      this.tilt.rotation.z += Math.sin(t * 6.5) * 0.05 * wv;
+    }
     // mindful activities: each eases in over the ordinary pose and out again
     if (pose.act) this.actKind = pose.act;
     this.actW = damp(this.actW, pose.act ? 1 : 0, 2.5, dt);
@@ -646,7 +664,8 @@ export class CalmlingModel {
       r.uArmL.value = clamp(this.armL.rotation.x * 0.8, -1.2, 1.2);
       r.uArmR.value = clamp(this.armR.rotation.x * 0.8, -1.2, 1.2);
       r.uLiftL.value = clamp((-this.armL.rotation.z - 0.14) * 0.85, 0, 1.25);
-      r.uLiftR.value = clamp((this.armR.rotation.z - 0.14) * 0.85, 0, 1.25);
+      r.uLiftR.value = clamp((this.armR.rotation.z - 0.14) * 0.85, 0, 1.25 + 0.5 * this.waving);
+      r.uSit.value = this.sit * (1 - this.sleep);
       r.uLegL.value = clamp(this.legL.rotation.x * 0.75, -1.15, 1.15);
       r.uLegR.value = clamp(this.legR.rotation.x * 0.75, -1.15, 1.15);
       for (const l of this.rig.lids) {

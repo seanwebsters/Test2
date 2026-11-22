@@ -118,6 +118,9 @@ function makeProp(kind: NonNullable<Activity['prop']>): THREE.Group {
   return wrap;
 }
 
+/** how long a wave hello lasts, in seconds */
+const GREET = 2.8;
+
 /** A resident Calmling: potters around home, greets you, and can tag along. */
 export class Npc {
   readonly model: CalmlingModel;
@@ -144,6 +147,8 @@ export class Npc {
   private speed = 0;
   private accel = new THREE.Vector3();
   private pose: CalmlingPose;
+  private greeted = false;
+  private greetT = 0;
   private seed: number;
 
   constructor(readonly who: Resident, private island: Island, index: number) {
@@ -204,6 +209,14 @@ export class Npc {
       return;
     }
     const toPlayer = Math.hypot(player.pos.x - this.pos.x, player.pos.z - this.pos.z);
+    // noticing you: the first time you come near on a visit, they look up, turn and wave
+    if (toPlayer > 16) this.greeted = false;
+    else if (toPlayer < 9 && !this.greeted && !this.following && !this.gather) {
+      this.greeted = true;
+      this.greetT = GREET;
+      this.model.impulse(1.1);
+    }
+    if (this.greetT > 0) this.greetT -= dt;
     let want = 0;
     let faceX = 0;
     let faceZ = 0;
@@ -302,6 +315,15 @@ export class Npc {
       }
     }
 
+    if (this.greetT > 0 && !this.following && !this.gather) {
+      // whatever they were doing waits a moment
+      want = 0;
+      faceX = player.pos.x - this.pos.x;
+      faceZ = player.pos.z - this.pos.z;
+      act = null;
+      closed = false;
+      breathe = false;
+    }
     if (this.now?.stroll) {
       this.nowFor -= dt;
       if (this.nowFor <= 0) this.now = null;
@@ -334,6 +356,7 @@ export class Npc {
     this.pose.breath = breathe ? 0.5 + 0.5 * Math.sin(time * 0.9 + this.seed) : sitting && this.following ? player.breath : 0;
     this.pose.act = act;
     this.pose.eyesClosed = closed;
+    this.pose.wave = this.greetT > 0 ? Math.min(1, (GREET - this.greetT) * 4, this.greetT * 3) : 0;
     this.model.update(dt, this.pose);
     this.sync();
   }
