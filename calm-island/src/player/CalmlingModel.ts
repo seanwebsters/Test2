@@ -75,12 +75,15 @@ export interface SculptRig {
   baked?: boolean;
   /** legs only count in front of this depth and inside this width, so a cloak hanging behind stays still */
   legBox?: [number, number];
+  /** only this side's arm moves (1 right, -1 left); the other is holding something that must stay straight */
+  freeArm?: 1 | -1;
 }
 export const BLUE_RIG: SculptRig = { armX: 0.53, armTop: -0.29, armBottom: -0.72, shoulder: [0.64, -0.3], hip: [0.3, -0.68] };
 export const ORANGE_RIG: SculptRig = { armX: 0.53, armTop: -0.29, armBottom: -0.72, shoulder: [0.64, -0.3], hip: [0.3, -0.78] };
 export const YETI_RIG: SculptRig = { armX: 0.34, armTop: -0.28, armBottom: -0.7, shoulder: [0.52, -0.4], hip: [0.25, -0.72], z: [0.42, 0.25], baked: true };
 export const HOODED_RIG: SculptRig = { ...BLUE_RIG, legBox: [-0.25, 0.46] };
 export const SPARKLY_RIG: SculptRig = { ...BLUE_RIG, hip: [0.3, -0.74] };
+export const ELDER_RIG: SculptRig = { ...BLUE_RIG, legBox: [-9, 0.5], freeArm: 1 };
 export const PINK_RIG: SculptRig = { armX: 0.5, armTop: -0.22, armBottom: -0.74, shoulder: [0.6, -0.24], hip: [0.33, -0.66] };
 
 export class CalmlingModel {
@@ -428,7 +431,7 @@ export class CalmlingModel {
             {
               vec3 p = transformed * ${S};
               float side = sign(p.x);
-              float wArm = smoothstep(${f(r.armX)}, ${f(r.armX + 0.08)}, abs(p.x)) * (1.0 - smoothstep(${f(r.armTop - 0.08)}, ${f(r.armTop)}, p.y)) * smoothstep(${f(r.armBottom - 0.12)}, ${f(r.armBottom)}, p.y)${limb};
+              float wArm = smoothstep(${f(r.armX)}, ${f(r.armX + 0.08)}, abs(p.x)) * (1.0 - smoothstep(${f(r.armTop - 0.08)}, ${f(r.armTop)}, p.y)) * smoothstep(${f(r.armBottom - 0.12)}, ${f(r.armBottom)}, p.y)${limb}${r.freeArm ? ` * step(0.0, side * ${f(r.freeArm)})` : ''};
               vec3 shoulder = vec3(side * ${f(r.shoulder[0])}, ${f(r.shoulder[1])}, ${f(r.z?.[0] ?? 0)});
               vec3 a = rigZ(rigX(p, shoulder, side < 0.0 ? uArmL : uArmR), shoulder, side * (side < 0.0 ? uLiftL : uLiftR));
               p = mix(p, a, wArm);

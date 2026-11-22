@@ -3,7 +3,7 @@ import { Npc } from '../npc/Npc';
 import { RESIDENTS } from '../npc/roster';
 import { CameraRig } from '../player/CameraRig';
 import { Player } from '../player/Player';
-import { BLUE_RIG, HOODED_RIG, SPARKLY_RIG, ORANGE_RIG, PINK_RIG, YETI_RIG } from '../player/CalmlingModel';
+import { BLUE_RIG, ELDER_RIG, HOODED_RIG, SPARKLY_RIG, ORANGE_RIG, PINK_RIG, YETI_RIG } from '../player/CalmlingModel';
 import { UI, type LogEntry } from '../ui/UI';
 import { Ambient } from '../world/Ambient';
 import { DayCycle } from '../world/DayCycle';
@@ -495,7 +495,7 @@ export class Game {
     if (!this.opts.plainPlants) {
       // friends who have a sculpted model; anyone whose file cannot be loaded keeps the built-in one
       await Promise.all(
-        ([['dadirri', 'pink', PINK_RIG], ['apricus', 'orange', ORANGE_RIG], ['psithuros', 'yeti', YETI_RIG], ['kintsugi', 'volcanic', BLUE_RIG], ['meraki', 'heart', BLUE_RIG], ['komorebi', 'sun', BLUE_RIG], ['wabisabi', 'patchwork', ORANGE_RIG], ['genkaku', 'hooded', HOODED_RIG], ['misogi', 'sparkly', SPARKLY_RIG], ['morgenfrisk', 'fluffy', BLUE_RIG], ['gokotta', 'spiky', BLUE_RIG]] as const).map(async ([id, file, rig]) => {
+        ([['dadirri', 'pink', PINK_RIG], ['apricus', 'orange', ORANGE_RIG], ['psithuros', 'yeti', YETI_RIG], ['kintsugi', 'volcanic', BLUE_RIG], ['meraki', 'heart', BLUE_RIG], ['komorebi', 'sun', BLUE_RIG], ['wabisabi', 'patchwork', ORANGE_RIG], ['genkaku', 'hooded', HOODED_RIG], ['misogi', 'sparkly', SPARKLY_RIG], ['morgenfrisk', 'fluffy', BLUE_RIG], ['gokotta', 'spiky', BLUE_RIG], ['kupuna', 'elder', ELDER_RIG], ['desbundar', 'party', ORANGE_RIG]] as const).map(async ([id, file, rig]) => {
           try {
             const glb = await new GLTFLoader().loadAsync(`${base}models/calmling/${file}.glb`);
             this.npcs.find((n) => n.who.id === id)?.model.useSculpt(glb.scene, rig);
