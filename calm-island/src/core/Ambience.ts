@@ -223,6 +223,14 @@ export class Ambience {
     this.burst(now + 0.02, 'bandpass', 2600, 0.7, 0.2, 0.07 * force, 1);
   }
 
+  /** A soft rush of air, for hopping onto a leaf. */
+  whoosh(): void {
+    if (!this.ctx || !this.master || !this.noise) return;
+    const now = this.ctx.currentTime;
+    this.burst(now, 'bandpass', 700, 0.6, 0.7, 0.16, 0.7);
+    this.burst(now + 0.08, 'bandpass', 1500, 0.8, 0.5, 0.08, 1.1);
+  }
+
   /** One snap from a wood fire. */
   crackle(volume: number): void {
     if (!this.ctx || !this.master || !this.noise) return;

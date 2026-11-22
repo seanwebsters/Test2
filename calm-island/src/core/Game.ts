@@ -13,6 +13,7 @@ import { Fishing } from '../world/Fishing';
 import { FRUITS, Home, KEEPSAKES } from '../world/Home';
 import { Springs } from '../world/Springs';
 import { Trail } from '../world/Trail';
+import { LeafTrail } from '../world/LeafTrail';
 import { Backdrop } from '../world/Backdrop';
 import { ArrivalClouds } from '../world/Arrival';
 import { SHOP_ITEMS, Shop } from '../world/Shop';
@@ -147,6 +148,9 @@ export class Game {
   private guide!: Npc;
   private trail!: Trail;
   private trailTarget: { x: number; z: number } | null = null;
+  /** somewhere the player asked to be shown the way to */
+  private wayTarget: { x: number; z: number } | null = null;
+  private leafTrail = new LeafTrail();
   private nextCheck = 0;
   private days = 0;
   private streak = 0;
@@ -445,7 +449,7 @@ export class Game {
     }
     this.scene.add(new Backdrop().group, this.arrivalClouds.group);
     this.trail = new Trail(this.island);
-    this.scene.add(this.trail.points);
+    this.scene.add(this.trail.points, this.leafTrail.points);
     this.scene.add(this.fishing.group, this.home.group);
     this.viewpoints = new Viewpoints(this.island);
     this.cairns = new Cairns(this.island);
@@ -703,7 +707,7 @@ export class Game {
       if (this.player.surfing && (this.player.sitting || this.inside || this.sleeping || this.player.arriving)) this.player.surfing = false;
       if (this.input.surfPressed() && !this.inside && !this.sleeping && !this.player.sitting && !this.player.arriving && !this.fishing.active) {
         this.player.surfing = !this.player.surfing;
-        this.ambience.plip(0.6);
+        this.ambience.whoosh();
         if (this.player.surfing) {
           this.kite.flying = false;
           this.player.model.impulse(1.6);
@@ -1196,11 +1200,36 @@ export class Game {
     }
     this.pickIntents();
     const kept = this.intents.done.filter(Boolean).length;
+    const icons: Record<string, string> = { breathe: 'drop', water: 'drop', fruit: 'berry', friend: 'heart', fire: 'lantern', view: 'star', skim: 'drop', fish: 'drop', sleep: 'lantern', tend: 'melon' };
+    const where: Record<string, string> = { breathe: 'Anywhere you like', water: 'By the river, a lake or the sea', fruit: 'In the patch beside your treehouse', friend: 'Invite one along', fire: 'At the fire ring, once evening comes', view: 'Look for a mossy log with a view', skim: 'At the edge of any water', fish: 'Beside any water', sleep: 'In your bed, or anywhere after dark', tend: 'The plots in the Calm Garden' };
+    const next = this.intents.ids.find((_, i) => !this.intents.done[i]);
     this.ui.showChoices(
       'Today',
       kept ? `${kept} of 3 kept. Day ${Math.max(1, this.days)} is counted, and the vine has its leaf.` : 'Keep any one of these and your vine grows a leaf.',
-      this.intents.ids.map((id, i) => ({ id, name: INTENTS[id], note: 'One of today’s three intentions', color: ['#ffd65a', '#ff9cc0', '#8fe0f0'][i], action: this.intents.done[i] ? 'Kept' : 'To do', enabled: false })),
+      this.intents.ids.map((id, i) => ({ id, name: INTENTS[id], note: where[id], color: '', icon: icons[id], action: '', enabled: false, done: this.intents.done[i] })),
       () => {},
+      next
+        ? {
+            label: 'Show me the way',
+            run: () => {
+              // sparkles lead to the nearest place the next intention can be kept
+              const p = this.player.pos;
+              const nearest = (list: { x: number; z: number }[]): { x: number; z: number } | null => [...list].sort((a, b2) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b2.x - p.x, b2.z - p.z))[0] ?? null;
+              const ch = this.currentChapter();
+              this.wayTarget =
+                next === 'fruit' ? this.home.plantSpot(0, Date.now())
+                : next === 'fire' ? this.home.fireSpot
+                : next === 'sleep' ? this.home.ladderSpot
+                : next === 'tend' ? { x: 9, z: 3 }
+                : next === 'view' ? nearest(this.viewpoints.spots)
+                : next === 'friend' ? nearest(this.npcs.filter((n) => this.met.has(n.who.id) && !n.absent).map((n) => n.pos))
+                : next === 'breathe' ? (ch >= 0 ? this.springs.spots[this.chapters[ch]] : null)
+                : nearest(this.island.lakes);
+              this.nextCheck = 0;
+              this.play();
+            },
+          }
+        : undefined,
     );
   }
 
@@ -1458,6 +1487,8 @@ export class Game {
           if (!text) text = d < 7 ? 'Sit and take three slow breaths to wake the spring' : `Chapter ${ch + 1}: a spring sleeps in ${sp.name}. It is ringed on your map`;
           if (!target && d < 140) target = sp;
         }
+        if (this.wayTarget && Math.hypot(this.wayTarget.x - p.x, this.wayTarget.z - p.z) < 6) this.wayTarget = null;
+        if (!target) target = this.wayTarget;
         this.trailTarget = target;
         // after the introduction the screen stays quiet: the sparkles, the Today button and the chapter bar say enough
         void text;
@@ -2258,6 +2289,7 @@ export class Game {
     this.home.update(globalUniforms.uTime.value, this.day.night, Date.now(), this.inside);
     this.shop.update(dt, this.day.night, this.day.hour);
     this.water.update();
+    this.leafTrail.update(dt, !!this.player?.surfing, this.player.pos, this.player.yaw, this.player.speed);
     const falling = this.started && !!this.player?.arriving;
     this.arrivalClouds.update(dt, falling, this.player.pos, this.island.heightAt(this.player.pos.x, this.player.pos.z), globalUniforms.uDayLight.value);
     this.ui.arriving(falling);

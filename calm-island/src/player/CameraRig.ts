@@ -48,7 +48,8 @@ export class CameraRig {
     this.target.y = damp(this.target.y, player.pos.y + 1.0, player.grounded ? 9 : 5, dt);
 
     const running = clamp((player.speed - 4) / 4);
-    this.fov = damp(this.fov, 50 + running * 5, 4, dt);
+    // (a little wider still when skimming along on a leaf, for the feeling of speed)
+    this.fov = damp(this.fov, 50 + running * 5 + clamp((player.speed - 9) / 4) * 8, 3, dt);
     if (Math.abs(this.camera.fov - this.fov) > 0.01) {
       this.camera.fov = this.fov;
       this.camera.updateProjectionMatrix();

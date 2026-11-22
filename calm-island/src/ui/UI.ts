@@ -12,6 +12,10 @@ export interface ChoiceRow {
   cost?: number[];
   action: string;
   enabled: boolean;
+  /** a drawn icon in place of the colour swatch */
+  icon?: string;
+  /** shows a tick (or an empty ring) in place of the button */
+  done?: boolean;
 }
 
 export interface LogEntry {
@@ -370,7 +374,7 @@ export class UI {
   }
 
   /** A list to pick from: the market stall, or the chest of things for the room. */
-  showChoices(title: string, lead: string, rows: ChoiceRow[], onPick: (id: string) => void): void {
+  showChoices(title: string, lead: string, rows: ChoiceRow[], onPick: (id: string) => void, footer?: { label: string; run: () => void }): void {
     $('menu').classList.add('hidden');
     $('choices-title').textContent = title;
     $('choices-lead').textContent = lead;
@@ -404,8 +408,28 @@ export class UI {
       btn.textContent = r.action;
       btn.disabled = !r.enabled;
       btn.addEventListener('click', () => onPick(r.id));
+      if (r.icon) {
+        sw.className = 'c-icon';
+        sw.style.background = '';
+        sw.innerHTML = `<svg width="40" height="40" aria-hidden="true"><use href="#${r.icon}"/></svg>`;
+      }
+      if (r.done !== undefined) {
+        const tick = document.createElement('span');
+        tick.className = `c-tick${r.done ? ' on' : ''}`;
+        tick.textContent = '✓';
+        row.append(sw, text, tick);
+        list.append(row);
+        continue;
+      }
       row.append(sw, text, btn);
       list.append(row);
+    }
+    if (footer) {
+      const go = document.createElement('button');
+      go.className = 'primary c-footer';
+      go.textContent = footer.label;
+      go.addEventListener('click', () => footer.run());
+      list.append(go);
     }
     $('choices').classList.remove('hidden');
   }
