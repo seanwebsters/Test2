@@ -1870,54 +1870,176 @@ export class Game {
     const S = canvas.width;
     const ctx = canvas.getContext('2d')!;
     if (!this.mapBase) {
-      // paint the ground texture once, with the sea drawn in
-      const B = 360;
+      // Painted once: a storybook map. Each biome has its own flat colour, hills are softly shaded,
+      // the coast drops away as a little cliff so the island looks like a model sitting in the sea.
+      const B = 540;
       const base = document.createElement('canvas');
       base.width = base.height = B;
       const bctx = base.getContext('2d')!;
       const img = bctx.createImageData(B, B);
-      const tex = this.groundTex.image as { data: Uint8Array; width: number };
+      const I = this.island;
+      const land = new Uint8Array(B * B);
+      const wx = (i: number): number => ((i + 0.5) / B) * WORLD_SIZE - HALF;
+      for (let j = 0; j < B; j++) for (let i = 0; i < B; i++) land[j * B + i] = I.heightAt(wx(i), wx(j)) >= 0.15 ? 1 : 0;
+      const hex = (c: number): [number, number, number] => [(c >> 16) & 255, (c >> 8) & 255, c & 255];
+      const SEA_A = hex(0x6fd6f5);
+      const SEA_B = hex(0x2f8fe6);
       for (let j = 0; j < B; j++) {
         for (let i = 0; i < B; i++) {
-          const x = ((i + 0.5) / B) * WORLD_SIZE - HALF;
-          const z = ((j + 0.5) / B) * WORLD_SIZE - HALF;
-          const h = this.island.heightAt(x, z);
+          const x = wx(i);
+          const z = wx(j);
+          const h = I.heightAt(x, z);
           const o = (j * B + i) * 4;
-          if (h < 0.15 || this.island.waterLevelAt(x, z) > h + 0.3) {
-            const deep = Math.min(1, Math.max(0, -h / 14));
-            img.data.set([90 - deep * 50, 196 - deep * 70, 226 - deep * 20, 255], o);
-          } else {
-            const t = (Math.floor(((j + 0.5) / B) * tex.width) * tex.width + Math.floor(((i + 0.5) / B) * tex.width)) * 4;
-            const shade = 0.86 + Math.min(0.3, h / 320);
-            img.data.set([tex.data[t] * shade, tex.data[t + 1] * shade, tex.data[t + 2] * shade, 255], o);
+          let c: [number, number, number];
+          if (!land[j * B + i]) {
+            // is there land just above? then this is the cliff under the island's southern edge
+            let cliff = 0;
+            for (let k = 1; k <= 9 && j - k >= 0; k++) if (land[(j - k) * B + i]) { cliff = k; break; }
+            if (cliff) c = cliff < 6 ? hex(0xd9b074) : hex(0xb98a52);
+            else {
+              const deep = Math.min(1, Math.max(0, -h / 16));
+              c = [SEA_A[0] + (SEA_B[0] - SEA_A[0]) * deep, SEA_A[1] + (SEA_B[1] - SEA_A[1]) * deep, SEA_A[2] + (SEA_B[2] - SEA_A[2]) * deep];
+            }
+          } else if (I.waterLevelAt(x, z) > h + 0.3) c = hex(0x62dcee); // lakes and the river
+          else {
+            c = I.sample(I.sand, x, z) > 0.5 ? hex(0xf8e4a6)
+              : h > 108 ? hex(0xffffff)
+              : h > 74 ? hex(0xbcaed2)
+              : h > 46 ? hex(0xc9e07c)
+              : I.sample(I.forest, x, z) > 0.5 ? hex(0x46a84e)
+              : hex(0x80d25c);
+            if (I.sample(I.path, x, z) > 0.5) c = hex(0xe6bd84);
+            // light from the top left: slopes facing it brighten, the far sides fall into shade
+            const shade = Math.min(1.16, Math.max(0.8, 1 + (h - I.heightAt(x - 3, z - 3)) * 0.05));
+            c = [c[0] * shade, c[1] * shade, c[2] * shade];
           }
+          img.data.set([c[0], c[1], c[2], 255], o);
         }
       }
       bctx.putImageData(img, 0, 0);
+      // little trees, blossom and peaks, like pieces set out on a board
+      const rnd = (n: number): number => {
+        const v = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+        return v - Math.floor(v);
+      };
+      for (let n = 0; n < 1500; n++) {
+        const i = rnd(n) * B;
+        const j = rnd(n + 5000) * B;
+        const x = wx(i);
+        const z = wx(j);
+        const h = I.heightAt(x, z);
+        if (h < 2 || I.waterLevelAt(x, z) > h + 0.3 || I.sample(I.sand, x, z) > 0.3 || I.sample(I.path, x, z) > 0.3) continue;
+        const forest = I.sample(I.forest, x, z) > 0.5;
+        if (!forest && rnd(n + 9000) > 0.16) continue;
+        if (h > 74) continue;
+        const r = 2.6 + rnd(n + 300) * 1.8;
+        const pink = !forest || rnd(n + 700) < 0.08;
+        bctx.fillStyle = 'rgba(30,80,40,.35)';
+        bctx.beginPath();
+        bctx.ellipse(i + 1, j + r * 0.9, r, r * 0.45, 0, 0, Math.PI * 2);
+        bctx.fill();
+        bctx.fillStyle = pink ? '#f58ab4' : h > 46 ? '#2f8a4a' : '#2f9a44';
+        bctx.beginPath();
+        bctx.arc(i, j, r, 0, Math.PI * 2);
+        bctx.fill();
+        bctx.fillStyle = pink ? '#ffc1d8' : '#6fcf62';
+        bctx.beginPath();
+        bctx.arc(i - r * 0.3, j - r * 0.35, r * 0.5, 0, Math.PI * 2);
+        bctx.fill();
+      }
       this.mapBase = base;
     }
-    const at = (x: number, z: number): [number, number] => [((x + HALF) / WORLD_SIZE) * S, ((z + HALF) / WORLD_SIZE) * S];
+    // the view is drawn in close on the island, leaving a rim of sea
+    const V = 418;
+    const at = (x: number, z: number): [number, number] => [((x + V) / (2 * V)) * S, ((z + V) / (2 * V)) * S];
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(this.mapBase, 0, 0, S, S);
-    // mist, with soft holes wherever you have been
-    const mist = document.createElement('canvas');
-    mist.width = mist.height = S;
-    const m = mist.getContext('2d')!;
-    m.fillStyle = 'rgba(232,242,250,0.84)';
-    m.fillRect(0, 0, S, S);
-    m.globalCompositeOperation = 'destination-out';
-    for (const [x, z, r] of this.reveals) {
-      const [cx, cy] = at(x, z);
-      const rr = (r / WORLD_SIZE) * S;
-      const g = m.createRadialGradient(cx, cy, rr * 0.55, cx, cy, rr);
-      g.addColorStop(0, 'rgba(0,0,0,1)');
-      g.addColorStop(1, 'rgba(0,0,0,0)');
-      m.fillStyle = g;
-      m.beginPath();
-      m.arc(cx, cy, rr, 0, Math.PI * 2);
-      m.fill();
+    const MB = this.mapBase.width;
+    ctx.drawImage(this.mapBase, ((HALF - V) / WORLD_SIZE) * MB, ((HALF - V) / WORLD_SIZE) * MB, ((2 * V) / WORLD_SIZE) * MB, ((2 * V) / WORLD_SIZE) * MB, 0, 0, S, S);
+    const FONT = "'Fredoka Variable', ui-rounded, system-ui, sans-serif";
+    const label = (text: string, cx: number, cy: number, size: number, fill = '#fff'): void => {
+      ctx.font = `600 ${size}px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = size * 0.36;
+      ctx.strokeStyle = '#1f3f7a';
+      ctx.strokeText(text, cx, cy);
+      ctx.fillStyle = fill;
+      ctx.fillText(text, cx, cy);
+    };
+    // puffy clouds lie over everything you have not walked through yet
+    const seen = (x: number, z: number): boolean => this.reveals.some(([rx, rz, rr]) => Math.hypot(x - rx, z - rz) < rr * 0.82);
+    const hash = (n: number): number => {
+      const v = Math.sin(n * 12.9898 + 78.233) * 43758.5453;
+      return v - Math.floor(v);
+    };
+    /** One cumulus: a row of rounded heads of different sizes over a flat base, shaded softly underneath. */
+    const puff = (cx: number, cy: number, r: number, seed: number): void => {
+      ctx.save();
+      // its shadow on the land below
+      ctx.fillStyle = 'rgba(30,70,60,.2)';
+      ctx.beginPath();
+      ctx.ellipse(cx + r * 0.25, cy + r * 0.95, r * 1.25, r * 0.36, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.rect(cx - r * 3, cy - r * 3, r * 6, r * 3.38); // everything below this line is cut away: the flat base
+      ctx.clip();
+      const g = ctx.createLinearGradient(0, cy - r * 1.1, 0, cy + r * 0.4);
+      g.addColorStop(0, '#ffffff');
+      g.addColorStop(0.62, '#f6faff');
+      g.addColorStop(1, '#cfdff2');
+      ctx.fillStyle = g;
+      const heads = 5 + Math.floor(hash(seed) * 3);
+      ctx.beginPath();
+      for (let k = 0; k < heads; k++) {
+        const t = k / (heads - 1);
+        const arch = Math.sin(t * Math.PI);
+        const rad = r * (0.34 + arch * 0.42 + hash(seed + k * 7) * 0.14);
+        const hx = cx + (t - 0.5) * r * 2.3;
+        const hy = cy + r * 0.38 - rad * (0.75 + hash(seed + k * 13) * 0.3);
+        ctx.moveTo(hx + rad, hy);
+        ctx.arc(hx, hy, rad, 0, Math.PI * 2);
+      }
+      ctx.rect(cx - r * 1.2, cy - r * 0.1, r * 2.4, r * 0.5);
+      ctx.fill();
+      // a rim of light along the tops
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.ellipse(cx - r * 0.2, cy - r * 0.5, r * 0.55, r * 0.22, -0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    };
+    // banks of cloud of every size, scattered unevenly, drawn back to front
+    const STEP = 62;
+    for (let gj = 0; gj * STEP < S + STEP; gj++) {
+      for (let gi = 0; gi * STEP < S + STEP; gi++) {
+        const n = gi * 31 + gj * 17 + 3;
+        if (hash(n + 400) < 0.14) continue;
+        const cx = gi * STEP + (hash(n) - 0.5) * 44 + (gj % 2) * 30;
+        const cy = gj * STEP + (hash(n + 100) - 0.5) * 34;
+        const x = (cx / S) * 2 * V - V;
+        const z = (cy / S) * 2 * V - V;
+        if (this.island.heightAt(x, z) < 1.5 || seen(x, z)) continue;
+        ctx.globalAlpha = 0.9 + hash(n + 200) * 0.1;
+        puff(cx, cy, 15 + hash(n + 300) * hash(n + 301) * 26, n);
+        ctx.globalAlpha = 1;
+      }
     }
-    ctx.drawImage(mist, 0, 0);
+    // every place: its name once discovered, a question mark on a dark badge until then
+    for (const r of this.island.regions) {
+      const [cx, cy] = at(r.x, r.z);
+      if (this.discovered.has(r.id)) label(r.name, cx, cy + 34, 17);
+      else {
+        ctx.fillStyle = '#24407e';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 19, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#fff';
+        ctx.stroke();
+        label('?', cx, cy + 8, 24);
+      }
+    }
     const dot = (x: number, z: number, r: number, fill: string, ring = '#fff'): void => {
       const [cx, cy] = at(x, z);
       ctx.beginPath();
@@ -1929,20 +2051,31 @@ export class Game {
       ctx.stroke();
     };
     for (const s of this.seeds.spots) if (s.found) dot(s.x, s.z, 3.5, '#eaff8a', '#7a9a2a');
-    ctx.font = '700 13px ui-rounded, system-ui, sans-serif';
-    ctx.textAlign = 'center';
     for (const npc of this.npcs) {
       if (!this.met.has(npc.who.id)) continue;
       const q = npc === this.companion ? npc.pos : npc.home;
       dot(q.x, q.z, 7, `#${npc.who.look.fur.toString(16).padStart(6, '0')}`);
       const [cx, cy] = at(q.x, q.z);
-      ctx.fillStyle = '#17406b';
-      ctx.strokeStyle = 'rgba(255,255,255,.9)';
-      ctx.lineWidth = 3;
-      ctx.strokeText(npc.who.name, cx, cy - 12);
-      ctx.fillText(npc.who.name, cx, cy - 12);
+      label(npc.who.name, cx, cy - 12, 12.5);
     }
-    dot(this.home.x, this.home.z, 6, '#fff', '#8a5a36');
+    {
+      // home: a little thatched house
+      const [hx, hy] = at(this.home.x, this.home.z);
+      ctx.fillStyle = '#c9975a';
+      ctx.fillRect(hx - 9, hy - 4, 18, 13);
+      ctx.fillStyle = '#f2cf66';
+      ctx.beginPath();
+      ctx.moveTo(hx - 14, hy - 3);
+      ctx.lineTo(hx, hy - 17);
+      ctx.lineTo(hx + 14, hy - 3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#6a3a16';
+      ctx.stroke();
+      ctx.strokeRect(hx - 9, hy - 4, 18, 13);
+      label('Home', hx, hy + 26, 13);
+    }
     dot(this.shop.x, this.shop.z, 5, '#ffd65a', '#6f4a8f');
     this.springs.spots.forEach((sp, i) => {
       if (this.springs.isAwake(i)) dot(sp.x, sp.z, 5, '#8fe9ff', '#ffffff');

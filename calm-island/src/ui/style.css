@@ -892,3 +892,11 @@ body:not(.is-touch) #btn-surf { display: none; }
 .c-tick { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 17px; font-weight: 600; color: transparent; background: #f1e2c4; box-shadow: inset 0 2px 3px rgba(120,80,20,.25); }
 .c-tick.on { color: #fff; background: radial-gradient(circle at 40% 30%, #c9f59a, #4fb944); box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px #3a9f3a; }
 .c-footer { margin-top: 10px; width: 100%; height: 56px; }
+
+/* the map: a bright painted board that fills the card */
+.map-card { width: min(760px, 100%); padding: 16px; }
+.map-card .log-head { margin-bottom: 8px; }
+.map-card .lead { font-size: 13px; margin: 0; }
+#map-canvas { max-height: 74vh; border-radius: 22px; background: #2f8fe6; box-shadow: inset 0 0 0 3px rgba(255,255,255,.6), 0 6px 14px rgba(30,40,90,.25); }
+
+#map-canvas { width: auto; max-width: 100%; align-self: center; background: #3493e8; }
