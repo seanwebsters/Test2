@@ -297,7 +297,7 @@ export class Game {
         this.paintFog();
         this.ui.seeds(0, this.seeds.spots.length);
         this.endPractice();
-        this.day.hour = 9;
+        this.day.hour = 15.4; // a fresh start arrives into the golden afternoon
         this.setCompanion(null);
         // a fresh start begins as the very first one did: down from the sky, with the introduction
         this.days = 0;

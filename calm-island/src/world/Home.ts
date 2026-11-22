@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { Island } from './islandMap';
 import type { Kit } from './Kit';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { glowDot } from './Trail';
 
 /** Where home stands, so the forest can leave a clearing around it. */
@@ -99,7 +100,39 @@ export class Home {
     const y = island.heightAt(this.x, this.z);
     this.group.position.set(this.x, y, this.z);
     this.group.rotation.y = -2.3; // the door looks back toward the garden
-    const L = (color: number, extra: THREE.MeshLambertMaterialParameters = {}): THREE.MeshLambertMaterial => new THREE.MeshLambertMaterial({ color, ...extra });
+    // Everything about the house is physically shaded: soft, matt, a little rough, never plastic.
+    const L = (color: number, extra: THREE.MeshStandardMaterialParameters = {}): THREE.MeshStandardMaterial => new THREE.MeshStandardMaterial({ color, roughness: 0.86, metalness: 0, ...extra });
+    /** A painted grain: long soft streaks, a few darker lines. `along` is which way the fibres run. */
+    const grain = (along: 'u' | 'v', streaks: number, contrast: number): THREE.CanvasTexture => {
+      const c = document.createElement('canvas');
+      c.width = c.height = 256;
+      const ctx = c.getContext('2d')!;
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, 256, 256);
+      let seedG = streaks * 7.3 + contrast * 91;
+      const r = (): number => {
+        const v = Math.sin(seedG++ * 127.1 + 311.7) * 43758.5453;
+        return v - Math.floor(v);
+      };
+      for (let i = 0; i < streaks; i++) {
+        const pos = r() * 256;
+        const w = 1 + r() * 7;
+        const dark = Math.round(255 - r() * contrast * 255);
+        ctx.fillStyle = `rgba(${dark},${Math.round(dark * 0.94)},${Math.round(dark * 0.86)},${0.25 + r() * 0.5})`;
+        if (along === 'u') ctx.fillRect(0, pos, 256, w);
+        else ctx.fillRect(pos, 0, w, 256);
+      }
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.anisotropy = 4;
+      return t;
+    };
+    const woodGrain = grain('u', 46, 0.34);
+    const strawGrain = grain('v', 70, 0.24);
+    /** Sawn, painted timber: grain you can see and feel. */
+    const wood = (color: number): THREE.MeshStandardMaterial => L(color, { map: woodGrain, bumpMap: woodGrain, bumpScale: 1.4, roughness: 0.8 });
+    const straw = (color: number): THREE.MeshStandardMaterial => L(color, { map: strawGrain, bumpMap: strawGrain, bumpScale: 2.2, roughness: 0.95 });
     const add = (m: THREE.Object3D, parent: THREE.Object3D = this.group): THREE.Object3D => {
       m.traverse((o) => {
         (o as THREE.Mesh).castShadow = true;
@@ -117,16 +150,16 @@ export class Home {
     };
     const bark = L(0x8a5a36);
     const barkDark = L(0x6f4528);
-    const plank = L(0xc79c64);
-    const plankDark = L(0x9a6f42);
-    const beam = L(0x7a5230);
-    const thatch = L(0xf0cc62);
-    const thatchDark = L(0xd7ac46);
+    const plank = wood(0xd0a268);
+    const plankDark = wood(0xa87848);
+    const beam = wood(0x8a5c36);
+    const thatch = straw(0xf2cf66);
+    const thatchDark = straw(0xd9ae48);
     const rope = L(0xc9a46a);
     const stone = new THREE.SphereGeometry(1, 12, 9);
 
     // ---- the stump: wide, flared and rooted
-    const stump = new THREE.CylinderGeometry(2.7, 3.3, 3.5, 20, 8, false).translate(0, 1.75, 0);
+    const stump = new THREE.CylinderGeometry(2.7, 3.3, 3.5, 48, 14, false).translate(0, 1.75, 0);
     {
       const p = stump.attributes.position;
       for (let i = 0; i < p.count; i++) {
@@ -134,12 +167,13 @@ export class Home {
         const py = p.getY(i);
         const pz = p.getZ(i);
         const a = Math.atan2(pz, px);
-        const flare = 1 + Math.max(0, 1.3 - py) * 0.42 * (0.6 + 0.4 * Math.sin(a * 5)) + 0.05 * Math.sin(a * 11 + py * 3);
+        // buttress roots flare out at the foot; deep furrows run up the trunk between them
+        const flare = 1 + Math.max(0, 1.3 - py) * 0.42 * (0.6 + 0.4 * Math.sin(a * 5)) + 0.05 * Math.sin(a * 11 + py * 3) + 0.035 * Math.sin(a * 23 + Math.sin(py * 2.0) * 1.5) * Math.min(1, py * 0.8 + 0.3);
         p.setXYZ(i, px * flare, py, pz * flare);
       }
       stump.computeVertexNormals();
     }
-    const stumpMat = kit?.barkDark ? new THREE.MeshLambertMaterial({ map: kit.bark, color: 0xe9d6bc, emissive: 0x241a10 }) : bark;
+    const stumpMat = kit?.barkDark ? new THREE.MeshStandardMaterial({ map: kit.bark, bumpMap: kit.bark, bumpScale: 3.5, color: 0xcdb9a2, roughness: 0.95 }) : bark;
     if (kit?.barkDark) {
       const uv = stump.attributes.uv;
       for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 5, uv.getY(i) * 1.6);
@@ -148,10 +182,40 @@ export class Home {
     for (let i = 0; i < 6; i++) {
       // roots running out into the grass
       const a = (i / 6) * Math.PI * 2 + 0.4;
-      const root = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 2.2, 4, 8), kit?.barkDark ? stumpMat : barkDark);
+      const root = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 2.2, 6, 14), kit?.barkDark ? stumpMat : barkDark);
       root.position.set(Math.cos(a) * 3.7, 0.2, Math.sin(a) * 3.7);
       root.rotation.set(0, -a, Math.PI / 2 - 0.3);
       add(root);
+    }
+
+    // moss banks up against the foot of the stump, with mushrooms and smooth stones among it
+    {
+      const mossA = L(0x55782e, { roughness: 1 });
+      const mossB = L(0x6a8a36, { roughness: 1 });
+      const round = new THREE.SphereGeometry(1, 18, 12);
+      const blob = (mat: THREE.Material, x: number, yy: number, z: number, sx: number, sy: number, sz: number): void => {
+        const m = new THREE.Mesh(round, mat);
+        m.position.set(x, yy, z);
+        m.scale.set(sx, sy, sz);
+        add(m);
+      };
+      for (let i = 0; i < 22; i++) {
+        const a = i * 0.97 + 0.3;
+        // low cushions pressed against the bark, never big enough to read as bushes
+        const r = 3.3 + (i % 4) * 0.16;
+        const sc = 0.2 + ((i * 7) % 5) * 0.055;
+        blob(i % 2 ? mossA : mossB, Math.cos(a) * r, 0.06 + (i % 3) * 0.2, Math.sin(a) * r, sc * 1.7, sc * 0.55, sc * 1.3);
+      }
+      for (const [x, z, sc] of [[2.6, 5.4, 0.55], [4.3, 4.6, 0.36], [-3.3, 5.0, 0.42]]) blob(L(0x9aa0aa, { roughness: 0.7 }), x, sc * 0.3, z, sc, sc * 0.62, sc * 0.85);
+      for (const [x, z, sc] of [[3.3, 5.0, 1], [3.6, 5.3, 0.7], [-2.6, 5.4, 0.85]]) {
+        const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * sc, 0.07 * sc, 0.26 * sc, 10), L(0xfff3e0));
+        stalk.position.set(x, 0.13 * sc, z);
+        add(stalk);
+        const cap = new THREE.Mesh(new THREE.SphereGeometry(0.17 * sc, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), L(0xe2483a, { roughness: 0.55 }));
+        cap.position.set(x, 0.24 * sc, z);
+        cap.scale.y = 0.8;
+        add(cap);
+      }
     }
 
     // ---- the deck, with posts and a rope rail
@@ -177,9 +241,10 @@ export class Home {
 
     // ---- shared batches: hundreds of planks, reeds and books drawn as a handful of meshes
     const batches = new Map<string, { geo: THREE.BufferGeometry; mat: THREE.Material; list: THREE.Matrix4[] }>();
-    const unitBox = new THREE.BoxGeometry(1, 1, 1);
-    const reed = new THREE.CylinderGeometry(0.5, 0.56, 1, 7);
-    const tuft = new THREE.ConeGeometry(0.5, 1, 5);
+    // every board and beam has softened edges; every reed is a round bundle with a rounded end
+    const unitBox = new RoundedBoxGeometry(1, 1, 1, 3, 0.1);
+    const reed = new THREE.CapsuleGeometry(0.5, 1, 4, 12).scale(1, 0.5, 1);
+    const tuft = new THREE.ConeGeometry(0.5, 1, 8);
     const pe = new THREE.Euler();
     const pq = new THREE.Quaternion();
     const piece = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, yy: number, z: number, sx = 1, sy = 1, sz = 1, rx = 0, ry = 0, rz = 0): void => {
@@ -225,7 +290,7 @@ export class Home {
     const RIDGE = RY + RISE;
     // Walls of broad boards laid one above another, each a slightly different honey brown,
     // none quite straight. `holes` are doorways and windows: along the wall from..to, and from..to in height.
-    const honey = [L(0xcf9f62), L(0xdcae70), L(0xbf8d52), L(0xc8975a), L(0xb5834a)];
+    const honey = [wood(0xd2a264), wood(0xdfb174), wood(0xc39054), wood(0xcb9a5c), wood(0xb8864c)];
     const boards = (alongX: boolean, fixed: number, half: number, holes: [number, number, number, number][]): void => {
       const BH = 0.255;
       for (let k = 0; k * BH < HH; k++) {
@@ -251,7 +316,7 @@ export class Home {
     boards(false, -HW, HD, []);
     boards(false, HW, HD, [[WZ0, WZ1, 0.82, 1.62]]);
     // log posts at the corners, and a beam tying the walls together
-    const frameWood = L(0x9a6838);
+    const frameWood = wood(0x9c6a3a);
     for (const sx of [-HW, HW]) for (const sz of [-HD, HD]) piece(unitBox, frameWood, sx, HY + (HH + 0.16) / 2, sz, 0.3, HH + 0.16, 0.3, 0, 0, (rnd(seed++) - 0.5) * 0.02);
     for (const sz of [-HD, HD]) piece(unitBox, beam, 0, HY + HH + 0.06, sz, HW * 2 + 0.3, 0.16, 0.2);
     for (const sx of [-HW, HW]) piece(unitBox, beam, sx, HY + HH + 0.06, 0, 0.2, 0.16, HD * 2 + 0.3);
@@ -291,8 +356,8 @@ export class Home {
     }
     // Three deep tiers of thatch, each a thick shaggy layer lying over the one below,
     // under a heavy ridge beam that sweeps up at both ends.
-    const thatchLight = L(0xf7dc7c);
-    const straw = [thatch, thatchLight, thatch, thatchDark];
+    const thatchLight = straw(0xf8de80);
+    const strawMix = [thatch, thatchLight, thatch, thatchDark];
     const TIERS = 3;
     for (const side of [-1, 1]) {
       for (let tier = 0; tier < TIERS; tier++) {
@@ -305,7 +370,7 @@ export class Home {
           const x = -HW - 0.72 + ((j + 0.5) / cols) * (HW * 2 + 1.44) + (r1 - 0.5) * 0.05;
           const yy = RIDGE - mid * (RISE + DROP) + Math.cos(SLOPE) * lift;
           const zz = side * (mid * RUN + Math.sin(SLOPE) * lift);
-          piece(reed, straw[(j + tier) % 4], x, yy, zz, 0.5 + r2 * 0.08, (SLEN / TIERS) * (1.2 + r2 * 0.12), 0.44, side * (Math.PI / 2 + SLOPE - 0.05), 0, (r1 - 0.5) * 0.07);
+          piece(reed, strawMix[(j + tier) % 4], x, yy, zz, 0.5 + r2 * 0.08, (SLEN / TIERS) * (1.2 + r2 * 0.12), 0.44, side * (Math.PI / 2 + SLOPE - 0.05), 0, (r1 - 0.5) * 0.07);
         }
         // the ragged lower edge of each tier
         const edge = (tier + 1) / TIERS + 0.07;
@@ -317,7 +382,7 @@ export class Home {
       // barge boards finishing the gable ends
       for (const sx of [-HW - 0.62, HW + 0.62]) piece(unitBox, frameWood, sx, RIDGE - (RISE + DROP) / 2 + 0.05, side * (RUN / 2), 0.12, 0.24, SLEN + 0.2, side * SLOPE, 0, 0);
     }
-    const ridgeWood = L(0xa9703c);
+    const ridgeWood = wood(0xa9703c);
     piece(unitBox, ridgeWood, 0, RIDGE + 0.46, 0, HW * 2 + 1.5, 0.3, 0.46);
     for (const sx of [-1, 1]) piece(unitBox, ridgeWood, sx * (HW + 1.18), RIDGE + 0.62, 0, 1.15, 0.28, 0.42, 0, 0, sx * 0.32);
     // a couple of boards nailed over a thin patch, as on any roof that has seen a few storms
