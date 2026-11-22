@@ -69,6 +69,7 @@ const RZ = 0.46;
 /** Where a one-piece sculpt bends, in its own units: arms start beyond armX and between armBottom and armTop; legs hang below the hip. */
 export interface SculptRig { armX: number; armTop: number; armBottom: number; shoulder: [number, number]; hip: [number, number] }
 export const BLUE_RIG: SculptRig = { armX: 0.53, armTop: -0.29, armBottom: -0.72, shoulder: [0.64, -0.3], hip: [0.3, -0.68] };
+export const ORANGE_RIG: SculptRig = { armX: 0.53, armTop: -0.29, armBottom: -0.72, shoulder: [0.64, -0.3], hip: [0.3, -0.78] };
 export const PINK_RIG: SculptRig = { armX: 0.5, armTop: -0.22, armBottom: -0.74, shoulder: [0.6, -0.24], hip: [0.33, -0.66] };
 
 export class CalmlingModel {

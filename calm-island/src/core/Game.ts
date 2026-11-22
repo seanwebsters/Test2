@@ -3,7 +3,7 @@ import { Npc } from '../npc/Npc';
 import { RESIDENTS } from '../npc/roster';
 import { CameraRig } from '../player/CameraRig';
 import { Player } from '../player/Player';
-import { PINK_RIG } from '../player/CalmlingModel';
+import { ORANGE_RIG, PINK_RIG } from '../player/CalmlingModel';
 import { UI, type LogEntry } from '../ui/UI';
 import { Ambient } from '../world/Ambient';
 import { DayCycle } from '../world/DayCycle';
@@ -493,12 +493,17 @@ export class Game {
       if (npc.prop) this.scene.add(npc.prop);
     });
     if (!this.opts.plainPlants) {
-      try {
-        const pink = await new GLTFLoader().loadAsync(`${base}models/calmling/pink.glb`);
-        this.npcs.find((n) => n.who.id === 'dadirri')?.model.useSculpt(pink.scene, PINK_RIG);
-      } catch (err) {
-        console.info('Sculpted Dadirri unavailable, using the built-in one:', err);
-      }
+      // friends who have a sculpted model; anyone whose file cannot be loaded keeps the built-in one
+      await Promise.all(
+        ([['dadirri', 'pink', PINK_RIG], ['apricus', 'orange', ORANGE_RIG]] as const).map(async ([id, file, rig]) => {
+          try {
+            const glb = await new GLTFLoader().loadAsync(`${base}models/calmling/${file}.glb`);
+            this.npcs.find((n) => n.who.id === id)?.model.useSculpt(glb.scene, rig);
+          } catch (err) {
+            console.info(`Sculpted ${id} unavailable, using the built-in one:`, err);
+          }
+        }),
+      );
     }
     this.pickDaily();
     // one friend lives close by, down the earth path by the river: the first you are sent to find
