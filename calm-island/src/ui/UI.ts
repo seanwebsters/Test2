@@ -65,6 +65,7 @@ export class UI {
   private hintsTimer = 0;
   /** set on phones and tablets: shows the on-screen controls */
   touch = false;
+  private tipTimer = 0;
   private fromTitle = false;
 
   constructor(private settings: Settings, private handlers: UIHandlers) {
@@ -184,6 +185,22 @@ export class UI {
 
   progress(fraction: number, text: string): void {
     $('bar-fill').style.width = `${Math.round(fraction * 100)}%`;
+    $('ld-runner').style.left = `${Math.round(fraction * 100)}%`;
+    if (!this.tipTimer) {
+      // a small thought to read while the island wakes, changed every few seconds
+      const tips = ['Sit beside a friend and it counts as time together.', 'Three slow breaths beside a ring of stones wakes a spring.', 'Every Calmling loves one fruit. The log says which.', 'Hold jump while falling to glide under a leaf.', 'Sampoyoshi trades rugs and lanterns for fruit.', 'Light the fire in the evening and friends come by.', 'There is no hurry here. There never is.'];
+      let i = Math.floor(Math.random() * tips.length);
+      const show = (): void => {
+        const el = $('loading-tip');
+        el.classList.remove('in');
+        window.setTimeout(() => {
+          el.textContent = tips[i++ % tips.length];
+          el.classList.add('in');
+        }, 350);
+      };
+      show();
+      this.tipTimer = window.setInterval(show, 3600);
+    }
     $('loading-text').textContent = text;
   }
 
@@ -195,7 +212,10 @@ export class UI {
     const wait = Math.max(0, this.introMinimum - performance.now());
     window.setTimeout(() => {
       intro.classList.add('out');
-      window.setTimeout(() => intro.classList.add('hidden'), 1200);
+      window.setTimeout(() => {
+        intro.classList.add('hidden');
+        clearInterval(this.tipTimer);
+      }, 1200);
     }, wait);
     $('start').classList.remove('hidden');
     $('play').textContent = returning ? 'Continue wandering' : 'Begin wandering';

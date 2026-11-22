@@ -627,3 +627,40 @@ body #touch #btn-practise { border-radius: 16px !important; color: #fff !importa
 /* long labels fit the green button on a phone */
 body #touch #btn-hello { font-size: 17px; max-width: 94vw; padding: 0 18px 3px !important; }
 body #touch #btn-practise { font-size: 15px; max-width: 94vw; }
+
+/* ---- loading: a little scene to watch while the island wakes ---- */
+.intro { background: linear-gradient(180deg, #4aa8f0 0%, #8fd0fb 46%, #d6f0ff 72%, #fff3d6 100%); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.intro-drift { display: none; }
+.ld-sun { position: absolute; right: 12%; top: 10%; width: 150px; height: 150px; border-radius: 50%; background: radial-gradient(circle, #fff8d0 0%, #ffe07a 45%, rgba(255,224,122,0) 70%); animation: ld-pulse 5s ease-in-out infinite; }
+.ld-cloud { position: absolute; width: 190px; height: 58px; border-radius: 99px; background: #fff; opacity: .92; filter: drop-shadow(0 8px 0 rgba(120,170,220,.22)); animation: ld-drift linear infinite; }
+.ld-cloud::before, .ld-cloud::after { content: ''; position: absolute; background: #fff; border-radius: 50%; }
+.ld-cloud::before { width: 84px; height: 84px; left: 28px; top: -40px; } .ld-cloud::after { width: 64px; height: 64px; left: 92px; top: -26px; }
+.ld-cloud.c1 { top: 14%; animation-duration: 70s; animation-delay: -20s; } .ld-cloud.c2 { top: 30%; transform: scale(.7); animation-duration: 95s; animation-delay: -60s; opacity: .8; } .ld-cloud.c3 { top: 7%; transform: scale(.55); animation-duration: 120s; animation-delay: -95s; opacity: .7; }
+.ld-hill { position: absolute; left: -20%; width: 140%; border-radius: 50% 50% 0 0 / 100% 100% 0 0; }
+.ld-hill.h1 { bottom: -6%; height: 34%; background: linear-gradient(#8fd66a, #5fb84a); left: -45%; }
+.ld-hill.h2 { bottom: -12%; height: 34%; background: linear-gradient(#a6e37a, #6cc452); left: 10%; }
+.ld-tree { position: absolute; bottom: 17%; width: 14px; height: 60px; background: #8a5a36; border-radius: 6px; }
+.ld-tree::before { content: ''; position: absolute; left: -38px; top: -66px; width: 90px; height: 84px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--leaf-hi), var(--leaf)); box-shadow: inset -8px -10px 0 rgba(0,0,0,.08); animation: ld-sway 4s ease-in-out infinite; transform-origin: 50% 100%; }
+.ld-tree.t1 { left: 9%; --leaf: #e86a8a; --leaf-hi: #ffa3bd; } .ld-tree.t2 { left: 19%; bottom: 20%; transform: scale(.75); --leaf: #4fae4a; --leaf-hi: #86d66a; } .ld-tree.t3 { right: 13%; bottom: 15%; transform: scale(1.1); --leaf: #c0304a; --leaf-hi: #e8607a; }
+.intro-inner { z-index: 2; }
+.intro-logo { filter: drop-shadow(0 5px 0 var(--navy)) drop-shadow(0 12px 20px rgba(20,50,110,.35)); }
+.intro-title { color: #fff; font-family: var(--ui); font-weight: 600; letter-spacing: .3em; font-size: clamp(16px, 2.4vw, 24px); -webkit-text-stroke: 5px var(--navy); paint-order: stroke fill; text-shadow: 0 3px 0 var(--navy); }
+.ld-track { position: relative; width: min(420px, 78%); margin: 58px 0 14px; opacity: 0; animation: rise .8s ease 1.2s forwards; }
+.intro .ld-track .bar { width: 100%; height: 22px; margin: 0; opacity: 1; animation: none; border-radius: 99px; background: #fff7e6; box-shadow: inset 0 3px 0 rgba(185,138,82,.35), 0 4px 0 var(--pan-edge), 0 8px 12px rgba(0,0,0,.2); padding: 4px; overflow: hidden; }
+.intro #bar-fill { height: 100%; min-width: 14px; border-radius: 99px; background: linear-gradient(#8fe35a, #4fbf3a); box-shadow: inset 0 3px 0 rgba(255,255,255,.5); }
+.ld-runner { position: absolute; top: -40px; left: 4%; margin-left: -22px; transition: left .35s ease; }
+.ld-calm { position: relative; width: 44px; height: 40px; border-radius: 48% 48% 46% 46%; background: radial-gradient(circle at 40% 30%, #8fd0ff, #3f9de4 60%, #2f86d4); box-shadow: 0 0 0 3px #bfe6ff inset, 0 3px 0 #1f6fb8; animation: ld-hop .55s ease-in-out infinite; }
+.ld-calm::before { content: ''; position: absolute; inset: -7px -6px auto -6px; height: 22px; background: radial-gradient(circle at 12% 100%, #bfe6ff 9px, transparent 10px), radial-gradient(circle at 32% 60%, #bfe6ff 9px, transparent 10px), radial-gradient(circle at 52% 40%, #bfe6ff 10px, transparent 11px), radial-gradient(circle at 72% 60%, #bfe6ff 9px, transparent 10px), radial-gradient(circle at 90% 100%, #bfe6ff 9px, transparent 10px); }
+.ld-calm::after { content: ''; position: absolute; left: 16px; bottom: 8px; width: 12px; height: 5px; border-bottom: 2.5px solid #1f5fa8; border-radius: 0 0 12px 12px; }
+.ld-calm i { position: absolute; top: 9px; width: 17px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px rgba(31,95,168,.25); }
+.ld-calm i:first-child { left: 5px; } .ld-calm i:last-child { right: 5px; }
+.ld-calm i::after { content: ''; position: absolute; left: 6px; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: #16305c; box-shadow: inset 2px -2px 0 #3f8fe0; }
+.intro #loading-text { color: #fff; font-weight: 600; font-size: 17px; opacity: 0; animation: rise .8s ease 1.4s forwards; -webkit-text-stroke: 4px var(--navy); paint-order: stroke fill; text-shadow: 0 2px 0 var(--navy); }
+#loading-tip { margin: 16px 0 0; padding: 8px 18px; min-height: 36px; max-width: min(520px, 86vw); border-radius: 16px; text-align: center; color: var(--ink); font-weight: 500; font-size: 15px; background: var(--pan); box-shadow: 0 3px 0 var(--pan-edge), 0 6px 10px rgba(0,0,0,.18); opacity: 0; transform: translateY(6px); transition: opacity .35s ease, transform .35s ease; }
+#loading-tip.in { opacity: 1; transform: none; }
+@keyframes ld-hop { 0%, 100% { transform: translateY(0) scale(1.06, .94); } 50% { transform: translateY(-12px) scale(.96, 1.05); } }
+@keyframes ld-drift { from { left: -240px; } to { left: 104%; } }
+@keyframes ld-sway { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+@keyframes ld-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+@media (prefers-reduced-motion: reduce) { .ld-cloud, .ld-calm, .ld-tree::before, .ld-sun { animation: none; } .ld-cloud.c1 { left: 12%; } .ld-cloud.c2 { left: 60%; } .ld-cloud.c3 { left: 38%; } .ld-track, .intro #loading-text { opacity: 1; animation: none; } }
+@media (max-width: 600px) { .ld-tree.t2 { display: none; } .ld-sun { width: 110px; height: 110px; right: 6%; } }
