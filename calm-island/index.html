@@ -80,6 +80,7 @@
         <button id="j-today" class="rim jew" aria-label="Today"><span class="in gold"><svg width="40" height="40" aria-hidden="true"><use href="#star"/></svg></span><span class="dot hidden"></span><span class="lbl">Today</span></button>
         <button id="j-friends" class="rim jew" aria-label="Friends"><span class="in rose"><img src="./brand/friend-head.webp" alt="" /></span><span class="dot hidden"></span><span class="lbl">Friends</span></button>
         <button id="j-map" class="rim jew" aria-label="Map"><span class="in leaf"><svg width="36" height="36" aria-hidden="true"><use href="#ico-map"/></svg></span><span class="lbl">Map</span></button>
+        <button id="j-merge" class="rim jew" aria-label="Merge 3"><span class="in plum"><img id="j-merge-img" alt="" /></span><span class="dot hidden"></span><span class="lbl">Merge</span></button>
         <button id="j-journal" class="rim jew" aria-label="Journal"><span class="in sky"><svg width="36" height="36" aria-hidden="true"><use href="#book"/></svg></span><span class="lbl">Journal</span></button>
       </div>
       <div id="fps" class="hidden"></div>
@@ -221,6 +222,29 @@
           <button id="map-close" class="primary">Back to the island</button>
         </div>
         <canvas id="map-canvas" width="720" height="720"></canvas>
+      </div>
+    </div>
+
+    <div id="merge" class="hidden">
+      <div class="mg-panel">
+        <img class="mg-deco l" alt="" /><img class="mg-deco r" alt="" />
+        <button id="mg-close" aria-label="Back to the island">✕</button>
+        <h2>Merge 3</h2>
+        <p id="mg-lead">Combine matching items to create something new!</p>
+        <div id="mg-grid"></div>
+        <div id="mg-preview" class="idle"><div id="mg-three"></div><span class="mg-arrow">➜</span><div id="mg-result"></div></div>
+        <button id="mg-go" disabled>Merge!</button>
+        <button id="mg-seek" class="hidden"></button>
+        <p id="mg-bag"></p>
+        <div id="mg-chains"></div>
+        <div id="mg-fx"></div>
+      </div>
+      <div id="mg-reward" class="hidden">
+        <div class="mg-rays"></div>
+        <img id="mg-reward-img" alt="" />
+        <h2 id="mg-reward-title"></h2>
+        <p id="mg-reward-text"></p>
+        <button id="mg-reward-go">Continue</button>
       </div>
     </div>
 

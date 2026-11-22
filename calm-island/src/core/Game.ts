@@ -19,6 +19,11 @@ import { Backdrop } from '../world/Backdrop';
 import { ArrivalClouds } from '../world/Arrival';
 import { SHOP_ITEMS, Shop } from '../world/Shop';
 import { WildFruit } from '../world/WildFruit';
+import { Finds } from '../world/Finds';
+import { Campsite } from '../world/Campsite';
+import { MergeBoard } from '../merge/board';
+import { MergeScreen } from '../merge/MergeScreen';
+import { COSY, renderIcons } from '../merge/items';
 import { SEASON, currentSeason, setSeason } from '../world/season';
 import { Cairns, Kite, Viewpoints } from '../world/Places';
 import { CELL, GRID, HALF, WORLD_SIZE } from '../world/islandMap';
@@ -163,6 +168,12 @@ export class Game {
   private toldDoing = new Map<string, string>();
   private shop!: Shop;
   private wild!: WildFruit;
+  private finds!: Finds;
+  private camp!: Campsite;
+  private board = new MergeBoard();
+  private mergeUI!: MergeScreen;
+  /** seconds into the campsite's arrival, or -1 */
+  private campShow = -1;
   /** the springs in the order the chapters visit them: nearest home first, then on round the island */
   private chapters: number[] = [];
   private owned = new Set<string>();
@@ -315,6 +326,9 @@ export class Game {
         this.introduced.clear();
         this.owned.clear();
         this.wild.load([]);
+        this.finds.load([]);
+        this.board.load(undefined);
+        this.mergeBadge();
         this.decor = { rug: '', quilt: '', lamp: '' };
         this.applyDecor();
         this.intents = { key: '', ids: [], done: [] };
@@ -341,6 +355,7 @@ export class Game {
     window.addEventListener('resize', () => this.resize());
     window.addEventListener('keydown', (e) => {
       if (e.code !== 'Escape' || !this.ready) return;
+      if (this.mergeUI.isOpen) return void this.closeMerge();
       if (this.playing) this.pause();
       else if (this.ui.menuOpen || this.ui.logOpen) this.play();
     });
@@ -433,6 +448,39 @@ export class Game {
       ...this.springs.spots.map((sp) => ({ x: sp.x, z: sp.z, r: 6 })),
     ]);
     this.scene.add(this.wild.group);
+    {
+      const taken = [
+        { x: 0, z: 0, r: 16 },
+        { x: this.home.x, z: this.home.z, r: 13 },
+        { x: this.shop.x, z: this.shop.z, r: 8 },
+        ...this.springs.spots.map((sp) => ({ x: sp.x, z: sp.z, r: 6 })),
+      ];
+      this.camp = new Campsite(this.island, this.vegetation.colliders, this.home, taken);
+      this.finds = new Finds(this.island, this.vegetation.colliders, [...taken, { x: this.camp.x, z: this.camp.z - 2, r: 10 }], this.home);
+      this.scene.add(this.camp.group, this.finds.group);
+      let icons: string[] = [];
+      try {
+        icons = renderIcons();
+      } catch (err) {
+        console.info('Item pictures could not be drawn:', err);
+      }
+      this.mergeUI = new MergeScreen(this.board, icons, {
+        onClose: () => this.closeMerge(),
+        onChange: () => this.save(),
+        onSound: (kind) => (kind === 'win' ? this.ambience.chime() : this.ambience.plip(kind === 'merge' ? 1 : 0.35)),
+        onReward: (chain) => {
+          if (chain === COSY) this.revealCamp();
+        },
+        onSeek: (chain) => {
+          const at = this.finds.nearestOf(chain, this.player.pos, Date.now());
+          if (at) this.wayTarget = { x: at.x, z: at.z };
+          this.nextCheck = 0;
+          this.closeMerge();
+        },
+      });
+      (document.getElementById('j-merge-img') as HTMLImageElement).src = icons[1] ?? '';
+      document.getElementById('j-merge')!.addEventListener('click', () => this.openMerge());
+    }
     {
       // each chapter leads on to the nearest spring not yet visited
       const left = this.springs.spots.map((_, i) => i);
@@ -560,6 +608,10 @@ export class Game {
       this.springs.load(save.springs);
       this.tut = save.tut ?? 99;
       this.wild.load(save.wild);
+      this.finds.load(save.finds);
+      this.board.load(save.merge);
+      if (save.camp || this.board.done[COSY]) this.camp.unlock(false);
+      this.mergeBadge();
       for (const id of save.owned ?? []) this.owned.add(id);
       if (save.decor) this.decor = { rug: save.decor.rug || '', quilt: save.decor.quilt || '', lamp: save.decor.lamp || '' };
       this.days = save.days ?? 0;
@@ -705,6 +757,21 @@ export class Game {
         this.rig.yaw = -2.19;
         this.rig.pitch = Math.min(1.12, Math.max(0.3, Math.atan2(up, 62)));
         this.rig.dist = 12;
+      }
+      if (this.campShow >= 0) {
+        // the campsite arriving: a slow turn around it, the Calmling in front
+        this.campShow += dt;
+        const t = this.campShow;
+        this.rig.yaw = Math.sin(t * 0.42) * 0.55;
+        this.rig.pitch = 0.2 + Math.min(1, t / 6) * 0.06;
+        this.rig.dist = Math.max(9.2, 14.5 - t * 0.85);
+        this.player.yaw = this.rig.yaw;
+        if (t > 7.2) {
+          this.campShow = -1;
+          this.input.enabled = true;
+          this.rig.dist = 7.5;
+          this.ui.toast('A new place', 'Cosy Campsite', 'It is yours now. Sit by the fire whenever you like');
+        }
       }
       if (this.inside) {
         // indoors the camera sits in one corner of the room
@@ -913,6 +980,40 @@ export class Game {
     }
     if (!best && !this.practice && !this.breathing.active && !this.fishing.active && !this.player.sitting && this.player.grounded) {
       // E always does whatever fits where you stand: pick a wild bush, or at the water's edge skim (E) or fish (Q)
+      const find = this.finds.near(p, Date.now());
+      if (find >= 0) {
+        this.nearby = null;
+        this.homePrompt = true;
+        this.ui.prompt(`Collect ${this.finds.name(find)}`);
+        this.ui.prompt2(null);
+        if (this.input.interactPressed()) {
+          const first = this.board.seen.size === 0;
+          const cell = this.board.add(this.finds.take(find, Date.now()));
+          this.ambience.plip(0.85);
+          try {
+            navigator.vibrate?.(12);
+          } catch {
+            /* not supported */
+          }
+          this.mergeBadge(true);
+          if (first) this.ui.toast('', 'Found something!', 'Collect three of a kind, then tap the purple Merge button');
+          else if (cell < 0) this.ui.toast('', 'Your board is full', 'Merge some sets to make room');
+          this.save();
+        }
+        return;
+      }
+      if (this.camp.near(p)) {
+        this.nearby = null;
+        this.homePrompt = true;
+        this.ui.prompt('Sit by the fire');
+        this.ui.prompt2(null);
+        if (this.input.interactPressed() && this.player.sit()) {
+          this.player.yaw = Math.atan2(this.camp.x - p.x, this.camp.z - p.z);
+          this.ambience.crackle(0.5);
+          this.flags.add('campfire');
+        }
+        return;
+      }
       const bush = this.wild.near(p, Date.now());
       if (bush >= 0) {
         this.nearby = null;
@@ -1188,6 +1289,51 @@ export class Game {
     this.stopBreathing();
     this.ui.prompt(null);
     this.ui.prompt2(null);
+  }
+
+  /** The Merge 3 board, over the island exactly where you left it. */
+  openMerge(): void {
+    if (!this.ready || !this.playing || this.campShow >= 0 || this.player.arriving) return;
+    this.openCard();
+    this.board.fresh = 0;
+    this.mergeBadge();
+    this.mergeUI.open();
+  }
+
+  private closeMerge(): void {
+    if (!this.mergeUI.isOpen) return;
+    this.mergeUI.close();
+    this.save();
+    this.play();
+  }
+
+  /** The little number on the Merge button: things collected since the board was last open. */
+  private mergeBadge(bump = false): void {
+    const btn = document.getElementById('j-merge');
+    const dot = btn?.querySelector('.dot');
+    if (!btn || !dot) return;
+    dot.textContent = String(this.board.fresh);
+    dot.classList.toggle('hidden', this.board.fresh <= 0);
+    if (bump) btn.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.28)' }, { transform: 'scale(1)' }], { duration: 380, easing: 'cubic-bezier(.2,.9,.3,1.2)' });
+  }
+
+  /** The Cosy collection is complete: the campsite rises out of the meadow while the camera circles it. */
+  private revealCamp(): void {
+    this.mergeUI.close();
+    if (this.inside) this.leaveHome();
+    this.camp.unlock(true);
+    this.player.teleport(this.camp.x + 0.4, this.camp.z + 4.6, 0);
+    this.player.sitting = false;
+    this.rig.yaw = 0;
+    this.rig.pitch = 0.2;
+    this.rig.dist = 14.5;
+    this.rig.snap(this.player);
+    this.play();
+    this.input.enabled = false;
+    this.campShow = 0;
+    this.wayTarget = null;
+    this.ambience.chime();
+    this.save();
   }
 
   /** Sampoyoshi's stall: this week's goods, paid for in fruit. */
@@ -2137,6 +2283,7 @@ export class Game {
       ctx.strokeRect(hx - 9, hy - 4, 18, 13);
     }
     dot(this.shop.x, this.shop.z, 5, '#ffd65a', '#6f4a8f');
+    if (this.camp.unlocked) dot(this.camp.x, this.camp.z, 6, '#ff9d4a', '#fff3c4');
     this.springs.spots.forEach((sp, i) => {
       if (this.springs.isAwake(i)) dot(sp.x, sp.z, 5, '#8fe9ff', '#ffffff');
     });
@@ -2511,6 +2658,8 @@ export class Game {
     this.arrivalClouds.update(dt, falling, this.player.pos, this.island.heightAt(this.player.pos.x, this.player.pos.z), globalUniforms.uDayLight.value);
     this.ui.arriving(falling);
     this.wild.update(globalUniforms.uTime.value, this.day.night, Date.now(), this.camera.position);
+    this.finds.update(globalUniforms.uTime.value, Date.now(), this.camera.position, this.player.pos);
+    this.camp.update(dt, globalUniforms.uTime.value);
     this.springs.update(globalUniforms.uTime.value, this.day.night);
     // the music hushes for sleep, and beside a lit fire
     const hush = this.sleeping || (this.home.lit && !!this.player && Math.hypot(this.home.fireSpot.x - p.x, this.home.fireSpot.z - p.z) < 14);
@@ -2590,6 +2739,9 @@ export class Game {
       gifted: [...this.gifted],
       springs: this.springs.serialize(),
       wild: this.wild.serialize(),
+      finds: this.finds.serialize(),
+      merge: this.board.serialize(),
+      camp: this.camp.unlocked,
       owned: [...this.owned],
       decor: this.decor,
       tut: this.tut,
