@@ -678,3 +678,9 @@ body #touch #btn-practise { font-size: 15px; max-width: 94vw; }
 @keyframes ld-logo { to { opacity: 1; transform: translateX(-50%) scale(1); } }
 @media (prefers-reduced-motion: reduce) { .ld-art { animation: none; } .intro .intro-logo { animation: none; opacity: 1; transform: translateX(-50%); } }
 @media (orientation: portrait) { .ld-art { background-position: 62% center; } }
+/* no little Calmling on the loading bar; on phones the logo sits lower, clear of the notch and browser bar */
+.ld-runner { display: none; }
+@media (orientation: portrait) {
+  .intro .intro-logo { top: calc(max(26px, env(safe-area-inset-top)) + 9vh); width: min(300px, 66vw); }
+  .intro .intro-title { top: calc(max(26px, env(safe-area-inset-top)) + 9vh + min(118px, 24vw)); }
+}
