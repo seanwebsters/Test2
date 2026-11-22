@@ -67,9 +67,16 @@ const RZ = 0.46;
  * Feet rest on y = 0 and the character looks down +z.
  */
 /** Where a one-piece sculpt bends, in its own units: arms start beyond armX and between armBottom and armTop; legs hang below the hip. */
-export interface SculptRig { armX: number; armTop: number; armBottom: number; shoulder: [number, number]; hip: [number, number] }
+export interface SculptRig {
+  armX: number; armTop: number; armBottom: number; shoulder: [number, number]; hip: [number, number];
+  /** how far forward the shoulders and hips sit, for hands and feet that poke out of the front of the fur */
+  z?: [number, number];
+  /** the file carries its own hand-and-foot weights (attribute _rigw), so long fur is left alone */
+  baked?: boolean;
+}
 export const BLUE_RIG: SculptRig = { armX: 0.53, armTop: -0.29, armBottom: -0.72, shoulder: [0.64, -0.3], hip: [0.3, -0.68] };
 export const ORANGE_RIG: SculptRig = { armX: 0.53, armTop: -0.29, armBottom: -0.72, shoulder: [0.64, -0.3], hip: [0.3, -0.78] };
+export const YETI_RIG: SculptRig = { armX: 0.34, armTop: -0.28, armBottom: -0.7, shoulder: [0.52, -0.4], hip: [0.25, -0.72], z: [0.42, 0.25], baked: true };
 export const PINK_RIG: SculptRig = { armX: 0.5, armTop: -0.22, armBottom: -0.74, shoulder: [0.6, -0.24], hip: [0.33, -0.66] };
 
 export class CalmlingModel {
@@ -398,6 +405,7 @@ export class CalmlingModel {
       const mesh = skin as THREE.Mesh;
       const S = mesh.scale.x.toFixed(4);
       const f = (n: number): string => n.toFixed(3);
+      const limb = r.baked && mesh.geometry.getAttribute('_rigw') ? ' * _rigw' : '';
       (mesh.material as THREE.Material).onBeforeCompile = (sh) => {
         Object.assign(sh.uniforms, u);
         sh.vertexShader = sh.vertexShader
@@ -405,6 +413,7 @@ export class CalmlingModel {
             '#include <common>',
             /* glsl */ `#include <common>
             uniform float uArmL, uArmR, uLiftL, uLiftR, uLegL, uLegR;
+            ${limb ? 'attribute float _rigw;' : ''}
             vec3 rigX(vec3 p, vec3 o, float a) { p -= o; float c = cos(a), s = sin(a); return vec3(p.x, p.y * c - p.z * s, p.y * s + p.z * c) + o; }
             vec3 rigZ(vec3 p, vec3 o, float a) { p -= o; float c = cos(a), s = sin(a); return vec3(p.x * c - p.y * s, p.x * s + p.y * c, p.z) + o; }`,
           )
@@ -414,12 +423,12 @@ export class CalmlingModel {
             {
               vec3 p = transformed * ${S};
               float side = sign(p.x);
-              float wArm = smoothstep(${f(r.armX)}, ${f(r.armX + 0.08)}, abs(p.x)) * (1.0 - smoothstep(${f(r.armTop - 0.08)}, ${f(r.armTop)}, p.y)) * smoothstep(${f(r.armBottom - 0.12)}, ${f(r.armBottom)}, p.y);
-              vec3 shoulder = vec3(side * ${f(r.shoulder[0])}, ${f(r.shoulder[1])}, 0.0);
+              float wArm = smoothstep(${f(r.armX)}, ${f(r.armX + 0.08)}, abs(p.x)) * (1.0 - smoothstep(${f(r.armTop - 0.08)}, ${f(r.armTop)}, p.y)) * smoothstep(${f(r.armBottom - 0.12)}, ${f(r.armBottom)}, p.y)${limb};
+              vec3 shoulder = vec3(side * ${f(r.shoulder[0])}, ${f(r.shoulder[1])}, ${f(r.z?.[0] ?? 0)});
               vec3 a = rigZ(rigX(p, shoulder, side < 0.0 ? uArmL : uArmR), shoulder, side * (side < 0.0 ? uLiftL : uLiftR));
               p = mix(p, a, wArm);
-              float wLeg = (1.0 - smoothstep(${f(r.hip[1] - 0.06)}, ${f(r.hip[1])}, p.y)) * (1.0 - wArm);
-              p = mix(p, rigX(p, vec3(side * ${f(r.hip[0])}, ${f(r.hip[1])}, 0.0), side < 0.0 ? uLegL : uLegR), wLeg);
+              float wLeg = (1.0 - smoothstep(${f(r.hip[1] - 0.06)}, ${f(r.hip[1])}, p.y)) * (1.0 - wArm)${limb};
+              p = mix(p, rigX(p, vec3(side * ${f(r.hip[0])}, ${f(r.hip[1])}, ${f(r.z?.[1] ?? 0)}), side < 0.0 ? uLegL : uLegR), wLeg);
               transformed = p / ${S};
             }`,
           );
