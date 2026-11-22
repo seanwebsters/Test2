@@ -623,7 +623,7 @@ export class Game {
       this.post.enabled = s.quality !== 'low';
       // contact shade and sun shafts come in with the better presets
       this.post.ao = s.quality === 'ultra' ? 1 : s.quality === 'high' ? 0.85 : 0;
-      this.post.rays = s.quality === 'ultra' ? 0.5 : s.quality === 'high' ? 0.42 : s.quality === 'medium' ? 0.3 : 0;
+      this.post.rays = s.quality === 'ultra' ? 0.3 : s.quality === 'high' ? 0.24 : s.quality === 'medium' ? 0.16 : 0;
       this.post.dof = s.quality === 'ultra' ? 1 : s.quality === 'high' ? 0.8 : 0;
     }
     this.grassNear?.setDensity(preset.grass * s.grassDensity);
@@ -1384,7 +1384,7 @@ export class Game {
       default: {
         // after the introduction: at most one quiet suggestion, refreshed now and then
         this.nextCheck -= dt;
-        if (this.nextCheck > 0) return void this.trail.update(dt, globalUniforms.uTime.value, p, this.trailTarget);
+        if (this.nextCheck > 0) return void this.trail.update(dt, globalUniforms.uTime.value, p, this.trailTarget, this.camera.position);
         this.nextCheck = 2;
         this.pickIntents();
         let near: Npc | null = null;
@@ -1412,12 +1412,12 @@ export class Game {
         }
         this.trailTarget = target;
         this.ui.next(this.inside ? null : text);
-        this.trail.update(dt, globalUniforms.uTime.value, p, target);
+        this.trail.update(dt, globalUniforms.uTime.value, p, target, this.camera.position);
         return;
       }
     }
     this.ui.next(text);
-    this.trail.update(dt, globalUniforms.uTime.value, p, this.inside ? null : target);
+    this.trail.update(dt, globalUniforms.uTime.value, p, this.inside ? null : target, this.camera.position);
   }
 
   /** Walking together slowly fills three hearts; the second one earns a story. */

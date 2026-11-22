@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import type { Colliders } from './Colliders';
 import { FRUITS } from './Home';
+import { fruitPlant, leafMound } from './Props';
 import type { Island } from './islandMap';
 
 /** How long a picked bush takes to fruit again, in real milliseconds. */
 const REGROW = 8 * 60 * 1000;
-const COLORS = [0xff7ad0, 0x8fe9ff, 0xffd65a];
 
 /**
  * Fruit bushes growing wild across the island, two or three in every region,
@@ -15,12 +15,8 @@ const COLORS = [0xff7ad0, 0x8fe9ff, 0xffd65a];
 export class WildFruit {
   readonly group = new THREE.Group();
   private bushes: { kind: number; x: number; z: number; fruits: THREE.Group; t: number }[] = [];
-  private mats = COLORS.map((c) => new THREE.MeshBasicMaterial({ color: c }));
 
   constructor(island: Island, colliders: Colliders, avoid: { x: number; z: number; r: number }[]) {
-    const ball = new THREE.SphereGeometry(1, 12, 9);
-    const leaf = new THREE.MeshLambertMaterial({ color: 0x4a9a44 });
-    const leafLight = new THREE.MeshLambertMaterial({ color: 0x74bd58 });
     const grad = { x: 0, z: 0 };
     const tmp = { x: 0, z: 0 };
     let n = 0;
@@ -46,25 +42,13 @@ export class WildFruit {
         if (!ok) continue;
         const kind = n++ % 3;
         const g = new THREE.Group();
-        const sc = 1.15 + (n % 4) * 0.08;
-        const puffs: [number, number, number, number][] = [[0, 0.5, 0, 0.62], [0.42, 0.42, 0.1, 0.44], [-0.4, 0.4, -0.12, 0.46], [0.05, 0.86, 0.05, 0.4]];
-        puffs.forEach(([px, py, pz, pr], i) => {
-          const m = new THREE.Mesh(ball, i % 2 ? leafLight : leaf);
-          m.scale.set(pr, pr * 0.82, pr);
-          m.position.set(px, py, pz);
-          m.castShadow = m.receiveShadow = true;
-          g.add(m);
-        });
-        const fruits = new THREE.Group();
-        for (let f = 0; f < 6; f++) {
-          const a = f * 1.05 + n;
-          const m = new THREE.Mesh(ball, this.mats[kind]);
-          const fr = kind === 1 ? 0.13 : 0.095;
-          m.scale.set(fr, fr * (kind === 2 ? 1.4 : 1), fr);
-          m.position.set(Math.cos(a) * 0.58, 0.4 + (f % 3) * 0.22, Math.sin(a) * 0.58);
-          fruits.add(m);
-        }
-        g.add(fruits);
+        const sc = 1.5 + (n % 4) * 0.1;
+        // the same plants as in the patch at home, grown bigger and wilder
+        const body = leafMound(54, 0.62, n * 13, 0.36, 0.95);
+        g.add(body);
+        const { group: plant, fruits } = fruitPlant(kind, n * 29, 1.0);
+        plant.position.y = kind === 2 ? 0.1 : 0.22;
+        g.add(plant);
         g.scale.setScalar(sc);
         g.position.set(x, island.heightAt(x, z), z);
         this.group.add(g);
@@ -106,13 +90,18 @@ export class WildFruit {
     this.bushes.forEach((b, i) => (b.t = typeof times?.[i] === 'number' ? times[i] : 0));
   }
 
-  update(time: number, night: number, now: number): void {
-    this.mats.forEach((m, i) => {
-      const g = 0.8 + 0.1 * Math.sin(time * 1.3 + i * 1.7) + night * 0.75;
-      m.color.setHex(COLORS[i]).multiplyScalar(g);
-    });
+  update(_time: number, _night: number, now: number): void {
     for (const b of this.bushes) {
-      const ripe = Math.min(1, (now - b.t) / REGROW);
+      const since = now - b.t;
+      if (since < 520) {
+        const k = since / 520;
+        b.fruits.visible = true;
+        b.fruits.position.y = k * k * 0.6;
+        b.fruits.scale.setScalar(1 - k * k);
+        continue;
+      }
+      b.fruits.position.y = 0;
+      const ripe = Math.min(1, since / REGROW);
       b.fruits.visible = ripe > 0.35;
       b.fruits.scale.setScalar(ripe >= 1 ? 1 : 0.3 + ripe * 0.55);
     }

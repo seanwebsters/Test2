@@ -110,10 +110,12 @@ class LightPass extends Pass {
                 if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) continue;
                 light += step(2500.0, depthAt(uv)) * (1.0 - t * 0.55);
               }
-              float nearSun = 1.0 - smoothstep(0.0, 0.95, length(toSun * vec2(uAspect, 1.0)));
+              float nearSun = 1.0 - smoothstep(0.0, 0.62, length(toSun * vec2(uAspect, 1.0)));
               // strongest where something stands between you and the sun: light spilling round its edges
               float blocked = 1.0 - step(2500.0, z) * 0.55;
-              c.rgb += uSunColor * (light / 16.0) * nearSun * nearSun * blocked * uRays;
+              // a soft veil of light, never a white-out: it adds less the brighter the picture already is
+              vec3 shaft = uSunColor * (light / 16.0) * nearSun * nearSun * blocked * uRays;
+              c.rgb += shaft * (1.0 - smoothstep(0.5, 1.6, max(c.r, max(c.g, c.b))));
             }
             gl_FragColor = c;
           }`,

@@ -37,7 +37,8 @@ export class Trail {
     this.points.frustumCulled = false;
   }
 
-  update(dt: number, time: number, from: THREE.Vector3, target: { x: number; z: number } | null): void {
+  /** `eye` is the camera: a sparkle that drifts right up to the lens would fill the screen, so those are put out. */
+  update(dt: number, time: number, from: THREE.Vector3, target: { x: number; z: number } | null, eye?: THREE.Vector3): void {
     const far = target ? Math.hypot(target.x - from.x, target.z - from.z) : 0;
     this.show += ((target && far > 5 ? 1 : 0) - this.show) * Math.min(1, dt * 2.5);
     this.mat.opacity = this.show * 0.7;
@@ -53,7 +54,8 @@ export class Trail {
       const x = from.x + this.dir.x * along - this.dir.z * side;
       const z = from.z + this.dir.z * along + this.dir.x * side;
       const y = Math.max(this.island.heightAt(x, z), this.island.waterLevelAt(x, z)) + 0.95 + Math.sin(time * 2.1 + i * 1.7) * 0.25;
-      pos.setXYZ(i, x, y, z);
+      const tooClose = !!eye && Math.hypot(x - eye.x, y - eye.y, z - eye.z) < 4;
+      pos.setXYZ(i, x, tooClose ? -500 : y, z);
     }
     pos.needsUpdate = true;
   }
