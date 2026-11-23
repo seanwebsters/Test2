@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { paintify } from './shared';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 /**
@@ -96,16 +97,26 @@ const veins = (): THREE.CanvasTexture =>
     }
   });
 
+const painted = new Set<string>();
+/** Shared materials are made once: paint each only the first time it is asked for. */
+function paintOnce<T extends THREE.Material>(key: string, m: T, tex: string, scale: number): T {
+  if (!painted.has(key)) {
+    painted.add(key);
+    paintify(m, tex, scale, 0.85);
+  }
+  return m;
+}
+
 export const MAT = {
   /** leaves: matt, softly veined, lit from both sides */
   leaf: (dark = false): THREE.MeshStandardMaterial => std(`leaf${dark}`, { color: dark ? 0x4f9a48 : 0x6dbb55, map: veins(), roughness: 0.72, side: THREE.DoubleSide, vertexColors: true }),
   stem: (): THREE.MeshStandardMaterial => std('stem', { color: 0x5a9a44, roughness: 0.8 }),
-  soil: (): THREE.MeshStandardMaterial => std('soil', { color: 0x5f3f2c, roughness: 1, bumpMap: speckle(), bumpScale: 4 }),
-  stone: (): THREE.MeshStandardMaterial => std('stone', { color: 0xa9a8b2, roughness: 0.78, bumpMap: speckle(), bumpScale: 1.5 }),
-  terracotta: (): THREE.MeshStandardMaterial => std('terracotta', { color: 0xc8703f, roughness: 0.85, bumpMap: speckle(), bumpScale: 0.8 }),
+  soil: (): THREE.MeshStandardMaterial => paintOnce('soil', std('soil', { color: 0x5f3f2c, roughness: 1, bumpMap: speckle(), bumpScale: 4 }), 'soil', 0.9),
+  stone: (): THREE.MeshStandardMaterial => paintOnce('stone', std('stone', { color: 0xbdb6ae, roughness: 0.78, bumpMap: speckle(), bumpScale: 1.5 }), 'rock', 0.7),
+  terracotta: (): THREE.MeshStandardMaterial => paintOnce('terracotta', std('terracotta', { color: 0xc8703f, roughness: 0.85, bumpMap: speckle(), bumpScale: 0.8 }), 'brush', 3),
   brass: (): THREE.MeshStandardMaterial => std('brass', { color: 0xe2b34a, roughness: 0.38, metalness: 0.55 }),
   wicker: (): THREE.MeshStandardMaterial => std('wicker', { color: 0xffffff, map: weave(), bumpMap: weave(), bumpScale: 2.5, roughness: 0.9, side: THREE.DoubleSide }),
-  petal: (color: number): THREE.MeshStandardMaterial => std(`petal${color}`, { color, roughness: 0.6, side: THREE.DoubleSide }),
+  petal: (color: number): THREE.MeshStandardMaterial => paintOnce(`petal${color}`, std(`petal${color}`, { color, roughness: 0.6, side: THREE.DoubleSide }), 'brush', 5),
   /** fruit skins carry their colour per vertex (a gradient from stalk to tip) and glow faintly from within */
   berry: (): THREE.MeshStandardMaterial => std('berry', { color: 0xffffff, vertexColors: true, roughness: 0.42, bumpMap: seeds(), bumpScale: 2.2, emissive: 0xff5a8a, emissiveIntensity: 0.12 }),
   melon: (): THREE.MeshStandardMaterial => std('melon', { color: 0xffffff, vertexColors: true, roughness: 0.5, bumpMap: speckle(), bumpScale: 0.7, emissive: 0x7fdfff, emissiveIntensity: 0.14 }),

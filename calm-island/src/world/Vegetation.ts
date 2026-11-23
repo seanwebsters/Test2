@@ -7,7 +7,7 @@ import { SEASON } from './season';
 import * as plants from './plantGeometry';
 import { HOME_SPOT } from './Home';
 import { seasonalLeaves, type NatureModels } from './NatureModels';
-import { globalUniforms } from './shared';
+import { globalUniforms, paintify } from './shared';
 
 interface Kind {
   hi: THREE.BufferGeometry;
@@ -105,7 +105,10 @@ function mossy<T extends THREE.Material>(mat: T): T {
 /** Lambert material with vertex colours and a gentle wind sway above `base`. */
 function foliageMaterial(sway: number, base: number, doubleSide = false, leafy = false, bloom = false, map: THREE.Texture | null = null, crownY = 0): THREE.MeshLambertMaterial {
   const mat = new THREE.MeshLambertMaterial({ vertexColors: !map, map, alphaTest: map ? 0.32 : 0, side: doubleSide ? THREE.DoubleSide : THREE.FrontSide });
-  mat.onBeforeCompile = (shader) => {
+  if (!map) paintify(mat, 'leaf', bloom ? 3.2 : 1.1, bloom ? 0.55 : 0.9);
+  const painted = mat.onBeforeCompile;
+  mat.onBeforeCompile = (shader, renderer) => {
+    painted.call(mat, shader, renderer);
     shader.uniforms.uTime = globalUniforms.uTime;
     shader.uniforms.uPlayer = globalUniforms.uPlayer;
     shader.uniforms.uSunThrough = globalUniforms.uSunDir;

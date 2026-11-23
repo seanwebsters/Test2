@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { paintify } from '../world/shared';
 
 /**
  * The things you find and merge. Four collections, four steps each; three of
@@ -26,7 +27,9 @@ export const itemName = (code: number): string => CHAINS[code >> 2].steps[code &
 export const itemPlural = (code: number): string => (itemName(code) === 'Wood' ? 'Wood' : `${itemName(code)}s`);
 
 const std = (color: number, roughness = 0.6, extra: THREE.MeshStandardMaterialParameters = {}): THREE.MeshStandardMaterial =>
-  new THREE.MeshStandardMaterial({ color, roughness, ...extra });
+  // (every plain colour gets painted brushwork over it; wood browns get grain)
+  paintify(new THREE.MeshStandardMaterial({ color, roughness, ...extra }), WOODS.has(color) ? 'wood' : 'brush', WOODS.has(color) ? 1.4 : 2.2, WOODS.has(color) ? 0.9 : 0.75);
+const WOODS = new Set([0x8a5a36, 0x74492c, 0x6b4a2e, 0x7a4a26, 0x6a4a7a, 0xe9c48d, 0xa9743f]);
 const glowing = (color: number, emissive: number, intensity = 1.2, roughness = 0.35): THREE.MeshStandardMaterial =>
   new THREE.MeshStandardMaterial({ color, roughness, emissive, emissiveIntensity: intensity });
 const lit = (color: number): THREE.MeshBasicMaterial => new THREE.MeshBasicMaterial({ color, fog: false });
@@ -184,7 +187,7 @@ export function campfire(size = 1): THREE.Group {
 /** A canvas A-frame tent, open to +z, sitting on y = 0. */
 export function tent(w: number, h: number, d: number, detail: boolean): THREE.Group {
   const g = new THREE.Group();
-  const cloth = std(0xf6e7c8, 0.85, { side: THREE.DoubleSide });
+  const cloth = paintify(new THREE.MeshStandardMaterial({ color: 0xf6e7c8, roughness: 0.85, side: THREE.DoubleSide }), 'cloth', 0.45, 0.9);
   const trim = std(0xe9b872, 0.8, { side: THREE.DoubleSide });
   const pole = std(0x8a5a36, 0.85);
   const slope = Math.hypot(w / 2, h);
