@@ -244,12 +244,21 @@ export class Home {
       post.position.set(Math.cos(a) * 3.95, DECK + 0.55, Math.sin(a) * 3.95);
       add(post);
       const a2 = a + (Math.PI * 2) / 8;
-      const railing = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 3.0, 5), rope);
+      const railing = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 3.05, 7), beam); // a proper wooden handrail
       railing.position.set(Math.cos((a + a2) / 2) * 3.65, DECK + 0.78, Math.sin((a + a2) / 2) * 3.65);
       railing.rotation.set(Math.PI / 2, 0, 0);
       railing.rotation.y = -(a + a2) / 2;
       railing.rotation.order = 'YXZ';
       add(railing);
+      const lower = railing.clone();
+      lower.scale.setScalar(0.72);
+      lower.scale.y = 1;
+      lower.position.y = DECK + 0.42;
+      add(lower);
+      // a rounded cap on every post
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), beam);
+      cap.position.set(Math.cos(a) * 3.95, DECK + 1.04, Math.sin(a) * 3.95);
+      add(cap);
     }
 
     // ---- shared batches: hundreds of planks, reeds and books drawn as a handful of meshes
@@ -412,6 +421,51 @@ export class Home {
       piece(mossGeo, mossy[k % 3], mx, RIDGE - along * (RISE + DROP) + Math.cos(SLOPE) * 0.3, side * (along * RUN + Math.sin(SLOPE) * 0.3), sc * 1.5, sc * 0.4, sc, side * SLOPE, 0, 0);
     }
     flush();
+
+    // ---- what makes it look lived in and grown over: a shaggy fringe under the eaves, and ivy trailing everywhere
+    {
+      const sprite = (name: string): THREE.MeshStandardMaterial => {
+        const t = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}textures/${name}.webp`);
+        t.colorSpace = THREE.SRGBColorSpace;
+        t.anisotropy = 8;
+        return new THREE.MeshStandardMaterial({ map: t, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.9 });
+      };
+      const fringe = sprite('fringe');
+      const ivy = sprite('ivy');
+      /** A card hanging down from (x, y, z), facing `ry`. `flip` mirrors it so no two look alike. */
+      const hang = (mat: THREE.Material, w: number, h: number, x: number, yy: number, z: number, ry: number, flip = false, lean = 0): void => {
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h).translate(0, -h / 2, 0), mat);
+        m.position.set(x, yy, z);
+        m.rotation.set(lean, ry, 0);
+        m.rotation.order = 'YXZ';
+        if (flip) m.scale.x = -1;
+        m.castShadow = true;
+        m.receiveShadow = true;
+        this.group.add(m);
+      };
+      const EAVE = RIDGE - (RISE + DROP);
+      for (const side of [-1, 1]) {
+        // two overlapping lengths of fringe along each eave
+        hang(fringe, HW * 2 + 1.7, 1.15, 0, EAVE + 0.5, side * (RUN + 0.16), 0, side < 0);
+        hang(fringe, HW * 2 + 1.5, 0.95, 0.2, EAVE + 0.62, side * (RUN - 0.05), 0, side > 0);
+        // ivy spilling off the corners of the roof and down the walls
+        hang(ivy, 1.7, 2.3, -HW - 0.05, EAVE + 0.45, side * (RUN + 0.2), 0, side < 0);
+        hang(ivy, 1.3, 1.7, HW - 0.2, EAVE + 0.4, side * (RUN + 0.22), 0, side > 0);
+        hang(ivy, 2.0, 1.4, side * 0.9, RIDGE - 0.25, side * 0.5, 0, side < 0, side * (Math.PI / 2 - SLOPE) * 0.92);
+      }
+      for (const sx of [-1, 1]) hang(ivy, 2.2, 2.4, sx * (HW + 0.72), RY + 1.0, 0.2 * sx, Math.PI / 2, sx > 0);
+      // and trailing from the edge of the deck, down toward the roots
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * Math.PI * 2 + 0.3;
+        if (Math.abs(a - Math.PI / 2 - Math.PI / 8) < 0.55) continue; // not across the ladder
+        hang(ivy, 1.9 + (i % 3) * 0.4, 1.9 + (i % 2) * 0.7, Math.cos(a) * 4.12, DECK - 0.08, Math.sin(a) * 4.12, -a + Math.PI / 2, i % 2 === 0);
+      }
+      // a climber up the stump
+      for (let i = 0; i < 4; i++) {
+        const a = i * 1.7 + 0.9;
+        hang(ivy, 1.6, 2.2, Math.cos(a) * 2.95, 3.3, Math.sin(a) * 2.95, -a + Math.PI / 2, i % 2 === 1, -0.08);
+      }
+    }
 
     // ---- ladder up to the deck
     const ladder = new THREE.Group();
@@ -1189,7 +1243,7 @@ export class Home {
     });
     const lampGlow = 0.8 + 0.35 * night;
     this.lampMat.color.copy(this.lampColor).multiplyScalar(lampGlow);
-    this.pane.opacity = 0.18 + 0.7 * night;
+    this.pane.opacity = 0.74 + 0.2 * night; // the window always glows warm, as if someone is home
     this.patchLight.color.copy(indoors ? this.patchLamp : this.fireColor);
     if (indoors) {
       this.patchLight.position.copy(this.lampPos);
