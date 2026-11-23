@@ -381,6 +381,13 @@ export class Npc {
     this.sync();
   }
 
+  /** A hop and a wave, on request. */
+  cheer(): void {
+    this.greeted = true;
+    this.greetT = GREET;
+    this.model.impulse(1.4);
+  }
+
   sync(): void {
     this.model.root.position.copy(this.pos);
     this.model.root.rotation.y = this.yaw;
