@@ -22,8 +22,12 @@ import { WildFruit } from '../world/WildFruit';
 import { Finds } from '../world/Finds';
 import { Campsite } from '../world/Campsite';
 import { MergeBoard } from '../merge/board';
+import { renderPortrait, Talk } from '../ui/Talk';
 import { MergeScreen } from '../merge/MergeScreen';
 import { COSY, renderIcons } from '../merge/items';
+
+/** how long the fire burns once lit, in real milliseconds */
+const FIRE_MS = 10 * 60 * 1000;
 import { SEASON, currentSeason, setSeason } from '../world/season';
 import { Cairns, Kite, Viewpoints } from '../world/Places';
 import { CELL, GRID, HALF, WORLD_SIZE } from '../world/islandMap';
@@ -69,7 +73,7 @@ const INTENTS: Record<string, string> = {
   water: 'Sit beside the water for a moment',
   fruit: 'Pick a fruit from your patch',
   friend: 'Walk a little way with a friend',
-  fire: 'Light the fire this evening',
+  fire: 'Light the fire',
   view: 'Rest at a viewpoint',
   skim: 'Skim a stone',
   fish: 'Cast a line and wait',
@@ -175,6 +179,11 @@ export class Game {
   /** seconds into the campsite's arrival, or -1 */
   private campShow = -1;
   private calmName = '';
+  /** the fire by the treehouse: lit once a day, and it burns for a while */
+  private fireDay = '';
+  private fireUntil = 0;
+  private talk = new Talk();
+  private kupunaFace = './brand/friend-head.webp';
   /** the player has taken hold of the camera during the fall in */
   private arriveLook = false;
   /** the springs in the order the chapters visit them: nearest home first, then on round the island */
@@ -562,11 +571,21 @@ export class Game {
       }
     }
     this.rig = new CameraRig(this.camera, this.island);
+    {
+      // Kupuna keeps the fire by the treehouse: the last seat round it is his
+      const seat = this.home.gatherSpots[this.home.gatherSpots.length - 1];
+      const k = RESIDENTS.find((r) => r.id === 'kupuna');
+      if (k && seat) k.home = [seat.x, seat.z];
+    }
     RESIDENTS.forEach((who, i) => {
       const npc = new Npc(who, this.island, i);
       this.npcs.push(npc);
       this.scene.add(npc.model.root);
       if (npc.prop) this.scene.add(npc.prop);
+      if (who.id === 'kupuna') {
+        npc.stay = true;
+        npc.stayFace.set(this.home.fireSpot.x, 0, this.home.fireSpot.z);
+      }
     });
     if (!this.opts.plainPlants) {
       try {
@@ -582,6 +601,13 @@ export class Game {
         ([['dadirri', 'pink', PINK_RIG], ['apricus', 'orange', ORANGE_RIG], ['psithuros', 'yeti', YETI_RIG], ['kintsugi', 'volcanic', BLUE_RIG], ['meraki', 'heart', BLUE_RIG], ['komorebi', 'sun', BLUE_RIG], ['wabisabi', 'patchwork', ORANGE_RIG], ['genkaku', 'hooded', HOODED_RIG], ['misogi', 'sparkly', SPARKLY_RIG], ['morgenfrisk', 'fluffy', BLUE_RIG], ['gokotta', 'spiky', BLUE_RIG], ['kupuna', 'elder', ELDER_RIG], ['desbundar', 'party', ORANGE_RIG], ['shinrin', 'mossy', BLUE_RIG], ['harmonia', 'eyelash', ORANGE_RIG], ['extrawunsch', 'scholar', ORANGE_RIG], ['mangata', 'horned', HORNED_RIG], ['shu', 'peach', BLUE_RIG]] as const).map(async ([id, file, rig]) => {
           try {
             const glb = await new GLTFLoader().loadAsync(`${base}models/calmling/${file}.glb`);
+            if (id === 'kupuna') {
+              try {
+                this.kupunaFace = renderPortrait(glb.scene);
+              } catch (err) {
+                console.info('No portrait for Kupuna:', err);
+              }
+            }
             this.npcs.find((n) => n.who.id === id)?.model.useSculpt(glb.scene, rig);
           } catch (err) {
             console.info(`Sculpted ${id} unavailable, using the built-in one:`, err);
@@ -592,7 +618,7 @@ export class Game {
     this.pickDaily();
     // one friend lives close by, down the earth path by the river: the first you are sent to find
     {
-      this.guide = [...this.npcs].filter((n) => !n.who.hours).sort((a, b) => Math.hypot(a.home.x - 62, a.home.z - 14) - Math.hypot(b.home.x - 62, b.home.z - 14))[0];
+      this.guide = [...this.npcs].filter((n) => !n.who.hours && !n.stay).sort((a, b) => Math.hypot(a.home.x - 62, a.home.z - 14) - Math.hypot(b.home.x - 62, b.home.z - 14))[0];
       const grad = { x: 0, z: 0 };
       for (let i = 0; i < 80; i++) {
         const x = 62 + Math.cos(i * 2.4) * i * 0.5;
@@ -640,6 +666,8 @@ export class Game {
       this.tut = save.tut ?? 99;
       this.wild.load(save.wild);
       this.finds.load(save.finds);
+      this.fireDay = save.fireDay ?? '';
+      this.fireUntil = Number(save.fireUntil) || 0;
       this.calmName = typeof save.name === 'string' ? save.name.slice(0, 14) : '';
       this.ui.calmName = this.calmName;
       this.board.load(save.merge);
@@ -821,8 +849,8 @@ export class Game {
       this.updateHums();
       if (this.arrivingIntro && !this.player.arriving) {
         this.arrivingIntro = false;
-        this.ui.moment('Welcome to', 'Calm Island', 'A quiet place, all your own. Somewhere close, a warm light is glowing.');
         this.ambience.chime();
+        this.kupunaWelcome();
       }
       this.updateMeetings();
       this.updateFriendship(dt);
@@ -910,7 +938,8 @@ export class Game {
     let bestD = 3.4;
     for (const npc of this.npcs) {
       const d = Math.hypot(npc.pos.x - p.x, npc.pos.z - p.z);
-      if (!npc.absent && d < bestD && Math.abs(npc.pos.y - p.y) < 2.5) {
+      // (the fire keeper never gets between you and the fire)
+      if (!npc.absent && d < bestD && Math.abs(npc.pos.y - p.y) < 2.5 && !(npc.stay && this.home.fireNear(p))) {
         bestD = d;
         best = npc;
       }
@@ -1084,7 +1113,7 @@ export class Game {
     if (best !== this.nearby || best) {
       this.nearby = best;
       const name = best?.who.name;
-      this.ui.prompt(!best ? null : !this.met.has(best.who.id) ? 'Say hello' : best === this.companion ? `Say goodbye to ${name}` : `Invite ${name} along`);
+      this.ui.prompt(!best ? null : !this.met.has(best.who.id) ? 'Say hello' : best.stay ? null : best === this.companion ? `Say goodbye to ${name}` : `Invite ${name} along`);
     }
     if (best && best === this.daily.npc && this.dailyDone !== this.daily.key) {
       this.ui.prompt(`Today’s moment with ${best.who.name}`);
@@ -1092,6 +1121,7 @@ export class Game {
       return;
     }
     if (!best || !this.input.interactPressed()) return;
+    if (best.stay && this.met.has(best.who.id)) return; // he keeps the fire: he does not come walking
     if (!this.met.has(best.who.id)) {
       this.meetMoment(best);
     } else if (best === this.companion) {
@@ -1135,18 +1165,26 @@ export class Game {
         this.save();
       };
     } else if (home.fireNear(p)) {
-      if (!home.lit && evening) {
+      if (!home.lit && this.fireDay !== this.dayKey()) {
         text = 'Light the fire';
         act = () => {
+          this.fireDay = this.dayKey();
+          this.fireUntil = Date.now() + FIRE_MS;
           home.lit = true;
+          this.gatherCheck = 0;
           this.flags.add('fire');
           this.did('fire');
-          this.ui.toast('', 'The fire is lit', this.met.size ? 'Friends you have made may come and sit a while' : 'It will burn until morning');
+          this.ambience.chime();
+          const friends = [...this.met].filter((id) => id !== 'kupuna').length;
+          this.ui.toast('', 'The fire is lit', friends ? `It burns for ${FIRE_MS / 60000} minutes. Your friends are on their way` : `It burns for ${FIRE_MS / 60000} minutes. Make a friend and they will come and sit here`);
+          this.save();
         };
       } else if (!this.player.sitting) {
         text = home.lit ? 'Sit by the fire' : 'Sit a while';
         act = () => {
-          if (this.player.sit() && !home.lit) this.ui.toast('', 'The fire ring', 'Come back in the evening to light it');
+          if (!this.player.sit()) return;
+          if (home.lit) this.ui.toast('', 'By the fire', `${Math.max(1, Math.ceil((this.fireUntil - Date.now()) / 60000))} minutes of firelight left`);
+          else this.ui.toast('', 'The fire has burned down', 'You can light it again tomorrow');
         };
       }
     } else if (home.ladderNear(p)) {
@@ -1238,7 +1276,7 @@ export class Game {
       const left = this.tut >= 9 ? this.intents.done.filter((d) => !d).length : 0;
       let waiting = 0;
       for (const n of this.npcs) if (this.met.has(n.who.id) && !this.gifted.has(n.who.id)) waiting++;
-      this.ui.hud(Math.max(1, this.days), ch >= 0 ? this.springs.spots[this.chapters[ch]].name : 'All awake', this.springs.awakeCount / Math.max(1, this.springs.spots.length), this.lastDay === this.dayKey() && left < 3 ? 0 : left, waiting);
+      this.ui.hud(Math.max(1, this.days), ch >= 0 ? `Springs woken · ${this.springs.awakeCount} of ${this.springs.spots.length}` : 'Every spring is awake', this.springs.awakeCount / Math.max(1, this.springs.spots.length), this.lastDay === this.dayKey() && left < 3 ? 0 : left, waiting);
     }
   }
 
@@ -1251,17 +1289,18 @@ export class Game {
     this.gatherCheck -= dt;
     if (this.gatherCheck > 0) return;
     this.gatherCheck = 1.5;
-    const h = this.day.hour;
-    const evening = h >= 17.5 || h < 5.5;
-    if (h > 8 && h < 16.5) {
-      home.lit = false;
+    // the fire burns on a timer from when it was lit; while it burns, the friends you have made come and sit round it
+    const burning = Date.now() < this.fireUntil;
+    if (home.lit && !burning) {
       this.gatherTold = false;
+      if (fireD < 30) this.ui.toast('', 'The fire has burned down', 'Light it again tomorrow');
     }
-    const guests = evening
+    home.lit = burning;
+    const guests = burning
       ? this.npcs
-          .filter((n) => this.met.has(n.who.id) && n !== this.companion && !n.absent)
+          .filter((n) => this.met.has(n.who.id) && n !== this.companion && !n.absent && !n.stay)
           .sort((a, b) => (this.bonds.get(b.who.id) ?? 0) - (this.bonds.get(a.who.id) ?? 0))
-          .slice(0, home.gatherSpots.length)
+          .slice(0, home.gatherSpots.length - 1)
       : [];
     this.guests = guests.length;
     let arrived = 0;
@@ -1282,7 +1321,7 @@ export class Game {
     if (arrived && !this.gatherTold && fireD < 20 && !this.inside) {
       this.gatherTold = true;
       this.flags.add('gathering');
-      this.ui.toast('Evening at home', arrived === 1 ? `${guests[0].who.name} has come by` : `${arrived} friends have come by`, home.lit ? 'The fire is warm. Sit with them a while' : 'Light the fire and sit with them a while');
+      this.ui.toast('Round the fire', arrived === 1 ? `${guests[0].who.name} has come by` : `${arrived} friends have come by`, home.lit ? 'The fire is warm. Sit with them a while' : 'Light the fire and sit with them a while');
     }
     // friends are found doing calm things; sit down near one and you are keeping them company
     for (const npc of this.npcs) {
@@ -1324,6 +1363,41 @@ export class Game {
     this.stopBreathing();
     this.ui.prompt(null);
     this.ui.prompt2(null);
+  }
+
+  /** Kupuna is waiting where you land, and tells you what the island needs. */
+  private kupunaWelcome(): void {
+    const k = this.npcs.find((n) => n.who.id === 'kupuna');
+    if (!k) return;
+    const p = this.player.pos;
+    // he stands just ahead, between you and the treehouse
+    const x = p.x - Math.sin(this.rig.yaw) * 3.2;
+    const z = p.z - Math.cos(this.rig.yaw) * 3.2;
+    k.pos.set(x, this.island.heightAt(x, z), z);
+    k.yaw = this.rig.yaw;
+    k.hold = true;
+    k.returning = false;
+    k.sync();
+    this.player.yaw = this.rig.yaw + Math.PI;
+    this.rig.pitch = 0.16;
+    this.rig.dist = 6.4;
+    this.openCard();
+    document.body.classList.add('talking');
+    this.talk.say('Kupuna', this.kupunaFace, [
+      'Great Gongs! I never thought I would see a new Calmling float down from the clouds!',
+      'Welcome to Calm Island. I am Kupuna. I keep the fire by the little treehouse, and the treehouse is yours now.',
+      'The island went quiet while it waited, and some of its cosy places faded away.',
+      'Gather the little things glowing in the grass. Merge three of a kind, and watch what comes back.',
+      'And light the fire once a day. Whoever you have befriended will come and sit with us while it burns.',
+      'Go on, follow the warm light home. I will be by the fire.',
+    ], () => {
+      document.body.classList.remove('talking');
+      k.hold = false;
+      k.returning = true;
+      this.met.add('kupuna');
+      this.save();
+      this.play();
+    });
   }
 
   /** The Merge 3 board, over the island exactly where you left it. */
@@ -1411,7 +1485,7 @@ export class Game {
     this.pickIntents();
     const kept = this.intents.done.filter(Boolean).length;
     const icons: Record<string, string> = { breathe: 'drop', water: 'drop', fruit: 'berry', friend: 'heart', fire: 'lantern', view: 'star', skim: 'drop', fish: 'drop', sleep: 'lantern', tend: 'melon' };
-    const where: Record<string, string> = { breathe: 'Anywhere you like', water: 'By the river, a lake or the sea', fruit: 'In the patch beside your treehouse', friend: 'Invite one along', fire: 'At the fire ring, once evening comes', view: 'Look for a mossy log with a view', skim: 'At the edge of any water', fish: 'Beside any water', sleep: 'In your bed, or anywhere after dark', tend: 'The plots in the Calm Garden' };
+    const where: Record<string, string> = { breathe: 'Anywhere you like', water: 'By the river, a lake or the sea', fruit: 'In the patch beside your treehouse', friend: 'Invite one along', fire: 'At the fire ring by your treehouse', view: 'Look for a mossy log with a view', skim: 'At the edge of any water', fish: 'Beside any water', sleep: 'In your bed, or anywhere after dark', tend: 'The plots in the Calm Garden' };
     const next = this.intents.ids.find((_, i) => !this.intents.done[i]);
     this.ui.showChoices(
       'Today',
@@ -1619,7 +1693,6 @@ export class Game {
           this.ui.showLetter('A letter, left on your bed', [
             'Dear new neighbour,',
             'Welcome to Calm Island. I saw you float down and hoped you would find the little house. It has been waiting for someone.',
-            'The island went quiet while it waited, and some of its cosy places faded away. You can bring them back: gather the little things glowing in the grass, merge three of a kind, and watch what returns.',
             `I live down by the river, just along the earth path. I would love a visitor. I am very fond of ${fruit.plural}, if any are ripe in your patch.`,
             'No hurry at all.',
             `— ${g.who.name}`,
@@ -2491,8 +2564,8 @@ export class Game {
       { title: 'Bring a friend the fruit they love', hint: `${this.gifted.size} of ${this.npcs.length} lanterns hung. The log says who loves what`, done: this.gifted.size > 0 },
       { title: 'Buy something from Sampoyoshi', hint: 'His stall is by the river path, east of the garden. He takes fruit', done: this.owned.size > 0 },
       { title: 'Go inside your treehouse', hint: 'Press E at the foot of the ladder', done: this.flags.has('inside') },
-      { title: 'Light the fire', hint: 'At the fire ring by the treehouse, once evening comes', done: this.flags.has('fire') },
-      { title: 'Spend an evening with friends', hint: 'Friends you have met come to the fire after dark', done: this.flags.has('gathering') },
+      { title: 'Light the fire', hint: 'At the fire ring by the treehouse, once a day', done: this.flags.has('fire') },
+      { title: 'Sit with friends by the fire', hint: 'Friends you have met come while the fire burns', done: this.flags.has('gathering') },
       { title: this.currentChapter() >= 0 ? `Chapter ${this.currentChapter() + 1} of ${this.chapters.length}: ${this.springs.spots[this.chapters[this.currentChapter()]].name}` : 'Every chapter told', hint: this.currentChapter() >= 0 ? 'A spring is sleeping there. Wake it and a letter will lead you on' : 'All eight springs are awake', done: this.currentChapter() < 0 },
       { title: 'Pick wild fruit', hint: `Bushes grow in every region: ${this.wild.count} across the island`, done: this.flags.has('wild') },
       { title: 'Wake a calm spring', hint: `${this.springs.awakeCount} of ${this.springs.spots.length} awake. Breathe beside the ring of stones in each place`, done: this.springs.awakeCount > 0 },
@@ -2795,6 +2868,8 @@ export class Game {
       springs: this.springs.serialize(),
       wild: this.wild.serialize(),
       finds: this.finds.serialize(),
+      fireDay: this.fireDay,
+      fireUntil: this.fireUntil,
       name: this.calmName,
       merge: this.board.serialize(),
       camp: this.camp.unlocked,

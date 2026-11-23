@@ -54,6 +54,9 @@ export interface SaveData {
   introduced?: string[];
   /** the merge board, when each find was last collected, and whether the campsite has been unlocked */
   merge?: MergeSave;
+  /** the day the fire was last lit, and when it burns out (ms) */
+  fireDay?: string;
+  fireUntil?: number;
   /** what the player has called their Calmling */
   name?: string;
   finds?: number[];
