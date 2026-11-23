@@ -86,6 +86,8 @@ export class Grass {
           float gHash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
           float gNoise2(vec2 p) { vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(gHash(i), gHash(i + vec2(1.0, 0.0)), f.x), mix(gHash(i + vec2(0.0, 1.0)), gHash(i + vec2(1.0, 1.0)), f.x), f.y); }
           varying vec3 vGrassCol;
+          varying float vFlower;
+          varying vec3 vFlowerCol;
           varying float vBladeY;
           varying float vSheen;
           ${WORLD_UV_GLSL}`,
@@ -108,7 +110,11 @@ export class Grass {
           float hgt = uBladeH * (0.55 + 0.9 * aOffset.z) * grow * mix(0.55, 1.3, lush);
           float ang = aOffset.w * 6.2831 + aOffset.z * 40.0;
           float bend = position.y * position.y;
-          vec3 local = vec3(cos(ang) * position.x, position.y * hgt, sin(ang) * position.x);
+          // (a flowering stem carries a little head: the blade swells near its tip instead of tapering away)
+          float flSeed = fract(aOffset.w * 53.0 + aOffset.z * 7.0);
+          float head = step(0.955, flSeed) * smoothstep(0.5, 0.75, gNoise2(base * 0.09 + 77.0)) * smoothstep(0.7, 0.9, position.y);
+          float wide = position.x + sign(position.x + 0.0001) * head * 0.05 * (1.0 - smoothstep(0.93, 1.0, position.y));
+          vec3 local = vec3(cos(ang) * wide, position.y * hgt, sin(ang) * wide);
           // wind: a slow swell with quick ripples running across it
           float swell = sin(uTime * 0.9 + base.x * 0.07 + base.y * 0.05);
           float ripple = sin(uTime * 2.6 + base.x * 0.45 - base.y * 0.33 + aOffset.z * 3.0);
@@ -128,6 +134,14 @@ export class Grass {
           // a soft pool of shade where the Calmling stands
           vGrassCol *= 1.0 - 0.42 * (1.0 - smoothstep(0.3, 1.25, pd)) * (1.0 - smoothstep(0.4, 1.6, abs(uPlayer.y - groundY)));
           vGrassCol = mix(vGrassCol, vGrassCol * vec3(1.25, 1.12, 0.6), step(0.93, fract(aOffset.w * 17.0)) * 0.6);
+          // broad drifts of warmer and cooler green, so a meadow is never one flat colour
+          float tone = gNoise2(base * 0.06 + 31.0);
+          vGrassCol *= mix(vec3(0.82, 0.96, 0.9), vec3(1.16, 1.08, 0.74), smoothstep(0.3, 0.7, tone));
+          // wildflowers: here and there a blade is a stem with a little bloom at its tip
+          float fl = fract(aOffset.w * 53.0 + aOffset.z * 7.0);
+          float patchy = smoothstep(0.5, 0.75, gNoise2(base * 0.09 + 77.0));
+          vFlower = step(0.955, fl) * patchy * step(0.3, grow);
+          vFlowerCol = fl > 0.985 ? vec3(1.0, 0.62, 0.78) : fl > 0.97 ? vec3(1.0, 0.86, 0.36) : vec3(1.0, 0.98, 0.92);
           // the crest of each gust catches the light as it rolls across the meadow
           vSheen = smoothstep(0.35, 1.0, swell) * 0.6 + smoothstep(0.5, 1.0, ripple) * 0.25;
           vBladeY = position.y;`,
@@ -139,18 +153,22 @@ export class Grass {
           varying vec3 vGrassCol;
           varying float vBladeY;
           varying float vSheen;
+          varying float vFlower;
+          varying vec3 vFlowerCol;
           uniform vec3 uSunGrass;`,
         )
         .replace(
           '#include <color_fragment>',
           /* glsl */ `
-          diffuseColor.rgb = vGrassCol * mix(0.62, 1.3, vBladeY) + vec3(0.05, 0.06, 0.0) * vBladeY * vBladeY;
+          // deep at the root, bright at the tip: this is what gives a lawn its depth
+          diffuseColor.rgb = vGrassCol * mix(0.4, 1.32, pow(vBladeY, 0.8)) + vec3(0.05, 0.06, 0.0) * vBladeY * vBladeY;
           diffuseColor.rgb += vec3(0.16, 0.19, 0.05) * vSheen * vBladeY * vBladeY;
           // blades light up from behind when you look toward the sun across a meadow
           vec3 sunGrassV = normalize((viewMatrix * vec4(uSunGrass, 0.0)).xyz);
           float throughGrass = pow(max(dot(-normalize(vViewPosition), sunGrassV), 0.0), 4.0);
           diffuseColor.rgb += vec3(0.2, 0.22, 0.02) * throughGrass * vBladeY;
-          diffuseColor.rgb = min(diffuseColor.rgb, vec3(0.8)); // grass must never be bright enough to glow`,
+          diffuseColor.rgb = min(diffuseColor.rgb, vec3(0.8)); // grass must never be bright enough to glow
+          diffuseColor.rgb = mix(diffuseColor.rgb, vFlowerCol * 0.86, vFlower * smoothstep(0.78, 0.88, vBladeY));`,
         )
         .replace(
           '#include <normal_fragment_begin>',

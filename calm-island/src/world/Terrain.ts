@@ -259,6 +259,16 @@ export class Terrain {
     this.material = new THREE.MeshLambertMaterial({ map: groundTex });
     this.material.onBeforeCompile = (shader) => {
       shader.uniforms.uDetail = { value: detail };
+      // hand-painted stone and earth, laid over the rock faces and the bare ground
+      const paint = (name: string): THREE.Texture => {
+        const t = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}textures/${name}.webp`);
+        t.colorSpace = THREE.SRGBColorSpace;
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.anisotropy = 8;
+        return t;
+      };
+      shader.uniforms.uPaintRock = { value: paint('rock') };
+      shader.uniforms.uPaintSoil = { value: paint('soil') };
       shader.uniforms.uTime = globalUniforms.uTime;
       shader.uniforms.uDayLight = globalUniforms.uDayLight;
       shader.vertexShader = shader.vertexShader
@@ -269,6 +279,8 @@ export class Terrain {
           '#include <map_pars_fragment>',
           /* glsl */ `#include <map_pars_fragment>
           uniform sampler2D uDetail;
+          uniform sampler2D uPaintRock;
+          uniform sampler2D uPaintSoil;
           uniform float uTime;
           uniform float uDayLight;
           varying vec3 vWPos;
@@ -310,6 +322,8 @@ export class Terrain {
           float c2 = gNoise(vWPos.xz * 1.3 - vec2(uTime * 0.24, uTime * 0.33) + 5.0);
           float caustic = pow(1.0 - abs(c1 - c2), 7.0);
           diffuseColor.rgb += vec3(0.75, 0.9, 0.7) * caustic * 0.5 * shallows;
+          // painted earth on paths and bare soil above the tide line (the textures are neutral: they add detail, not colour)
+          diffuseColor.rgb *= mix(vec3(1.0), texture2D(uPaintSoil, vWPos.xz * 0.16).rgb * 1.24, bare * smoothstep(0.4, 1.6, vWPos.y) * 0.85);
           diffuseColor.a = 1.0;
           // Cliffs are too steep for the top-down ground texture, so their
           // rock is drawn here in world space: warped strata with fine grain.
@@ -337,6 +351,11 @@ export class Terrain {
             // and it gathers along the top of every ledge, trailing a little way down the face
             moss = max(moss, smoothstep(0.72, 0.98, bed + (grain - 0.5) * 0.35) * smoothstep(0.92, 0.5, steepness) * 0.9);
             rockCol = mix(rockCol, mix(vec3(0.16, 0.34, 0.08), vec3(0.34, 0.50, 0.12), blotch), moss * 0.78);
+            // painted stone, projected from the side the face looks out of
+            vec3 an = abs(normalize(vWNormal));
+            vec3 paintX = texture2D(uPaintRock, vWPos.zy * 0.085).rgb;
+            vec3 paintZ = texture2D(uPaintRock, vWPos.xy * 0.085).rgb;
+            rockCol *= mix(paintZ, paintX, smoothstep(0.35, 0.65, an.x / max(an.x + an.z, 1e-3))) * 1.22;
             diffuseColor.rgb = mix(diffuseColor.rgb, rockCol, rockMask);
           }
           // Surface relief, from smooth noise only so its slope is clean:
