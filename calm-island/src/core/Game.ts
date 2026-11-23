@@ -20,6 +20,7 @@ import { ArrivalClouds } from '../world/Arrival';
 import { SHOP_ITEMS, Shop } from '../world/Shop';
 import { WildFruit } from '../world/WildFruit';
 import { Finds } from '../world/Finds';
+import { Fireflies } from '../world/Fireflies';
 import { Campsite } from '../world/Campsite';
 import { MergeBoard } from '../merge/board';
 import { renderPortrait, Talk } from '../ui/Talk';
@@ -173,6 +174,7 @@ export class Game {
   private shop!: Shop;
   private wild!: WildFruit;
   private finds!: Finds;
+  private fireflies!: Fireflies;
   private camp!: Campsite;
   private board = new MergeBoard();
   private mergeUI!: MergeScreen;
@@ -545,6 +547,8 @@ export class Game {
     this.scene.add(this.seeds.group);
     this.scene.add(this.garden.group, this.weather.mesh);
     this.scene.add(this.ambient.group);
+    this.fireflies = new Fireflies(this.island);
+    this.scene.add(this.fireflies.points);
 
     this.sun.castShadow = true;
     this.sun.shadow.radius = 3;
@@ -2819,6 +2823,8 @@ export class Game {
     this.grassFar.update(this.grassCenter.copy(p).addScaledVector(this.fwd, 36), p);
     this.vegetation.update(this.camera.position, QUALITY_PRESETS[this.settings.quality].distance);
     this.ambient.update(dt, globalUniforms.uTime.value, p, this.player.speed, this.player.grounded, this.day.night);
+    this.fireflies.points.visible = !this.inside;
+    this.fireflies.update(globalUniforms.uTime.value, p, 1 - globalUniforms.uDayLight.value + this.day.night);
     for (const npc of this.npcs) {
       npc.update(dt, globalUniforms.uTime.value, this.player, this.camera.position, this.day.hour);
       if (npc.greetNow) {
