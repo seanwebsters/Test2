@@ -134,6 +134,11 @@ export class Npc {
   absent = false;
   /** a place to go and sit for the evening (by the fire at the treehouse), and what to face there */
   gather: THREE.Vector3 | null = null;
+  /** keeps to one spot (their home) instead of pottering about, turned toward `stayFace` */
+  stay = false;
+  stayFace = new THREE.Vector3();
+  /** standing still, attention on the player (while they are speaking) */
+  hold = false;
   gatherFace = new THREE.Vector3();
   /** what they are doing just now, for the game to mention (null while pottering) */
   doing: string | null = null;
@@ -290,7 +295,7 @@ export class Npc {
           // pick a new spot to potter to, staying on dry land near home
           for (let i = 0; i < 6; i++) {
             const a = Math.random() * Math.PI * 2;
-            const r = 2 + Math.random() * 6;
+            const r = this.stay ? 0 : 2 + Math.random() * 6;
             const x = this.home.x + Math.cos(a) * r;
             const z = this.home.z + Math.sin(a) * r;
             if (this.dry(x, z)) {
@@ -315,6 +320,18 @@ export class Npc {
       }
     }
 
+    if (this.stay && !this.returning && !this.following && faceX === 0 && faceZ === 0 && Math.hypot(this.home.x - this.pos.x, this.home.z - this.pos.z) < 0.6) {
+      faceX = this.stayFace.x - this.pos.x;
+      faceZ = this.stayFace.z - this.pos.z;
+    }
+    if (this.hold) {
+      want = 0;
+      faceX = player.pos.x - this.pos.x;
+      faceZ = player.pos.z - this.pos.z;
+      act = null;
+      sitting = false;
+      closed = false;
+    }
     if (this.greetT > 0 && !this.following && !this.gather) {
       // whatever they were doing waits a moment
       want = 0;
