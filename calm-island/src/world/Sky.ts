@@ -51,7 +51,7 @@ export class Sky {
             vec3 d = normalize(vDir);
             float h = clamp(d.y, 0.0, 1.0);
             vec3 col = mix(uHorizon, uTop, pow(h, 0.5));
-            col *= mix(vec3(1.0), vec3(0.8, 0.86, 1.0), pow(h, 0.8)); // a deeper, richer blue overhead
+            col = mix(col, col * 1.08 + vec3(0.03, 0.05, 0.06), pow(h, 0.7)); // a bright, airy blue overhead, never heavy
             col = mix(col, uHorizon, smoothstep(0.02, -0.1, d.y));
             float s = max(dot(d, uSunDir), 0.0);
             // warmth pooling in the sky around the sun
@@ -62,8 +62,8 @@ export class Sky {
             vec4 cl = texture2D(uClouds, cuv);
             float ca = cl.a * (1.0 - smoothstep(0.92, 1.0, cuv.y)) * smoothstep(-0.06, 0.0, el);
             vec3 cloudLit = mix(vec3(1.0, 0.985, 0.96), uHorizon * 1.2, 0.3) + vec3(1.0, 0.82, 0.55) * pow(s, 5.0) * 0.4;
-            vec3 cloudShade = mix(uTop, uHorizon, 0.62) * vec3(0.94, 0.9, 1.02);
-            vec3 cloudCol = mix(cloudShade, cloudLit, smoothstep(0.05, 0.95, cl.r)) * mix(0.32, 1.0, uDayLight);
+            vec3 cloudShade = mix(mix(uTop, uHorizon, 0.8), vec3(1.0), 0.3) * vec3(0.98, 0.96, 1.03); // pale, luminous shadows
+            vec3 cloudCol = mix(cloudShade, cloudLit, smoothstep(0.05, 0.95, cl.r)) * mix(0.45, 1.0, uDayLight);
             // the bases melt into the haze along the horizon
             cloudCol = mix(cloudCol, uHorizon, smoothstep(0.2, 0.0, el) * 0.55);
             col = mix(col, cloudCol, ca);
