@@ -130,11 +130,22 @@ export class Home {
       t.anisotropy = 4;
       return t;
     };
-    const woodGrain = grain('u', 46, 0.34);
-    const strawGrain = grain('v', 70, 0.24);
+    // Hand-painted surfaces (wood, thatch, bark): they arrive a moment after the house and simply appear on it.
+    const painted = (name: string, rx = 1, ry = 1): THREE.Texture => {
+      const t = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}textures/${name}.webp`);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.repeat.set(rx, ry);
+      t.anisotropy = 8;
+      return t;
+    };
+    void grain;
+    const woodGrain = painted('wood', 1, 0.5);
+    const strawGrain = painted('thatch', 2, 1);
+    const barkPaint = painted('bark');
     /** Sawn, painted timber: grain you can see and feel. */
-    const wood = (color: number): THREE.MeshStandardMaterial => L(color, { map: woodGrain, bumpMap: woodGrain, bumpScale: 1.4, roughness: 0.8 });
-    const straw = (color: number): THREE.MeshStandardMaterial => L(color, { map: strawGrain, bumpMap: strawGrain, bumpScale: 2.2, roughness: 0.95 });
+    const wood = (color: number): THREE.MeshStandardMaterial => L(color, { map: woodGrain, bumpMap: woodGrain, bumpScale: 1.1, roughness: 0.78 });
+    const straw = (color: number): THREE.MeshStandardMaterial => L(color, { map: strawGrain, bumpMap: strawGrain, bumpScale: 2.6, roughness: 0.92 });
     const add = (m: THREE.Object3D, parent: THREE.Object3D = this.group): THREE.Object3D => {
       m.traverse((o) => {
         (o as THREE.Mesh).castShadow = true;
@@ -175,10 +186,10 @@ export class Home {
       }
       stump.computeVertexNormals();
     }
-    const stumpMat = kit?.barkDark ? new THREE.MeshStandardMaterial({ map: kit.bark, bumpMap: kit.bark, bumpScale: 3.5, color: 0xcdb9a2, roughness: 0.95 }) : bark;
+    const stumpMat = kit?.barkDark ? new THREE.MeshStandardMaterial({ map: barkPaint, bumpMap: barkPaint, bumpScale: 4, color: 0xa69a84, roughness: 0.95 }) : bark;
     if (kit?.barkDark) {
       const uv = stump.attributes.uv;
-      for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 5, uv.getY(i) * 1.6);
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 3, uv.getY(i) * 1.1);
     }
     add(new THREE.Mesh(stump, stumpMat));
     for (let i = 0; i < 6; i++) {
