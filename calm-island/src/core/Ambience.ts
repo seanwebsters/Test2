@@ -16,6 +16,8 @@ export interface AmbienceMix {
   trees: number;
 }
 
+export type Sfx = 'wood' | 'shell' | 'seed' | 'acorn' | 'tap' | 'open' | 'close' | 'merge' | 'mergeBig' | 'fire' | 'talk' | 'hello' | 'pin' | 'camp' | 'sit';
+
 export class Ambience {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -257,6 +259,99 @@ export class Ambience {
       o.start(t);
       o.stop(t + 2.3);
     });
+  }
+
+  /** One plain note: the building block of the little sounds below. */
+  private tone(at: number, freq: number, dur: number, gain: number, type: OscillatorType = 'sine', slideTo = 0): void {
+    const ctx = this.ctx!;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, at);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, at + dur);
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.linearRampToValueAtTime(gain, at + Math.min(0.012, dur * 0.3));
+    g.gain.exponentialRampToValueAtTime(0.0004, at + dur);
+    o.connect(g).connect(this.master!);
+    o.start(at);
+    o.stop(at + dur + 0.03);
+  }
+
+  /** The small sounds of doing things: each a few notes or a puff of noise, never a recording. */
+  sfx(kind: Sfx): void {
+    if (!this.ctx || !this.master || !this.noise) return;
+    const n = this.ctx.currentTime;
+    const r = 0.94 + Math.random() * 0.12;
+    switch (kind) {
+      case 'wood': // two hollow knocks, one log against another
+        this.tone(n, 210 * r, 0.09, 0.2, 'triangle', 130);
+        this.burst(n, 'bandpass', 900, 2, 0.05, 0.12, 0.8);
+        this.tone(n + 0.09, 260 * r, 0.08, 0.15, 'triangle', 160);
+        this.burst(n + 0.09, 'bandpass', 1300, 2, 0.04, 0.08, 1);
+        break;
+      case 'shell': // glassy and bright, with a drop of water
+        this.tone(n, 1318 * r, 0.35, 0.09);
+        this.tone(n + 0.07, 1760 * r, 0.4, 0.07);
+        this.tone(n + 0.14, 2637 * r, 0.3, 0.035);
+        break;
+      case 'seed': // a soft pop
+        this.tone(n, 620 * r, 0.09, 0.15, 'sine', 1180);
+        this.burst(n, 'highpass', 4200, 0.6, 0.05, 0.03, 1.3);
+        break;
+      case 'acorn': // a woody tok
+        this.tone(n, 430 * r, 0.07, 0.2, 'triangle', 290);
+        this.burst(n, 'bandpass', 2000, 3, 0.03, 0.09, 1.1);
+        break;
+      case 'tap': // choosing something
+        this.tone(n, 880 * r, 0.06, 0.07, 'triangle');
+        break;
+      case 'open':
+        this.tone(n, 523, 0.14, 0.08);
+        this.tone(n + 0.07, 784, 0.2, 0.08);
+        this.burst(n, 'bandpass', 1200, 0.6, 0.18, 0.03, 1);
+        break;
+      case 'close':
+        this.tone(n, 784, 0.12, 0.07);
+        this.tone(n + 0.07, 523, 0.18, 0.07);
+        break;
+      case 'merge': // three quick rising notes and a sprinkle
+        [659, 880, 1175].forEach((f, i) => this.tone(n + i * 0.06, f, 0.3, 0.1));
+        this.burst(n + 0.12, 'highpass', 5200, 0.5, 0.35, 0.04, 1.4);
+        this.tone(n, 160, 0.14, 0.12, 'sine', 90);
+        break;
+      case 'mergeBig': // a collection finished: a run up the scale over a warm swell
+        [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => this.tone(n + i * 0.085, f, 1.3, 0.09));
+        this.tone(n, 131, 1.2, 0.14);
+        this.burst(n + 0.3, 'highpass', 5000, 0.5, 0.9, 0.05, 1.5);
+        break;
+      case 'fire': // a match, a whoomph, and the first crackles
+        this.burst(n, 'highpass', 3800, 0.8, 0.16, 0.1, 1.6);
+        this.burst(n + 0.16, 'lowpass', 420, 0.6, 0.9, 0.28, 0.5);
+        this.tone(n + 0.16, 90, 0.5, 0.16, 'sine', 55);
+        for (let i = 0; i < 8; i++) this.burst(n + 0.45 + i * 0.13 + Math.random() * 0.08, 'bandpass', 1500 + Math.random() * 3000, 2.5, 0.04, 0.09, 0.8 + Math.random());
+        break;
+      case 'talk': { // an old, kindly mumble: a few low notes of different heights
+        const k = 3 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < k; i++) this.tone(n + i * 0.085, (170 + Math.random() * 90) * r, 0.075, 0.09, 'triangle');
+        break;
+      }
+      case 'hello': // a friend noticing you
+        this.tone(n, 880 * r, 0.11, 0.07, 'sine', 990);
+        this.tone(n + 0.11, 1175 * r, 0.2, 0.07, 'sine', 1320);
+        break;
+      case 'pin':
+        this.tone(n, 660, 0.08, 0.1, 'triangle');
+        this.tone(n + 0.08, 990, 0.16, 0.09, 'triangle');
+        break;
+      case 'camp': // something large arriving: a long breath of air under a slow climb
+        this.burst(n, 'bandpass', 500, 0.5, 2.2, 0.16, 0.6);
+        [262, 330, 392, 523, 659, 784, 1047].forEach((f, i) => this.tone(n + 0.3 + i * 0.22, f, 1.6, 0.08));
+        break;
+      case 'sit': // settling down
+        this.burst(n, 'lowpass', 300, 0.7, 0.2, 0.1, 0.6);
+        this.burst(n + 0.03, 'bandpass', 2400, 0.7, 0.18, 0.04, 1);
+        break;
+    }
   }
 
   /** A small watery plip, for skimming stones. */
