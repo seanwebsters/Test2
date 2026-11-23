@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mulberry32 } from '../core/math';
-import { WORLD_UV_GLSL, globalUniforms } from './shared';
+import { WORLD_UV_GLSL, globalUniforms, paintTexture } from './shared';
 
 export interface GrassOptions {
   patch: number;
@@ -8,6 +8,8 @@ export interface GrassOptions {
   bladeHeight: number;
   bladeWidth: number;
   seed: number;
+  /** painted tufts: each instance is a card carrying a whole clump of blades */
+  tuft?: boolean;
   /** far layers use a single triangle per blade */
   simple?: boolean;
   /** blades closer than this to the player are left to a finer layer */
@@ -35,7 +37,20 @@ export class Grass {
   constructor(heightTex: THREE.Texture, groundTex: THREE.Texture, private opts: GrassOptions) {
     const w = opts.bladeWidth / 2;
     const geo = new THREE.InstancedBufferGeometry();
-    if (opts.simple) {
+    const T = opts.tuft ? '1.0' : '0.0';
+    if (opts.tuft) {
+      // a card three rows tall, so it can bend in the wind
+      const pos: number[] = [];
+      const uv: number[] = [];
+      for (const y of [0, 0.5, 1]) {
+        pos.push(-w, y, 0, w, y, 0);
+        uv.push(0, y, 1, y);
+      }
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      geo.setAttribute('normal', new THREE.Float32BufferAttribute(new Array(6).fill([0, 1, 0]).flat(), 3));
+      geo.setIndex([0, 1, 2, 1, 3, 2, 2, 3, 4, 3, 5, 4]);
+    } else if (opts.simple) {
       geo.setAttribute('position', new THREE.Float32BufferAttribute([-w, 0, 0, w, 0, 0, 0, 1, 0], 3));
       geo.setAttribute('normal', new THREE.Float32BufferAttribute([0, 1, 0, 0, 1, 0, 0, 1, 0], 3));
     } else {
@@ -62,8 +77,10 @@ export class Grass {
     this.uniforms.uHeightTex.value = heightTex;
     this.uniforms.uGroundTex.value = groundTex;
 
-    const mat = new THREE.MeshLambertMaterial({ side: THREE.DoubleSide });
+    const mat = new THREE.MeshLambertMaterial({ side: THREE.DoubleSide, alphaTest: opts.tuft ? 0.42 : 0 });
+    const tuftTex = opts.tuft ? paintTexture('tuft') : null;
     mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uTuft = { value: tuftTex };
       Object.assign(shader.uniforms, this.uniforms, {
         uTime: globalUniforms.uTime,
         uWorldSize: globalUniforms.uWorldSize,
@@ -86,6 +103,7 @@ export class Grass {
           float gHash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
           float gNoise2(vec2 p) { vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(gHash(i), gHash(i + vec2(1.0, 0.0)), f.x), mix(gHash(i + vec2(0.0, 1.0)), gHash(i + vec2(1.0, 1.0)), f.x), f.y); }
           varying vec3 vGrassCol;
+          varying vec2 vTuftUv;
           varying float vBladeX;
           varying float vFlower;
           varying vec3 vFlowerCol;
@@ -113,7 +131,7 @@ export class Grass {
           float bend = position.y * position.y;
           // (a flowering stem carries a little head: the blade swells near its tip instead of tapering away)
           float flSeed = fract(aOffset.w * 53.0 + aOffset.z * 7.0);
-          float head = step(0.955, flSeed) * smoothstep(0.5, 0.75, gNoise2(base * 0.09 + 77.0)) * smoothstep(0.7, 0.9, position.y);
+          float head = (1.0 - ${T}) * step(0.955, flSeed) * smoothstep(0.5, 0.75, gNoise2(base * 0.09 + 77.0)) * smoothstep(0.7, 0.9, position.y);
           float wide = position.x + sign(position.x + 0.0001) * head * 0.05 * (1.0 - smoothstep(0.93, 1.0, position.y));
           vec3 local = vec3(cos(ang) * wide, position.y * hgt, sin(ang) * wide);
           // wind: a slow swell with quick ripples running across it
@@ -146,7 +164,11 @@ export class Grass {
           // the crest of each gust catches the light as it rolls across the meadow
           vSheen = smoothstep(0.35, 1.0, swell) * 0.6 + smoothstep(0.5, 1.0, ripple) * 0.25;
           vBladeY = position.y;
-          vBladeX = position.x * ${(1 / w).toFixed(2)};`,
+          vBladeX = position.x * ${(1 / w).toFixed(2)};
+          // which of the two painted tufts, and which way round
+          vTuftUv = vec2((position.x * ${(0.5 / w).toFixed(3)} + 0.5) * (fract(aOffset.z * 13.0) > 0.5 ? 1.0 : -1.0), position.y);
+          vTuftUv.x = fract(vTuftUv.x) * 0.5 + step(0.5, fract(aOffset.w * 29.0)) * 0.5;
+          vFlower *= 1.0 - ${T};`,
         );
       shader.fragmentShader = shader.fragmentShader
         .replace(
@@ -157,8 +179,10 @@ export class Grass {
           varying float vSheen;
           varying float vFlower;
           varying float vBladeX;
+          varying vec2 vTuftUv;
           varying vec3 vFlowerCol;
-          uniform vec3 uSunGrass;`,
+          uniform vec3 uSunGrass;
+          uniform sampler2D uTuft;`,
         )
         .replace(
           '#include <color_fragment>',
@@ -171,8 +195,15 @@ export class Grass {
           float throughGrass = pow(max(dot(-normalize(vViewPosition), sunGrassV), 0.0), 4.0);
           diffuseColor.rgb += vec3(0.2, 0.22, 0.02) * throughGrass * vBladeY;
           // each blade is folded along a darker midrib, with one side catching more light than the other
-          diffuseColor.rgb *= 1.0 - 0.2 * (1.0 - smoothstep(0.0, 0.3, abs(vBladeX))) * (1.0 - vBladeY * 0.6);
-          diffuseColor.rgb *= 1.0 + 0.13 * vBladeX;
+          if (${T} > 0.5) {
+            // the painted tuft supplies the blades: its light and shade over the meadow's colour
+            vec4 tuft = texture2D(uTuft, vec2(clamp(vTuftUv.x, 0.004, 0.996), vTuftUv.y * 0.98 + 0.01));
+            diffuseColor.rgb *= tuft.rgb * 1.3;
+            diffuseColor.a = tuft.a;
+          } else {
+            diffuseColor.rgb *= 1.0 - 0.2 * (1.0 - smoothstep(0.0, 0.3, abs(vBladeX))) * (1.0 - vBladeY * 0.6);
+            diffuseColor.rgb *= 1.0 + 0.13 * vBladeX;
+          }
           diffuseColor.rgb = min(diffuseColor.rgb, vec3(0.8)); // grass must never be bright enough to glow
           diffuseColor.rgb = mix(diffuseColor.rgb, vFlowerCol * 0.86, vFlower * smoothstep(0.78, 0.88, vBladeY));`,
         )
