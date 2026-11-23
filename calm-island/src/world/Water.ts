@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { glowDot } from './Trail';
 import { HIGH_SHORE, LOW_SHORE, RIVER_HALF_WIDTH, SEA_LEVEL, WATER_DROP, polylineAt, type Island } from './islandMap';
 import { SKY_TOP } from './Sky';
-import { NOISE_GLSL, WORLD_UV_GLSL, fogMask, globalUniforms, skyTex, canopyTex } from './shared';
+import { NOISE_GLSL, WORLD_UV_GLSL, fogMask, globalUniforms, skyTex, canopyTex, paintTexture } from './shared';
 
 const VERT = /* glsl */ `
 #include <common>
@@ -31,6 +31,7 @@ uniform vec3 uDeep;
 uniform vec3 uSky;
 uniform vec3 uSkyTop;
 uniform sampler2D uRefl;
+uniform sampler2D uPaintWater;
 uniform float uReflLevel;
 uniform float uReflOn;
 uniform vec2 uResolution;
@@ -68,6 +69,9 @@ void main() {
   // dancing light on the shallows
   float ca = vnoise(p * 0.8 + N.xz * 4.0 + uTime * 0.35);
   col += pow(ca, 4.0) * 0.35 * (1.0 - dk);
+  // painted ripples of light: two layers sliding past each other, strongest in clear shallow water
+  float pr = texture2D(uPaintWater, p * 0.085 + N.xz * 0.6 + uTime * vec2(0.012, 0.008)).r * texture2D(uPaintWater, p * 0.061 - uTime * vec2(0.009, 0.013) + 0.4).r;
+  col += vec3(0.75, 1.0, 0.95) * pr * (0.9 - 0.6 * dk);
   // the surface mirrors the sky: pale at the horizon, deep blue overhead
   vec3 Rv = reflect(-V, N);
   vec3 skyRefl = mix(uSky, uSkyTop, pow(clamp(Rv.y, 0.0, 1.0), 0.6));
@@ -190,6 +194,7 @@ export class Water {
   private reflPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private reflUniforms = {
     uRefl: { value: this.reflTarget.texture },
+    uPaintWater: { value: paintTexture('water') },
     uReflLevel: { value: -999 },
     uReflOn: { value: 0 },
     uResolution: { value: new THREE.Vector2(1280, 720) },
@@ -360,6 +365,7 @@ export class Water {
         uSky: { value: sky },
         uSkyTop: { value: SKY_TOP },
         uRefl: this.reflUniforms.uRefl,
+        uPaintWater: this.reflUniforms.uPaintWater,
         uReflLevel: this.reflUniforms.uReflLevel,
         uReflOn: this.reflUniforms.uReflOn,
         uResolution: this.reflUniforms.uResolution,

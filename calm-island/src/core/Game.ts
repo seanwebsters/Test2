@@ -43,7 +43,7 @@ import { loadKit } from '../world/Kit';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { Vegetation } from '../world/Vegetation';
 import { Water } from '../world/Water';
-import { SUN_DIR, clearFog, fogClearAt, globalUniforms, makeHeightTexture, resetFog, paintCanopy } from '../world/shared';
+import { SUN_DIR, clearFog, fogClearAt, globalUniforms, makeHeightTexture, resetFog, paintCanopy, preloadPaint } from '../world/shared';
 import { Ambience } from './Ambience';
 import { BREATHS, Breathing } from './Breathing';
 import { Input } from './Input';
@@ -436,6 +436,7 @@ export class Game {
 
     setSeason(currentSeason(this.opts.season ?? (this.settings.tropical ? 'spring' : this.settings.season === 'auto' ? null : this.settings.season)));
     this.weather = new Weather(SEASON === 'winter');
+    await preloadPaint();
     await step(0.08, 'Raising hills from the sea…');
     this.island = getIsland();
     const heightTex = makeHeightTexture(this.island);

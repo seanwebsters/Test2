@@ -219,6 +219,27 @@ export function paintTexture(name: string): THREE.Texture {
   return t;
 }
 
+/** Fetch every painted texture before the world is built, so nothing is ever drawn without its paint. */
+export async function preloadPaint(): Promise<void> {
+  await Promise.all(
+    ['wood', 'brush', 'cloth', 'leaf', 'rock', 'soil', 'water', 'bark', 'thatch'].map(async (name) => {
+      try {
+        const t = await new THREE.TextureLoader().loadAsync(`${import.meta.env.BASE_URL}textures/${name}.webp`);
+        t.colorSpace = THREE.SRGBColorSpace;
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.anisotropy = 4;
+        paintCache.set(name, t);
+      } catch {
+        // without it the surface is simply plain: a 1x1 white stands in
+        const t = new THREE.DataTexture(new Uint8Array([205, 205, 205, 255]), 1, 1);
+        t.colorSpace = THREE.SRGBColorSpace;
+        t.needsUpdate = true;
+        paintCache.set(name, t);
+      }
+    }),
+  );
+}
+
 /**
  * Lays a painted detail texture over a plainly coloured material, projected from
  * whichever side each face looks out of, so shapes built in code need no texture

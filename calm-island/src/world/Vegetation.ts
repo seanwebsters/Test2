@@ -105,7 +105,7 @@ function mossy<T extends THREE.Material>(mat: T): T {
 /** Lambert material with vertex colours and a gentle wind sway above `base`. */
 function foliageMaterial(sway: number, base: number, doubleSide = false, leafy = false, bloom = false, map: THREE.Texture | null = null, crownY = 0): THREE.MeshLambertMaterial {
   const mat = new THREE.MeshLambertMaterial({ vertexColors: !map, map, alphaTest: map ? 0.32 : 0, side: doubleSide ? THREE.DoubleSide : THREE.FrontSide });
-  if (!map) paintify(mat, 'leaf', bloom ? 3.2 : 1.1, bloom ? 0.55 : 0.9);
+  if (!map) paintify(mat, bloom ? 'brush' : 'leaf', bloom ? 6 : 2.2, bloom ? 0.9 : 1.0);
   const painted = mat.onBeforeCompile;
   mat.onBeforeCompile = (shader, renderer) => {
     painted.call(mat, shader, renderer);

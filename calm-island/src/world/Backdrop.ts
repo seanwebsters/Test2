@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { paintify } from './shared';
 
 /**
  * A ring of far mountains out across the sea. They are never reached: they
@@ -13,8 +14,9 @@ export class Backdrop {
       const v = Math.sin(i * 91.7 + 13.3) * 43758.5453;
       return v - Math.floor(v);
     };
-    const rock = new THREE.MeshLambertMaterial({ color: 0x8f9fc0, flatShading: false });
-    const green = new THREE.MeshLambertMaterial({ color: 0x7fa88a });
+    // painted strata and crags, large enough to read from across the sea
+    const rock = paintify(new THREE.MeshLambertMaterial({ color: 0x9aa8c6, flatShading: false }), 'rock', 0.011, 0.95);
+    const green = paintify(new THREE.MeshLambertMaterial({ color: 0x86b090 }), 'leaf', 0.02, 0.8);
     let n = 0;
     for (let i = 0; i < 22; i++) {
       const a = (i / 22) * Math.PI * 2 + rnd(n++) * 0.2;
