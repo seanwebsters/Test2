@@ -27,8 +27,10 @@ export function renderPortrait(model: THREE.Object3D, size = 220): string {
     const key = new THREE.DirectionalLight(0xfff2dc, 2.4);
     key.position.set(2, 3, 4);
     scene.add(key);
-    const copy = model.clone(true);
+    // (the model itself, not a copy: a copy of a skinned mesh would still hang on the original's bones)
+    const copy = model;
     scene.add(copy);
+    copy.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(copy);
     const dim = box.getSize(new THREE.Vector3());
     const mid = box.getCenter(new THREE.Vector3());
@@ -37,6 +39,7 @@ export function renderPortrait(model: THREE.Object3D, size = 220): string {
     cam.position.set(mid.x + dim.x * 0.25, mid.y + dim.y * 0.12, mid.z + 10);
     cam.lookAt(mid.x, mid.y + dim.y * 0.04, mid.z);
     renderer.render(scene, cam);
+    scene.remove(copy);
     return renderer.domElement.toDataURL('image/png');
   }
 }
