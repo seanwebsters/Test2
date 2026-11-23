@@ -1096,3 +1096,11 @@ body.talking #hud, body.talking #touch { opacity: 0; pointer-events: none; trans
 #talk-badge.hidden { display: none; }
 #talk-badge::before { content: '♥ '; } #talk-badge::after { content: ' ♥'; }
 @keyframes badge-in { from { transform: translateX(-50%) scale(.3); opacity: 0; } }
+
+/* the loading screen waits for one tap, so the music can play from the very start */
+#ld-tap { display: none; }
+#loading.await-tap { cursor: pointer; }
+#loading.await-tap #ld-tap { display: inline-block; margin: 26px 0 6px; padding: 15px 42px 17px; border: 0; border-radius: 999px; font: 600 22px var(--ui); color: #fff; -webkit-text-stroke: 0; text-shadow: 0 2px 0 rgba(40,110,30,.55); cursor: pointer;
+  background: radial-gradient(130% 150% at 50% 0%, #d8fbb0 0%, #84d862 48%, #58bb4a 100%); box-shadow: inset 0 4px 8px rgba(255,255,255,.6), 0 0 0 3px #fff6d0, 0 0 0 4.5px #e9b95a, 0 14px 24px rgba(30,60,40,.32); animation: ld-tap 1.6s ease-in-out infinite; }
+#loading.await-tap .ld-track, #loading.await-tap #loading-text, #loading.await-tap #loading-tip { visibility: hidden; height: 0; margin: 0; overflow: hidden; }
+@keyframes ld-tap { 50% { transform: scale(1.06); } }
