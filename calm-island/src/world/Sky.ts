@@ -13,6 +13,12 @@ export class Sky {
   private stars: THREE.Points;
 
   constructor() {
+    // a painted cloudscape wrapped right round the horizon: towering cumulus, lit by the day's own colours
+    const painted = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}textures/sky.webp`);
+    painted.wrapS = THREE.RepeatWrapping;
+    painted.wrapT = THREE.ClampToEdgeWrapping;
+    painted.generateMipmaps = false;
+    painted.minFilter = THREE.LinearFilter;
     this.dome = new THREE.Mesh(
       new THREE.SphereGeometry(3500, 32, 16),
       new THREE.ShaderMaterial({
@@ -24,6 +30,8 @@ export class Sky {
           uHorizon: { value: SKY_HORIZON },
           uSunDir: globalUniforms.uSunDir,
           uDayLight: globalUniforms.uDayLight,
+          uClouds: { value: painted },
+          uTime: globalUniforms.uTime,
         },
         vertexShader: /* glsl */ `
           varying vec3 vDir;
@@ -36,13 +44,30 @@ export class Sky {
           uniform vec3 uHorizon;
           uniform vec3 uSunDir;
           uniform float uDayLight;
+          uniform sampler2D uClouds;
+          uniform float uTime;
           varying vec3 vDir;
           void main() {
             vec3 d = normalize(vDir);
             float h = clamp(d.y, 0.0, 1.0);
             vec3 col = mix(uHorizon, uTop, pow(h, 0.5));
+            col = mix(col, col * 1.08 + vec3(0.03, 0.05, 0.06), pow(h, 0.7)); // a bright, airy blue overhead, never heavy
             col = mix(col, uHorizon, smoothstep(0.02, -0.1, d.y));
             float s = max(dot(d, uSunDir), 0.0);
+            // warmth pooling in the sky around the sun
+            col += vec3(1.0, 0.72, 0.42) * pow(s, 3.0) * 0.16 * uDayLight * (1.0 - h * 0.6);
+            // the painted clouds
+            float el = asin(clamp(d.y, -1.0, 1.0));
+            vec2 cuv = vec2(atan(d.z, d.x) / 6.2831853 * 2.0 + uTime * 0.0005, clamp(el / 0.8 + 0.04, 0.0, 1.0));
+            vec4 cl = texture2D(uClouds, cuv);
+            float ca = cl.a * (1.0 - smoothstep(0.92, 1.0, cuv.y)) * smoothstep(-0.06, 0.0, el);
+            vec3 cloudLit = mix(vec3(1.0, 0.985, 0.96), uHorizon * 1.2, 0.3) + vec3(1.0, 0.82, 0.55) * pow(s, 5.0) * 0.4;
+            vec3 cloudShade = mix(mix(uTop, uHorizon, 0.8), vec3(1.0), 0.3) * vec3(0.98, 0.96, 1.03); // pale, luminous shadows
+            vec3 cloudCol = mix(cloudShade, cloudLit, smoothstep(0.05, 0.95, cl.r)) * mix(0.45, 1.0, uDayLight);
+            // the bases melt into the haze along the horizon
+            cloudCol = mix(cloudCol, uHorizon, smoothstep(0.2, 0.0, el) * 0.55);
+            col = mix(col, cloudCol, ca);
+            s *= 1.0 - ca * 0.85;
             // a warm sun by day, a small cool moon by night
             vec3 disc = mix(vec3(0.75, 0.85, 1.0), vec3(1.0, 0.93, 0.78), uDayLight);
             col += disc * (pow(s, 1400.0) * 6.0 + (pow(s, 40.0) * 0.22 + pow(s, 5.0) * 0.07) * uDayLight);
@@ -178,6 +203,7 @@ export class Sky {
       mesh.position.set(Math.cos(ang) * dist, horizon ? 90 + rnd() * 160 : 230 + rnd() * 170, Math.sin(ang) * dist);
       mesh.rotation.y = (rnd() - 0.5) * 0.6;
       mesh.frustumCulled = false;
+      mesh.visible = !horizon; // the painted cloudscape is the horizon now; only the drifting clouds overhead are modelled
       this.clouds.push({ mesh, speed: 2 + rnd() * 2.5 });
       this.group.add(mesh);
     }
