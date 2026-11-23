@@ -92,6 +92,13 @@ export const HORNED_RIG: SculptRig = { ...BLUE_RIG, hip: [0.3, -0.84] };
 export const BANDANA_RIG: SculptRig = { armX: 0.56, armTop: -0.08, armBottom: -0.72, shoulder: [0.62, -0.1], hip: [0.3, -0.8] };
 export const PINK_RIG: SculptRig = { armX: 0.5, armTop: -0.22, armBottom: -0.74, shoulder: [0.6, -0.24], hip: [0.33, -0.66] };
 
+interface Bone { bone: THREE.Bone; local: THREE.Quaternion; world: THREE.Quaternion; pos: THREE.Vector3; parentInv: THREE.Quaternion }
+const AXIS_X = new THREE.Vector3(1, 0, 0);
+const AXIS_Z = new THREE.Vector3(0, 0, 1);
+const Q1 = new THREE.Quaternion();
+const Q2 = new THREE.Quaternion();
+const V1 = new THREE.Vector3();
+
 export class CalmlingModel {
   readonly root = new THREE.Group();
   private tilt = new THREE.Group();
@@ -121,6 +128,9 @@ export class CalmlingModel {
   private furVel = new THREE.Vector3();
   private lookX = 0;
   private sit = 0;
+  /** the bones of a properly rigged model, with how each lies at rest */
+  private bones: Record<string, Bone> | null = null;
+  private sitSlide = new THREE.Vector3();
   private waving = 0;
   private breath = 0;
   private eyesShut = 0;
@@ -415,7 +425,22 @@ export class CalmlingModel {
       if ((o as THREE.Mesh).isMesh) skin = o as THREE.Mesh;
     });
     const lids: THREE.Object3D[] = [];
-    if (skin) {
+    // A model with a real skeleton (rigged in Blender) is posed by its bones instead.
+    const bones: Record<string, Bone> = {};
+    model.updateMatrixWorld(true);
+    const rootInv = model.getWorldQuaternion(new THREE.Quaternion()).invert();
+    model.traverse((o) => {
+      if (!(o as THREE.Bone).isBone) return;
+      const world = o.getWorldQuaternion(new THREE.Quaternion()).premultiply(rootInv);
+      const parent = o.parent ? o.parent.getWorldQuaternion(new THREE.Quaternion()).premultiply(rootInv) : new THREE.Quaternion();
+      bones[o.name] = { bone: o as THREE.Bone, local: o.quaternion.clone(), world, pos: o.position.clone(), parentInv: parent.invert() };
+    });
+    const boned = ['armL', 'armR', 'legL', 'legR'].every((n) => bones[n]);
+    if (boned) {
+      this.bones = bones;
+      this.sitSlide.set(0, r.sit?.[1] ?? 0.05, r.sit?.[0] ?? 0.34);
+      model.traverse((o) => (o.frustumCulled = false)); // a posed mesh outgrows the box it was given
+    } else if (skin) {
       const mesh = skin as THREE.Mesh;
       const S = mesh.scale.x.toFixed(4);
       const f = (n: number): string => n.toFixed(3);
@@ -677,6 +702,20 @@ export class CalmlingModel {
       r.uSit.value = this.sit * (1 - this.sleep);
       r.uLegL.value = clamp(this.legL.rotation.x * 0.75, -1.15, 1.15);
       r.uLegR.value = clamp(this.legR.rotation.x * 0.75, -1.15, 1.15);
+      if (this.bones) {
+        // the same numbers, given to real bones: each turn is about the model's own axes, from the rest pose
+        const B = this.bones;
+        const turn = (b: Bone, lift: number, swing: number, slide: number): void => {
+          Q1.setFromAxisAngle(AXIS_Z, lift).multiply(Q2.setFromAxisAngle(AXIS_X, swing));
+          b.bone.quaternion.copy(b.local).multiply(Q2.copy(b.world).invert()).multiply(Q1).multiply(b.world);
+          b.bone.position.copy(b.pos);
+          if (slide) b.bone.position.add(V1.copy(this.sitSlide).multiplyScalar(slide).applyQuaternion(b.parentInv));
+        };
+        turn(B.armL, -r.uLiftL.value, r.uArmL.value, 0);
+        turn(B.armR, r.uLiftR.value, r.uArmR.value, 0);
+        turn(B.legL, 0, r.uLegL.value, r.uSit.value);
+        turn(B.legR, 0, r.uLegR.value, r.uSit.value);
+      }
       for (const l of this.rig.lids) {
         l.visible = lid < 0.97;
         l.scale.y = Math.max(0.03, (1 - lid) * 1.55);
