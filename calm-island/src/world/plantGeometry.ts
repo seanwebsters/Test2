@@ -38,7 +38,17 @@ function paint(geo: THREE.BufferGeometry, fn: ColorFn): THREE.BufferGeometry {
 }
 
 function merge(list: THREE.BufferGeometry[]): THREE.BufferGeometry {
-  const out = mergeGeometries(list.map((g) => (g.index ? g.toNonIndexed() : g)));
+  const flat = list.map((g) => (g.index ? g.toNonIndexed() : g));
+  // fronds carry where each point lies on its leaf; anything merged with them gets a "not a leaf" marker
+  if (flat.some((g) => g.attributes.aLeaf)) {
+    for (const g of flat) {
+      if (g.attributes.aLeaf) continue;
+      const a = new Float32Array(g.attributes.position.count * 2);
+      for (let i = 0; i < a.length; i += 2) a[i + 1] = -1;
+      g.setAttribute('aLeaf', new THREE.BufferAttribute(a, 2));
+    }
+  }
+  const out = mergeGeometries(flat);
   if (!out) throw new Error('could not merge plant geometry');
   return out;
 }
@@ -258,6 +268,7 @@ export function pineTree(variant: number, detail: number): THREE.BufferGeometry 
 /** A leaf blade that arcs up and droops over: palm fronds, ferns, big tropical leaves. */
 function frond(length: number, width: number, rise: number, droop: number, base: THREE.Color, tip: THREE.Color, segs = 8): THREE.BufferGeometry {
   const pos: number[] = [];
+  const leaf: number[] = [];
   const idx: number[] = [];
   for (let i = 0; i <= segs; i++) {
     const t = i / segs;
@@ -266,6 +277,7 @@ function frond(length: number, width: number, rise: number, droop: number, base:
     const w = width * Math.pow(Math.sin(Math.PI * Math.min(1, t * 0.92 + 0.06)), 0.7) * 0.5;
     const fold = w * 0.45;
     pos.push(x, y - fold, -w, x, y, 0, x, y - fold, w);
+    leaf.push(-1, t + 0.01, 0, t + 0.01, 1, t + 0.01); // (never exactly 0: that is what a shape with no leaf data reads as)
     if (i > 0) {
       const a = (i - 1) * 3;
       const b = i * 3;
@@ -274,6 +286,7 @@ function frond(length: number, width: number, rise: number, droop: number, base:
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('aLeaf', new THREE.Float32BufferAttribute(leaf, 2));
   g.setIndex(idx);
   g.computeVertexNormals();
   return paint(g, (p, _n, c) => {

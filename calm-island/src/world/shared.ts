@@ -222,7 +222,7 @@ export function paintTexture(name: string): THREE.Texture {
 /** Fetch every painted texture before the world is built, so nothing is ever drawn without its paint. */
 export async function preloadPaint(): Promise<void> {
   await Promise.all(
-    ['wood', 'brush', 'cloth', 'leaf', 'rock', 'soil', 'water', 'bark', 'thatch', 'tuft'].map(async (name) => {
+    ['wood', 'brush', 'cloth', 'leaf', 'rock', 'soil', 'water', 'bark', 'thatch', 'tuft', 'foliage'].map(async (name) => {
       try {
         const t = await new THREE.TextureLoader().loadAsync(`${import.meta.env.BASE_URL}textures/${name}.webp`);
         t.colorSpace = THREE.SRGBColorSpace;

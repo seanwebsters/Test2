@@ -105,7 +105,9 @@ function mossy<T extends THREE.Material>(mat: T): T {
 /** Lambert material with vertex colours and a gentle wind sway above `base`. */
 function foliageMaterial(sway: number, base: number, doubleSide = false, leafy = false, bloom = false, map: THREE.Texture | null = null, crownY = 0): THREE.MeshLambertMaterial {
   const mat = new THREE.MeshLambertMaterial({ vertexColors: !map, map, alphaTest: map ? 0.32 : 0, side: doubleSide ? THREE.DoubleSide : THREE.FrontSide });
-  if (!map) paintify(mat, bloom ? 'brush' : 'leaf', bloom ? 6 : 2.2, bloom ? 0.9 : 1.0);
+  // crowns are painted with massed leaves; single leaves and fronds get their veins drawn below
+  if (!map && (leafy || bloom)) paintify(mat, bloom ? 'brush' : 'foliage', bloom ? 6 : 0.42, bloom ? 0.9 : 1.0);
+  const fronds = !map && !leafy && !bloom;
   const painted = mat.onBeforeCompile;
   mat.onBeforeCompile = (shader, renderer) => {
     painted.call(mat, shader, renderer);
@@ -125,6 +127,22 @@ function foliageMaterial(sway: number, base: number, doubleSide = false, leafy =
         }
         #include <opaque_fragment>`,
       );
+    if (fronds) {
+      // each frond: a pale midrib, fine veins sweeping out to the edge, and a lighter rim
+      shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nattribute vec2 aLeaf;\nvarying vec2 vLeafUv;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvLeafUv = aLeaf;');
+      shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vLeafUv;').replace(
+        '#include <color_fragment>',
+        /* glsl */ `#include <color_fragment>
+        if (vLeafUv.y > 0.005) {
+          float ax = abs(vLeafUv.x);
+          float rib = 1.0 - smoothstep(0.0, 0.09, ax);
+          float veins = smoothstep(0.75, 1.0, sin((vLeafUv.y * 26.0 - ax * 3.2) * 6.2831) * 0.5 + 0.5) * smoothstep(0.05, 0.3, ax);
+          diffuseColor.rgb *= 1.0 - 0.2 * veins;
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.5 + vec3(0.05, 0.07, 0.0), rib * 0.6);
+          diffuseColor.rgb *= mix(0.82, 1.12, smoothstep(-1.0, 1.0, vLeafUv.x)) * (1.0 + 0.2 * smoothstep(0.8, 1.0, ax));
+        }`,
+      );
+    }
     shader.uniforms.uSunDirW = globalUniforms.uSunDir;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform vec3 uPlayer;')
@@ -235,7 +253,7 @@ export class Vegetation {
     const rockMat = mossy(new THREE.MeshLambertMaterial({ vertexColors: true }));
 
     const treeKind = (make: (detail: number) => THREE.BufferGeometry): Kind => ({
-      hi: make(4), lo: make(2), material: tree, shadow: true, lodDist: 30, farDist: 120, cullDist: 1e9, tint: false, receive: false,
+      hi: make(4), lo: make(2), material: tree, shadow: true, lodDist: 62, farDist: 150, cullDist: 1e9, tint: false, receive: false,
     });
     const broad = [0, 1, 2].map((v) => treeKind((d) => plants.broadleafTree(v, d)));
     const cherry = [0, 1].map((v) => treeKind((d) => plants.cherryTree(v, d)));
