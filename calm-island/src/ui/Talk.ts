@@ -3,13 +3,25 @@ import * as THREE from 'three';
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
 /** A head-and-shoulders picture of a sculpted Calmling, for the speech bubble. Call before the model is rigged. */
+let studio: THREE.WebGLRenderer | null = null;
+
+/** Put away the little renderer the portraits are drawn with, once they have all been taken. */
+export function donePortraits(): void {
+  studio?.dispose();
+  studio?.forceContextLoss();
+  studio = null;
+}
+
 export function renderPortrait(model: THREE.Object3D, size = 220): string {
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
-  try {
-    renderer.setPixelRatio(1);
-    renderer.setSize(size, size, false);
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.NeutralToneMapping;
+  if (!studio) {
+    studio = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+    studio.setPixelRatio(1);
+    studio.setSize(size, size, false);
+    studio.outputColorSpace = THREE.SRGBColorSpace;
+    studio.toneMapping = THREE.NeutralToneMapping;
+  }
+  const renderer = studio;
+  {
     const scene = new THREE.Scene();
     scene.add(new THREE.HemisphereLight(0xffffff, 0xd8c8b0, 2.4));
     const key = new THREE.DirectionalLight(0xfff2dc, 2.4);
@@ -26,9 +38,6 @@ export function renderPortrait(model: THREE.Object3D, size = 220): string {
     cam.lookAt(mid.x, mid.y + dim.y * 0.04, mid.z);
     renderer.render(scene, cam);
     return renderer.domElement.toDataURL('image/png');
-  } finally {
-    renderer.dispose();
-    renderer.forceContextLoss();
   }
 }
 
@@ -63,7 +72,10 @@ export class Talk {
     return !$('talk').classList.contains('hidden');
   }
 
-  say(name: string, portrait: string, lines: string[], done: () => void): void {
+  /** `badge` is a line shown beneath, such as "New friend · 3 of 18". */
+  say(name: string, portrait: string, lines: string[], done: () => void, badge = ''): void {
+    $('talk-badge').textContent = badge;
+    $('talk-badge').classList.toggle('hidden', !badge);
     this.lines = lines;
     this.at = 0;
     this.done = done;

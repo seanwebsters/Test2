@@ -23,7 +23,8 @@ import { Finds } from '../world/Finds';
 import { Fireflies } from '../world/Fireflies';
 import { Campsite } from '../world/Campsite';
 import { MergeBoard } from '../merge/board';
-import { renderPortrait, Talk } from '../ui/Talk';
+import { donePortraits, renderPortrait, Talk } from '../ui/Talk';
+import { Burst } from '../world/Burst';
 import { MergeScreen } from '../merge/MergeScreen';
 import { COSY, renderIcons } from '../merge/items';
 
@@ -181,11 +182,17 @@ export class Game {
   /** seconds into the campsite's arrival, or -1 */
   private campShow = -1;
   private calmName = '';
+  /** when a name has been asked for (by Kupuna), what happens once it is given */
+  private nameThen: (() => void) | null = null;
+  private askName: (then: () => void) => void = (then) => then();
   /** the fire by the treehouse: lit once a day, and it burns for a while */
   private fireDay = '';
   private fireUntil = 0;
   private talk = new Talk();
   private kupunaFace = './brand/friend-head.webp';
+  /** a portrait of each sculpted friend, for when they speak */
+  private faces = new Map<string, string>();
+  private burst = new Burst();
   /** the player has taken hold of the camera during the fall in */
   private arriveLook = false;
   /** the springs in the order the chapters visit them: nearest home first, then on round the island */
@@ -498,13 +505,30 @@ export class Game {
       const field = document.getElementById('namer-input') as HTMLInputElement;
       const done = (): void => {
         if (namer.classList.contains('hidden')) return;
+        const then = this.nameThen;
+        if (then && !field.value.trim()) {
+          // asked for a name: one must be given
+          field.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-7px)' }, { transform: 'translateX(7px)' }, { transform: 'translateX(0)' }], { duration: 260 });
+          field.focus();
+          return;
+        }
         this.calmName = field.value.trim().slice(0, 14);
         this.ui.calmName = this.calmName;
         document.getElementById('hud-day')!.textContent = this.calmName || `Day ${Math.max(1, this.days)}`;
         namer.classList.add('hidden');
         field.blur();
+        this.ambience.sfx('pin');
         this.save();
-        this.play();
+        if (then) {
+          this.nameThen = null;
+          then();
+        } else this.play();
+      };
+      this.askName = (then) => {
+        this.nameThen = then;
+        field.value = this.calmName;
+        namer.classList.remove('hidden');
+        window.setTimeout(() => field.focus(), 60);
       };
       document.getElementById('hud-ava')!.addEventListener('click', () => {
         if (!this.ready || !this.playing || this.campShow >= 0 || this.player.arriving) return;
@@ -548,7 +572,7 @@ export class Game {
     this.scene.add(this.garden.group, this.weather.mesh);
     this.scene.add(this.ambient.group);
     this.fireflies = new Fireflies(this.island);
-    this.scene.add(this.fireflies.points);
+    this.scene.add(this.fireflies.points, this.burst.points);
 
     this.sun.castShadow = true;
     this.sun.shadow.radius = 3;
@@ -605,12 +629,11 @@ export class Game {
         ([['dadirri', 'pink', PINK_RIG], ['apricus', 'orange', ORANGE_RIG], ['psithuros', 'yeti', YETI_RIG], ['kintsugi', 'volcanic', BLUE_RIG], ['meraki', 'heart', BLUE_RIG], ['komorebi', 'sun', BLUE_RIG], ['wabisabi', 'patchwork', ORANGE_RIG], ['genkaku', 'hooded', HOODED_RIG], ['misogi', 'sparkly', SPARKLY_RIG], ['morgenfrisk', 'fluffy', BLUE_RIG], ['gokotta', 'spiky', BLUE_RIG], ['kupuna', 'elder', ELDER_RIG], ['desbundar', 'party', ORANGE_RIG], ['shinrin', 'mossy', BLUE_RIG], ['harmonia', 'eyelash', ORANGE_RIG], ['extrawunsch', 'scholar', ORANGE_RIG], ['mangata', 'horned', HORNED_RIG], ['shu', 'peach', BLUE_RIG]] as const).map(async ([id, file, rig]) => {
           try {
             const glb = await new GLTFLoader().loadAsync(`${base}models/calmling/${file}.glb`);
-            if (id === 'kupuna') {
-              try {
-                this.kupunaFace = renderPortrait(glb.scene);
-              } catch (err) {
-                console.info('No portrait for Kupuna:', err);
-              }
+            try {
+              this.faces.set(id, renderPortrait(glb.scene));
+              if (id === 'kupuna') this.kupunaFace = this.faces.get(id)!;
+            } catch (err) {
+              console.info(`No portrait for ${id}:`, err);
             }
             this.npcs.find((n) => n.who.id === id)?.model.useSculpt(glb.scene, rig);
           } catch (err) {
@@ -618,6 +641,7 @@ export class Game {
           }
         }),
       );
+      donePortraits();
     }
     this.pickDaily();
     // one friend lives close by, down the earth path by the river: the first you are sent to find
@@ -1384,25 +1408,38 @@ export class Game {
     k.returning = false;
     k.sync();
     this.player.yaw = this.rig.yaw + Math.PI;
-    this.rig.pitch = 0.16;
-    this.rig.dist = 6.4;
+    // over your shoulder, so he stands clear beside you in the picture
+    this.rig.yaw += 0.45;
+    this.rig.pitch = 0.22;
+    this.rig.dist = 5.6;
+    this.rig.snap(this.player);
     this.openCard();
     document.body.classList.add('talking');
     this.talk.onLine = () => this.ambience.sfx('talk');
-    this.talk.say('Kupuna', this.kupunaFace, [
-      'Great Gongs! I never thought I would see a new Calmling float down from the clouds!',
-      'Welcome to Calm Island. I am Kupuna. I keep the fire by the little treehouse, and the treehouse is yours now.',
-      'The island went quiet while it waited, and some of its cosy places faded away.',
-      'Gather the little things glowing in the grass. Merge three of a kind, and watch what comes back.',
-      'And light the fire once a day. Whoever you have befriended will come and sit with us while it burns.',
-      'Go on, follow the warm light home. I will be by the fire.',
-    ], () => {
+    const finish = (): void => {
       document.body.classList.remove('talking');
       k.hold = false;
       k.returning = true;
       this.met.add('kupuna');
       this.save();
       this.play();
+    };
+    this.talk.say('Kupuna', this.kupunaFace, [
+      'Great Gongs! I never thought I would see a new Calmling float down from the clouds!',
+      'Welcome to Calm Island. I am Kupuna. I keep the fire by the little treehouse, and the treehouse is yours now.',
+      'But where are my manners? What shall we call you, little one?',
+    ], () => {
+      // he waits while you choose your name, then carries on, using it
+      this.askName(() => {
+        k.cheer();
+        this.talk.say('Kupuna', this.kupunaFace, [
+          `${this.calmName}! Now that is a fine name.`,
+          'The island went quiet while it waited, and some of its cosy places faded away.',
+          'Gather the little things glowing in the grass. Merge three of a kind, and watch what comes back.',
+          'And light the fire once a day. Whoever you have befriended will come and sit with us while it burns.',
+          `Go on, ${this.calmName}, follow the warm light home. I will be by the fire.`,
+        ], finish);
+      });
     });
   }
 
@@ -1834,10 +1871,42 @@ export class Game {
     this.met.add(npc.who.id);
     this.reveal(npc.pos.x, npc.pos.z, 96);
     this.ambience.chime();
-    this.ui.moment(`You found a friend · ${this.met.size} of ${this.npcs.length}`, npc.who.name, npc.who.meaning);
-    // swing the camera round so they are framed beyond the player
-    this.momentYaw = Math.atan2(this.player.pos.x - npc.pos.x, this.player.pos.z - npc.pos.z);
-    this.momentUntil = globalUniforms.uTime.value + 4.5;
+    // a moment of its own: the view moves in on them, they hop and wave in a shower of sparkles,
+    // and they say hello and tell you what their name means
+    const back = Math.atan2(this.player.pos.x - npc.pos.x, this.player.pos.z - npc.pos.z);
+    const keep = { yaw: this.rig.yaw, pitch: this.rig.pitch, dist: this.rig.dist };
+    // (from a little above, so low plants do not get in the way)
+    // and from over your shoulder, so they stand clear beside you in the picture
+    this.rig.yaw = back + 0.48;
+    this.rig.pitch = 0.3;
+    this.rig.dist = 4.8;
+    this.rig.snap(this.player);
+    this.player.yaw = back + Math.PI;
+    npc.yaw = back;
+    npc.hold = true;
+    npc.cheer();
+    this.burst.fire(npc.pos);
+    this.ambience.sfx('hello');
+    this.openCard();
+    document.body.classList.add('talking');
+    this.talk.onLine = () => this.ambience.sfx('talk');
+    const [tongue, sense] = npc.who.meaning.includes(': ') ? npc.who.meaning.split(': ') : ['', npc.who.meaning];
+    this.talk.say(
+      npc.who.name,
+      this.faces.get(npc.who.id) ?? './brand/friend-head.webp',
+      [npc.who.hello, `I am ${npc.who.name}. ${tongue ? `In ${tongue}, my name means` : 'My name means'} "${sense}".`, npc.who.story],
+      () => {
+        document.body.classList.remove('talking');
+        npc.hold = false;
+        this.rig.pitch = keep.pitch;
+        this.rig.dist = keep.dist;
+        this.rig.snap(this.player);
+        this.burst.fire(npc.pos, 0xffe9a0);
+        this.ambience.sfx('merge');
+        this.play();
+      },
+      `New friend · ${this.met.size} of ${this.npcs.length}`,
+    );
     // a little later they mention someone else worth finding
     if (this.tut >= 9) window.setTimeout(() => this.introduce(npc), 9500);
     // take their picture once the air has cleared
@@ -2823,6 +2892,7 @@ export class Game {
     this.grassFar.update(this.grassCenter.copy(p).addScaledVector(this.fwd, 36), p);
     this.vegetation.update(this.camera.position, QUALITY_PRESETS[this.settings.quality].distance);
     this.ambient.update(dt, globalUniforms.uTime.value, p, this.player.speed, this.player.grounded, this.day.night);
+    this.burst.update(dt);
     this.fireflies.points.visible = !this.inside;
     this.fireflies.update(globalUniforms.uTime.value, p, 1 - globalUniforms.uDayLight.value + this.day.night);
     for (const npc of this.npcs) {
