@@ -42,6 +42,8 @@ export class Talk {
   private shown = 0;
   private timer = 0;
   private done: (() => void) | null = null;
+  /** called as each line begins, for a voice */
+  onLine: (() => void) | null = null;
 
   constructor() {
     $('talk').addEventListener('click', (e) => {
@@ -74,6 +76,7 @@ export class Talk {
   private write(): void {
     window.clearInterval(this.timer);
     this.shown = 0;
+    this.onLine?.();
     const text = this.lines[this.at];
     const out = $('talk-text');
     out.textContent = '';

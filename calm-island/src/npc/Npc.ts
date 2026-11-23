@@ -139,6 +139,8 @@ export class Npc {
   stayFace = new THREE.Vector3();
   /** standing still, attention on the player (while they are speaking) */
   hold = false;
+  /** set for one frame as they notice the player, so the game can give them a voice */
+  greetNow = false;
   gatherFace = new THREE.Vector3();
   /** what they are doing just now, for the game to mention (null while pottering) */
   doing: string | null = null;
@@ -219,6 +221,7 @@ export class Npc {
     else if (toPlayer < 9 && !this.greeted && !this.following && !this.gather) {
       this.greeted = true;
       this.greetT = GREET;
+      this.greetNow = true;
       this.model.impulse(1.1);
     }
     if (this.greetT > 0) this.greetT -= dt;

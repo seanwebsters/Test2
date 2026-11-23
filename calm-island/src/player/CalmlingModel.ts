@@ -591,7 +591,8 @@ export class CalmlingModel {
       this.armL.rotation.x = lerp(this.armL.rotation.x, 0, s2);
       this.armR.rotation.x = lerp(this.armR.rotation.x, 0, s2);
     }
-    const lift = this.surf * 1.1 + this.air * 1.15 + this.run * 0.18 + this.swim * 0.9 + this.glide * 1.5;
+    // (gliding, the hands go right up to grip the vines of the leaf)
+    const lift = this.surf * 1.1 + this.air * 1.15 * (1 - this.glide) + this.run * 0.18 + this.swim * 0.9 + this.glide * (this.rig ? 1.85 : 1.5);
     const idleSway = Math.sin(t * 1.9) * 0.04 * (1 - this.move);
     this.armL.rotation.x = -s * armSwing + Math.sin(t * 4) * 0.5 * this.swim;
     this.armR.rotation.x = s * armSwing - Math.sin(t * 4) * 0.5 * this.swim;
@@ -601,6 +602,14 @@ export class CalmlingModel {
     this.armL.rotation.z = -(0.14 + lift + idleSway + this.breath * 0.42);
     this.armR.rotation.z = 0.14 + lift + idleSway + this.breath * 0.42;
 
+    // hanging under the leaf: the feet pedal at the air and the body swings a little
+    if (this.glide > 0.01) {
+      const kick = Math.sin(t * 6.2) * 0.42 * this.glide;
+      this.legL.rotation.x += kick;
+      this.legR.rotation.x -= kick;
+      this.tilt.rotation.z += Math.sin(t * 1.7) * 0.07 * this.glide;
+      this.tilt.rotation.x += Math.sin(t * 1.3 + 1) * 0.05 * this.glide;
+    }
     // waving hello: one arm goes up and wags, with a happy little bob
     this.waving = damp(this.waving, pose.wave ?? 0, 9, dt);
     if (this.waving > 0.002) {
@@ -663,8 +672,8 @@ export class CalmlingModel {
       const r = this.rig.u;
       r.uArmL.value = clamp(this.armL.rotation.x * 0.8, -1.2, 1.2);
       r.uArmR.value = clamp(this.armR.rotation.x * 0.8, -1.2, 1.2);
-      r.uLiftL.value = clamp((-this.armL.rotation.z - 0.14) * 0.85, 0, 1.25);
-      r.uLiftR.value = clamp((this.armR.rotation.z - 0.14) * 0.85, 0, 1.25 + 0.5 * this.waving);
+      r.uLiftL.value = clamp((-this.armL.rotation.z - 0.14) * 0.85, 0, 1.25 + 1.1 * this.glide);
+      r.uLiftR.value = clamp((this.armR.rotation.z - 0.14) * 0.85, 0, 1.25 + 0.5 * this.waving + 1.1 * this.glide);
       r.uSit.value = this.sit * (1 - this.sleep);
       r.uLegL.value = clamp(this.legL.rotation.x * 0.75, -1.15, 1.15);
       r.uLegR.value = clamp(this.legR.rotation.x * 0.75, -1.15, 1.15);
@@ -1349,8 +1358,21 @@ function makeLeaf(): THREE.Group {
   const leaf = new THREE.Mesh(blade, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
   leaf.castShadow = true;
   leaf.position.y = 0.62;
-  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.028, 0.62, 6).translate(0, 0.31, 0), new THREE.MeshLambertMaterial({ color: 0x3f9a40 }));
-  g.add(leaf, stem);
+  g.add(leaf);
+  // held, not worn: a vine runs down from each side of the leaf to a hand
+  const vine = new THREE.MeshLambertMaterial({ color: 0x3f9a40 });
+  for (const s of [-1, 1]) {
+    const top = new THREE.Vector3(s * 0.66, 0.44, 0);
+    const hand = new THREE.Vector3(s * 0.82, -0.88, 0.04);
+    const len = top.distanceTo(hand);
+    const v = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.02, len, 6), vine);
+    v.position.copy(top).add(hand).multiplyScalar(0.5);
+    v.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), top.clone().sub(hand).normalize());
+    g.add(v);
+    const knot = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), vine);
+    knot.position.copy(hand);
+    g.add(knot);
+  }
   g.position.set(0, 1.42, 0.02);
   return g;
 }

@@ -480,7 +480,7 @@ export class Game {
       this.mergeUI = new MergeScreen(this.board, icons, {
         onClose: () => this.closeMerge(),
         onChange: () => this.save(),
-        onSound: (kind) => (kind === 'win' ? this.ambience.chime() : this.ambience.plip(kind === 'merge' ? 1 : 0.35)),
+        onSound: (kind) => this.ambience.sfx(kind === 'win' ? 'mergeBig' : kind),
         onReward: (chain) => {
           if (chain === COSY) this.revealCamp();
         },
@@ -1052,8 +1052,9 @@ export class Game {
         this.ui.prompt2(null);
         if (this.input.interactPressed()) {
           const first = this.board.seen.size === 0;
-          const cell = this.board.add(this.finds.take(find, Date.now()));
-          this.ambience.plip(0.85);
+          const code = this.finds.take(find, Date.now());
+          const cell = this.board.add(code);
+          this.ambience.sfx((['shell', 'seed', 'acorn', 'wood'] as const)[code >> 2] ?? 'wood');
           try {
             navigator.vibrate?.(12);
           } catch {
@@ -1073,7 +1074,7 @@ export class Game {
         this.ui.prompt2(null);
         if (this.input.interactPressed() && this.player.sit()) {
           this.player.yaw = Math.atan2(this.camp.x - p.x, this.camp.z - p.z);
-          this.ambience.crackle(0.5);
+          this.ambience.sfx('sit');
           this.flags.add('campfire');
         }
         return;
@@ -1174,7 +1175,7 @@ export class Game {
           this.gatherCheck = 0;
           this.flags.add('fire');
           this.did('fire');
-          this.ambience.chime();
+          this.ambience.sfx('fire');
           const friends = [...this.met].filter((id) => id !== 'kupuna').length;
           this.ui.toast('', 'The fire is lit', friends ? `It burns for ${FIRE_MS / 60000} minutes. Your friends are on their way` : `It burns for ${FIRE_MS / 60000} minutes. Make a friend and they will come and sit here`);
           this.save();
@@ -1383,6 +1384,7 @@ export class Game {
     this.rig.dist = 6.4;
     this.openCard();
     document.body.classList.add('talking');
+    this.talk.onLine = () => this.ambience.sfx('talk');
     this.talk.say('Kupuna', this.kupunaFace, [
       'Great Gongs! I never thought I would see a new Calmling float down from the clouds!',
       'Welcome to Calm Island. I am Kupuna. I keep the fire by the little treehouse, and the treehouse is yours now.',
@@ -1406,12 +1408,14 @@ export class Game {
     this.openCard();
     this.board.fresh = 0;
     this.mergeBadge();
+    this.ambience.sfx('open');
     this.mergeUI.open();
   }
 
   private closeMerge(): void {
     if (!this.mergeUI.isOpen) return;
     this.mergeUI.close();
+    this.ambience.sfx('close');
     this.save();
     this.play();
   }
@@ -1441,7 +1445,7 @@ export class Game {
     this.input.enabled = false;
     this.campShow = 0;
     this.wayTarget = null;
-    this.ambience.chime();
+    this.ambience.sfx('camp');
     this.save();
   }
 
@@ -2184,6 +2188,7 @@ export class Game {
         if (this.wayTarget && Math.hypot(this.wayTarget.x - x, this.wayTarget.z - z) < 26) this.wayTarget = null;
         else if (this.island.heightAt(x, z) >= 0.15) this.wayTarget = { x, z };
         else return;
+        this.ambience.sfx(this.wayTarget ? 'pin' : 'tap');
         this.nextCheck = 0; // the sparkles turn toward it straight away
         this.openMap();
       });
@@ -2788,6 +2793,11 @@ export class Game {
     this.wild.update(globalUniforms.uTime.value, this.day.night, Date.now(), this.camera.position);
     this.finds.update(globalUniforms.uTime.value, Date.now(), this.camera.position, this.player.pos);
     this.camp.update(dt, globalUniforms.uTime.value);
+    if (this.camp.unlocked && this.player) {
+      // the campfire can be heard as you come near
+      const cd = Math.hypot(this.camp.x - this.player.pos.x, this.camp.z - this.player.pos.z);
+      if (cd < 18 && Math.random() < dt * 4) this.ambience.crackle(Math.min(1, 5 / (cd + 2)));
+    }
     this.springs.update(globalUniforms.uTime.value, this.day.night);
     // the music hushes for sleep, and beside a lit fire
     const hush = this.sleeping || (this.home.lit && !!this.player && Math.hypot(this.home.fireSpot.x - p.x, this.home.fireSpot.z - p.z) < 14);
@@ -2809,7 +2819,13 @@ export class Game {
     this.grassFar.update(this.grassCenter.copy(p).addScaledVector(this.fwd, 36), p);
     this.vegetation.update(this.camera.position, QUALITY_PRESETS[this.settings.quality].distance);
     this.ambient.update(dt, globalUniforms.uTime.value, p, this.player.speed, this.player.grounded, this.day.night);
-    for (const npc of this.npcs) npc.update(dt, globalUniforms.uTime.value, this.player, this.camera.position, this.day.hour);
+    for (const npc of this.npcs) {
+      npc.update(dt, globalUniforms.uTime.value, this.player, this.camera.position, this.day.hour);
+      if (npc.greetNow) {
+        npc.greetNow = false;
+        if (this.playing) this.ambience.sfx('hello');
+      }
+    }
     // keep the shadow box centred on the Calmling, snapped so edges don't shimmer
     const snap = 92 / this.sun.shadow.mapSize.x * 4;
     this.sun.target.position.set(Math.round(p.x / snap) * snap, Math.round(p.y / snap) * snap, Math.round(p.z / snap) * snap);
