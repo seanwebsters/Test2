@@ -96,7 +96,8 @@ export class Home {
   /** Small solid things around the house, as [x, z, radius] in world metres. */
   readonly solids: [number, number, number][] = [];
 
-  constructor(island: Island, kit: Kit | null = null) {
+  /** `roof`: the thatched roof modelled in Blender; without it the roof is laid from bundles as before. */
+  constructor(island: Island, kit: Kit | null = null, roof: THREE.BufferGeometry | null = null) {
     this.x = HOME_SPOT.x;
     this.z = HOME_SPOT.z;
     const y = island.heightAt(this.x, this.z);
@@ -186,7 +187,7 @@ export class Home {
       }
       stump.computeVertexNormals();
     }
-    const stumpMat = kit?.barkDark ? new THREE.MeshStandardMaterial({ map: barkPaint, bumpMap: barkPaint, bumpScale: 4, color: 0xa69a84, roughness: 0.95 }) : bark;
+    const stumpMat = kit?.barkDark ? new THREE.MeshStandardMaterial({ map: barkPaint, bumpMap: barkPaint, bumpScale: 4, color: 0x8c9486, roughness: 0.95 }) : bark;
     if (kit?.barkDark) {
       const uv = stump.attributes.uv;
       for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 3, uv.getY(i) * 1.1);
@@ -382,7 +383,7 @@ export class Home {
     const strawMix = [thatch, thatchLight, thatch, thatchDark];
     const TIERS = 3;
     for (const side of [-1, 1]) {
-      for (let tier = 0; tier < TIERS; tier++) {
+      for (let tier = 0; tier < (roof ? 0 : TIERS); tier++) {
         const mid = (tier + 0.5) / TIERS + 0.02;
         const lift = 0.16 + (TIERS - 1 - tier) * 0.19;
         const cols = 15;
@@ -403,6 +404,14 @@ export class Home {
       }
       // barge boards finishing the gable ends
       for (const sx of [-HW - 0.62, HW + 0.62]) piece(unitBox, frameWood, sx, RIDGE - (RISE + DROP) / 2 + 0.05, side * (RUN / 2), 0.12, 0.24, SLEN + 0.2, side * SLOPE, 0, 0);
+    }
+    if (roof) {
+      // one thick, settled, shaggy roof: three lapped layers and a ridge roll, sculpted and shaded in Blender
+      const mat = straw(0xffe28a);
+      mat.vertexColors = true;
+      const m = new THREE.Mesh(roof, mat);
+      m.castShadow = m.receiveShadow = true;
+      this.group.add(m);
     }
     const ridgeWood = wood(0xa9703c);
     piece(unitBox, ridgeWood, 0, RIDGE + 0.46, 0, HW * 2 + 1.5, 0.3, 0.46);

@@ -474,7 +474,20 @@ export class Game {
     this.skimming = new Skimming(this.island);
     this.fishing = new Fishing(this.island);
     const kit = this.opts.plainPlants ? null : await loadKit(base);
-    this.home = new Home(this.island, kit);
+    let roof: THREE.BufferGeometry | null = null;
+    if (!this.opts.plainPlants) {
+      try {
+        const glb = await new GLTFLoader().loadAsync(`${base}models/home/roof.glb`);
+        glb.scene.updateMatrixWorld(true);
+        glb.scene.traverse((o) => {
+          const m = o as THREE.Mesh;
+          if (m.isMesh) roof = m.geometry.clone().applyMatrix4(m.matrixWorld);
+        });
+      } catch (err) {
+        console.info('Sculpted roof unavailable, laying it from bundles:', err);
+      }
+    }
+    this.home = new Home(this.island, kit, roof);
     this.vegetation.colliders.add(this.home.x, this.home.z, 3.7);
     for (const [sx, sz, sr] of this.home.solids) this.vegetation.colliders.add(sx, sz, sr);
     this.springs = new Springs(this.island, this.vegetation.colliders);
