@@ -826,7 +826,7 @@ export class Game {
       // contact shade and sun shafts come in with the better presets
       this.post.ao = s.quality === 'ultra' ? 1 : s.quality === 'high' ? 0.85 : 0;
       this.post.rays = s.quality === 'ultra' ? 0.3 : s.quality === 'high' ? 0.24 : s.quality === 'medium' ? 0.16 : 0;
-      this.post.dof = s.quality === 'ultra' ? 1 : s.quality === 'high' ? 0.8 : 0;
+      this.post.dof = s.quality === 'ultra' ? 0.3 : s.quality === 'high' ? 0.22 : 0; // a touch of softness far away, never a blur over the world
     }
     this.grassNear?.setDensity(preset.grass * s.grassDensity);
     this.grassFar?.setDensity(preset.grass * s.grassDensity);
