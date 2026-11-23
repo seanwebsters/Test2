@@ -103,7 +103,7 @@ export class Game {
   private sun = new THREE.DirectionalLight(0xffecc8, 3.0);
   private hemi = new THREE.HemisphereLight(0xcfe6ff, 0x9cc76a, 1.55);
   private timer = new THREE.Timer();
-  private music = new Music(`${import.meta.env.BASE_URL}audio/woodland-walk.wav`);
+  private music = new Music(`${import.meta.env.BASE_URL}audio/woodland-walk.mp3`);
   private playing = false;
   private discovered = new Set<string>();
   private currentRegion: Region | null = null;
@@ -182,6 +182,8 @@ export class Game {
   /** seconds into the campsite's arrival, or -1 */
   private campShow = -1;
   private calmName = '';
+  /** settles once the loading screen has been tapped (or sound was already allowed) */
+  private tapped: Promise<void> = Promise.resolve();
   /** when a name has been asked for (by Kupuna), what happens once it is given */
   private nameThen: (() => void) | null = null;
   private askName: (then: () => void) => void = (then) => then();
@@ -402,6 +404,21 @@ export class Game {
       void this.music.start();
       const wake = (): void => void this.music.start();
       for (const ev of ['pointerdown', 'touchend', 'keydown', 'click']) window.addEventListener(ev, wake, { passive: true });
+      // A browser will not play a note until the page has been touched. So the loading screen opens
+      // with one big "Tap to begin": the island wakes behind it, and the music plays from that tap on.
+      const loading = document.getElementById('loading')!;
+      this.tapped = new Promise<void>((done) => {
+        const go = (): void => {
+          loading.classList.remove('await-tap');
+          for (const ev of ['pointerdown', 'keydown']) window.removeEventListener(ev, go);
+          done();
+        };
+        window.setTimeout(() => {
+          if (this.music.running) return done(); // already allowed (a return visit on desktop, say)
+          loading.classList.add('await-tap');
+          for (const ev of ['pointerdown', 'keydown']) window.addEventListener(ev, go);
+        }, 350);
+      });
     }
     window.addEventListener('beforeunload', () => this.save());
     document.addEventListener('visibilitychange', () => {
@@ -744,6 +761,8 @@ export class Game {
     await step(1, 'Ready');
 
     this.ready = true;
+    // the loading screen stays up until it has been tapped, unless the music is already playing
+    await this.tapped;
     this.ui.showStart(!!save);
     this.renderer.setAnimationLoop(() => this.frame());
   }

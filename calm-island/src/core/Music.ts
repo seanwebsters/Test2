@@ -13,6 +13,11 @@ export class Music {
 
   constructor(private url: string) {}
 
+  /** Sound is actually coming out (the browser has allowed it). */
+  get running(): boolean {
+    return this.ctx?.state === 'running';
+  }
+
   async start(): Promise<void> {
     if (this.started) {
       void this.ctx?.resume();
