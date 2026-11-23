@@ -204,3 +204,51 @@ float fbm2(vec2 p) {
   return vnoise(p) * 0.6 + vnoise(p * 2.13 + 7.0) * 0.3 + vnoise(p * 4.31 + 3.0) * 0.1;
 }
 `;
+
+const paintCache = new Map<string, THREE.Texture>();
+/** One of the hand-painted detail textures (neutral: they add brushwork and grain, not colour). */
+export function paintTexture(name: string): THREE.Texture {
+  let t = paintCache.get(name);
+  if (!t) {
+    t = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}textures/${name}.webp`);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = 4;
+    paintCache.set(name, t);
+  }
+  return t;
+}
+
+/**
+ * Lays a painted detail texture over a plainly coloured material, projected from
+ * whichever side each face looks out of, so shapes built in code need no texture
+ * coordinates. `scale` is repeats per unit; `strength` how strongly it shows.
+ */
+export function paintify<T extends THREE.Material>(mat: T, name: string, scale = 1, strength = 0.8): T {
+  const before = mat.onBeforeCompile;
+  mat.onBeforeCompile = (shader, renderer) => {
+    before?.call(mat, shader, renderer);
+    shader.uniforms.uPaintTex = { value: paintTexture(name) };
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vPaintP;\nvarying vec3 vPaintN;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPaintP = position;\nvPaintN = normal;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform sampler2D uPaintTex;\nvarying vec3 vPaintP;\nvarying vec3 vPaintN;')
+      .replace(
+        '#include <color_fragment>',
+        /* glsl */ `#include <color_fragment>
+        {
+          vec3 pw = abs(normalize(vPaintN));
+          pw = pw * pw;
+          pw /= (pw.x + pw.y + pw.z);
+          vec3 pp = vPaintP * ${scale.toFixed(3)};
+          vec3 paintCol = texture2D(uPaintTex, pp.zy).rgb * pw.x + texture2D(uPaintTex, pp.xz).rgb * pw.y + texture2D(uPaintTex, pp.xy).rgb * pw.z;
+          diffuseColor.rgb *= mix(vec3(1.0), paintCol * 1.24, ${strength.toFixed(2)});
+        }`,
+      );
+  };
+  // (materials that differ only in which texture they carry can share a program, but not with unpainted ones)
+  const key = mat.customProgramCacheKey?.bind(mat);
+  mat.customProgramCacheKey = () => `${key ? key() : ''}|paint${scale}|${strength}`;
+  return mat;
+}

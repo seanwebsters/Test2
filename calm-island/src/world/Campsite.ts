@@ -5,6 +5,7 @@ import type { Colliders } from './Colliders';
 import type { Island } from './islandMap';
 import { stone } from './Props';
 import { glowDot } from './Trail';
+import { paintify } from './shared';
 
 const REVEAL = 2.6;
 
@@ -105,7 +106,7 @@ export class Campsite {
       s.add(o);
       return o;
     };
-    const mat = (color: number, roughness = 0.8): THREE.MeshStandardMaterial => new THREE.MeshStandardMaterial({ color, roughness });
+    const mat = (color: number, roughness = 0.8): THREE.MeshStandardMaterial => paintify(new THREE.MeshStandardMaterial({ color, roughness }), color === 0x8a5a36 || color === 0xe6c08a ? 'wood' : 'cloth', color === 0x8a5a36 || color === 0xe6c08a ? 0.9 : 1.6, 0.9);
     const mesh = (geo: THREE.BufferGeometry, m: THREE.Material): THREE.Mesh => {
       const o = new THREE.Mesh(geo, m);
       o.castShadow = o.receiveShadow = true;
