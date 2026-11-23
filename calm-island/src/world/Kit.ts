@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { paintify } from './shared';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 /** The building pieces and furniture the treehouse and the market stall are made from. */
@@ -49,6 +50,7 @@ export class Kit {
           alphaTest: /Vine/.test(src.name) ? 0.5 : 0,
           side: THREE.DoubleSide,
         });
+        if (!glass && !/Vine/.test(src.name)) paintify(mat, /wood|plank|bark|log/i.test(src.name) ? 'wood' : 'brush', /wood|plank|bark|log/i.test(src.name) ? 1.2 : 2.4, 0.85);
         this.mats.set(src.name, mat);
       }
       parts.push({ geo, mat });

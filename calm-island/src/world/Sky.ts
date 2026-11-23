@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mulberry32 } from '../core/math';
-import { SUN_DIR, globalUniforms } from './shared';
+import { SUN_DIR, globalUniforms, paintTexture } from './shared';
 
 export const SKY_TOP = new THREE.Color(0x2f86ea);
 export const SKY_HORIZON = new THREE.Color(0xbfe6ff);
@@ -116,11 +116,14 @@ export class Sky {
         uSunDir: globalUniforms.uSunDir,
         uDayLight: globalUniforms.uDayLight,
         uHorizon: { value: SKY_HORIZON },
+        uPaint: { value: paintTexture('brush') },
       },
       vertexShader: /* glsl */ `
         varying vec3 vN;
         varying vec3 vW;
+        varying vec3 vL;
         void main() {
+          vL = position;
           vec4 wp = modelMatrix * instanceMatrix * vec4(position, 1.0);
           vN = normalize(mat3(modelMatrix) * mat3(instanceMatrix) * normal);
           vW = wp.xyz;
@@ -130,11 +133,15 @@ export class Sky {
         uniform vec3 uSunDir;
         uniform float uDayLight;
         uniform vec3 uHorizon;
+        uniform sampler2D uPaint;
         varying vec3 vN;
         varying vec3 vW;
+        varying vec3 vL;
         void main() {
           vec3 n = normalize(vN);
-          float l = dot(n, uSunDir) * 0.45 + n.y * 0.4 + 0.4;
+          // brushwork breaks up the smooth shading, as in a painted sky
+          float brush = (texture2D(uPaint, vL.xy * 0.55 + vL.z * 0.3).r + texture2D(uPaint, vL.zy * 0.9 + 0.37).r) * 0.5;
+          float l = dot(n, uSunDir) * 0.45 + n.y * 0.4 + 0.4 + (brush - 0.8) * 0.9;
           l = smoothstep(0.05, 0.85, l);
           vec3 col = mix(vec3(0.68, 0.78, 0.93), vec3(1.0), l) * mix(vec3(0.3, 0.36, 0.6), vec3(1.0), uDayLight);
           float far = smoothstep(900.0, 3000.0, length(vW.xz - cameraPosition.xz));

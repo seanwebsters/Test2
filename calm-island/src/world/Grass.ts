@@ -86,6 +86,7 @@ export class Grass {
           float gHash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
           float gNoise2(vec2 p) { vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(gHash(i), gHash(i + vec2(1.0, 0.0)), f.x), mix(gHash(i + vec2(0.0, 1.0)), gHash(i + vec2(1.0, 1.0)), f.x), f.y); }
           varying vec3 vGrassCol;
+          varying float vBladeX;
           varying float vFlower;
           varying vec3 vFlowerCol;
           varying float vBladeY;
@@ -144,7 +145,8 @@ export class Grass {
           vFlowerCol = fl > 0.985 ? vec3(1.0, 0.62, 0.78) : fl > 0.97 ? vec3(1.0, 0.86, 0.36) : vec3(1.0, 0.98, 0.92);
           // the crest of each gust catches the light as it rolls across the meadow
           vSheen = smoothstep(0.35, 1.0, swell) * 0.6 + smoothstep(0.5, 1.0, ripple) * 0.25;
-          vBladeY = position.y;`,
+          vBladeY = position.y;
+          vBladeX = position.x * ${(1 / w).toFixed(2)};`,
         );
       shader.fragmentShader = shader.fragmentShader
         .replace(
@@ -154,6 +156,7 @@ export class Grass {
           varying float vBladeY;
           varying float vSheen;
           varying float vFlower;
+          varying float vBladeX;
           varying vec3 vFlowerCol;
           uniform vec3 uSunGrass;`,
         )
@@ -167,6 +170,9 @@ export class Grass {
           vec3 sunGrassV = normalize((viewMatrix * vec4(uSunGrass, 0.0)).xyz);
           float throughGrass = pow(max(dot(-normalize(vViewPosition), sunGrassV), 0.0), 4.0);
           diffuseColor.rgb += vec3(0.2, 0.22, 0.02) * throughGrass * vBladeY;
+          // each blade is folded along a darker midrib, with one side catching more light than the other
+          diffuseColor.rgb *= 1.0 - 0.2 * (1.0 - smoothstep(0.0, 0.3, abs(vBladeX))) * (1.0 - vBladeY * 0.6);
+          diffuseColor.rgb *= 1.0 + 0.13 * vBladeX;
           diffuseColor.rgb = min(diffuseColor.rgb, vec3(0.8)); // grass must never be bright enough to glow
           diffuseColor.rgb = mix(diffuseColor.rgb, vFlowerCol * 0.86, vFlower * smoothstep(0.78, 0.88, vBladeY));`,
         )
