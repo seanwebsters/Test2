@@ -117,6 +117,9 @@ class LightPass extends Pass {
               vec3 shaft = uSunColor * (light / 16.0) * nearSun * nearSun * blocked * uRays;
               c.rgb += shaft * (1.0 - smoothstep(0.5, 1.6, max(c.r, max(c.g, c.b))));
             }
+            // nothing may be so bright (or so broken) that the bloom smears it into a white screen:
+            // a light sitting right against a surface can otherwise come out thousands of times too bright
+            c.rgb = min(max(c.rgb, vec3(0.0)), vec3(5.0));
             gl_FragColor = c;
           }`,
       }),
@@ -219,7 +222,7 @@ export class PostFX {
     u.uFar.value = cam.far;
     u.uAspect.value = cam.aspect;
     u.uTan.value = Math.tan((cam.fov * Math.PI) / 360);
-    this.light.enabled = this.ao > 0 || this.rays > 0 || this.dof > 0;
+    this.light.enabled = true; // always on: it is also where over-bright pixels are capped
   }
 
   render(): void {
