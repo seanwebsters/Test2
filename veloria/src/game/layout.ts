@@ -12,7 +12,7 @@ export const PLACES = {
   bookshopDoor: [9.2, -1.5] as V2,
   garden: [-12.5, -1.5] as V2,
   gardenGate: [-7.6, -1.5] as V2,
-  bench: [-14.5, -4.6] as V2,
+  bench: [-16.1, -1.5] as V2,
   tree: [4.5, 16.2] as V2,
   wake: [2.8, 14.2] as V2,
   bridge: [0, 9.5] as V2,
@@ -129,7 +129,7 @@ export interface Circle {
 export const CIRCLES: Circle[] = [
   { x: 0, z: 0, r: 2.75 }, // fountain
   { x: 4.5, z: 16.2, r: 0.8 }, // wake tree trunk
-  { x: -14.5, z: -4.6, r: 0.9 }, // bench
+  { x: -16.1, z: -1.5, r: 0.7 }, // bench
   ...BLOSSOMS.map(([x, z]) => ({ x, z, r: 0.45 })),
   ...LAMPS.map(([x, z]) => ({ x, z, r: 0.3 })),
 ];

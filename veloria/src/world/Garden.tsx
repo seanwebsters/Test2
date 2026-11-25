@@ -272,7 +272,7 @@ function Bench() {
   const wood = mat('#8a6a5a');
   const iron = mat('#4a4256');
   return (
-    <group position={[x, 0, z]} rotation-y={Math.PI / 4}>
+    <group position={[x, 0, z]} rotation-y={Math.PI / 2}>
       <RoundedBox args={[1.8, 0.1, 0.5]} radius={0.04} position={[0, 0.48, 0]} castShadow material={wood} raycast={nr} />
       <RoundedBox args={[1.8, 0.45, 0.08]} radius={0.04} position={[0, 0.8, -0.22]} castShadow material={wood} raycast={nr} />
       {[-0.75, 0.75].map((lx) => (

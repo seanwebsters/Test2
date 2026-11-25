@@ -233,12 +233,13 @@ export function Him() {
   );
 }
 
-const FOCI: Record<string, { pos: [number, number, number]; look: [number, number, number] }> = {
-  square: { pos: [7, 6.5, 11], look: [0, 1.6, 0] },
-  garden: { pos: [-4.5, 7.5, 7], look: [-12.5, 0.8, -1.5] },
-  bookshop: { pos: [2.5, 5.5, 4.5], look: [11.5, 2.2, -1.2] },
-  tower: { pos: [5, 3.2, -1], look: [0, 10, -12] },
-  tree: { pos: [-1.5, 3.6, 21.5], look: [3.4, 1.0, 14.2] },
+/** cinematic shots: what to look at, and the direction the camera sits from it */
+const FOCI: Record<string, { look: [number, number, number]; off: [number, number, number] }> = {
+  square: { look: [0, 1.2, 0], off: [-4, 9, 6.5] },
+  garden: { look: [-12.5, 0.4, -1.4], off: [5, 8, 2.6] },
+  bookshop: { look: [11, 2.2, -1.2], off: [-7.5, 3.5, 6.5] },
+  tower: { look: [0, 10, -12], off: [3, -6, 13] },
+  tree: { look: [3.4, 0.7, 14.0], off: [-2, 3.2, -5.5] },
 };
 
 export function CameraRig() {
@@ -305,9 +306,9 @@ export function CameraRig() {
       k = 1.2;
     } else if (s.focus && FOCI[s.focus]) {
       const f = FOCI[s.focus];
-      pos.set(...f.pos);
       tgt.set(...f.look);
-      if (portrait) pos.add(new THREE.Vector3(0, 2, 4));
+      pos.set(...f.off).multiplyScalar(portrait ? 1.35 : 1).add(tgt);
+      pos.y = Math.max(pos.y, 1.5);
       k = 1.4;
     } else if (s.dialogue && s.step >= STEP.explore && W.him.distanceTo(W.player) < 7) {
       // over-the-shoulder two-shot
