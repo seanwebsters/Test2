@@ -106,7 +106,7 @@ export function MergeScreen() {
               >
                 {c && !dragging && (
                   <div key={c.uid} className={`piece ${isNew ? 'pop' : 'land'} ${c.kind === 'gen' ? 'gen' : ''}`}>
-                    {c.kind === 'item' ? <ItemIcon item={c.item} size={46} /> : <GenIcon gen={c.gen} size={48} />}
+                    {c.kind === 'item' ? <ItemIcon item={c.item} size={64} /> : <GenIcon gen={c.gen} size={64} />}
                     {c.kind === 'item' && !c.frozen && <span className="lvl">{parse(c.item).level}</span>}
                     {isQuest && <span className="quest-dot" />}
                     {c.kind === 'gen' && !c.frozen && <span className="gen-badge">tap</span>}

@@ -2,8 +2,8 @@
 
 *Somewhere between dreams and reality, he's waiting for you.*
 
-A cozy romantasy merge adventure for portrait mobile, built with React,
-TypeScript and React Three Fiber.
+A cozy romantasy merge adventure for portrait mobile, built with React and
+TypeScript. The town is a layered, hand-painted 2.5D scene.
 
 Each night, a woman falls asleep and wakes in Veloria, a fairytale city
 frozen in time for ninety-seven years. Beneath the great clock tower she
@@ -21,8 +21,7 @@ Open http://localhost:5174. On a phone, open the network URL Vite prints.
 
 - **Explore**: tap or hold on the ground to walk (WASD or arrow keys on
   desktop). Walk through the small lights to gather them. Tap Lucien to talk.
-  Pinch or scroll to zoom.
-- **Merge**: tap a generator to make an item (costs one energy). Drag two
+  - **Merge**: tap a generator to make an item (costs one energy). Drag two
   matching items together to merge them. Frosted items are suspended in
   time: merge next to them to wake them. Deliver orders to restore the city.
 - **Story**: the storybook, with chapters, page turns and collected letters.
@@ -60,8 +59,16 @@ Progress saves automatically in the browser.
 | Path | What it holds |
 | --- | --- |
 | `src/game/` | Game logic and data: items, board, quests, story script, layout, the Zustand store with saving, and audio |
-| `src/world/` | The 3D scene: environment and sky, buildings, fountain, garden, nature, characters, actors and camera, ambient effects |
+| `src/explore/` | The painted town: walking, camera, characters, restoration blending and animated overlays |
 | `src/ui/` | The interface: merge screen, storybook, panels and dialogue, SVG item icons, illustrations |
 
-The nature models are from Quaternius' Stylized Nature MegaKit (CC0); see
-`public/models/*/LICENSE.txt`. Everything else is drawn or generated in code.
+## Art
+
+All art in `public/art/` (the town in its frozen and living versions,
+character sprites and portraits, storybook illustrations, title art and item
+icons) was generated with an image model to match the Veloria mockup.
+
+The frozen and living towns are the same painting, and each restoration
+blends the living version back in over that area. On top of the painting run
+live animations: the clock hands, drifting or suspended petals, fountain
+spray, birds, butterflies, lamp glow, bell rings and light orbs.

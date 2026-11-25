@@ -1,27 +1,113 @@
 import { ChainId } from './items';
 
-/** World positions shared by the 3D scene and the game logic. x/z on the ground; north is -z. */
+/**
+ * Positions in the painted town map, in image pixels (the map is 1024 × 1536).
+ * North is up; y grows towards the viewer.
+ */
 export type V2 = [number, number];
 
+export const MAP_W = 1024;
+export const MAP_H = 1536;
+
 export const PLACES = {
-  fountain: [0, 0] as V2,
-  tower: [0, -14] as V2,
-  towerSteps: [0, -10.4] as V2,
-  himSeat: [0, -10.0] as V2,
-  bookshop: [12, -1.5] as V2,
-  bookshopDoor: [9.2, -1.5] as V2,
-  garden: [-12.5, -1.5] as V2,
-  gardenGate: [-7.6, -1.5] as V2,
-  bench: [-16.1, -1.5] as V2,
-  tree: [4.5, 16.2] as V2,
-  wake: [2.8, 14.2] as V2,
-  bridge: [0, 9.5] as V2,
-  canalZ: 9.5,
-  canalHalf: 1.15,
-  bridgeHalf: 1.7,
+  clockFace: [410, 320] as V2,
+  clockR: 54,
+  towerSteps: [410, 640] as V2,
+  himSeat: [455, 668] as V2,
+  fountain: [508, 812] as V2,
+  bookshopDoor: [748, 700] as V2,
+  gardenGate: [228, 650] as V2,
+  tree: [850, 1290] as V2,
+  wake: [690, 1400] as V2,
+  bridge: [210, 1040] as V2,
+  canal: [150, 1260] as V2,
 } as const;
 
-export const BOUNDS = { minX: -21, maxX: 21, minZ: -18, maxZ: 20 };
+/** walkable regions (polygons); anything outside is scenery */
+const WALK: V2[][] = [
+  // the plaza and the approach to the tower
+  [
+    [40, 760], [120, 700], [200, 668], [300, 660], [345, 640], [352, 600], [470, 600], [475, 640],
+    [560, 650], [620, 660], [690, 700], [690, 748], [760, 752], [900, 760], [1000, 790], [1015, 900],
+    [1000, 990], [900, 1030], [720, 1040], [360, 1050], [300, 1000], [120, 980], [30, 940],
+  ],
+  // into the garden through the rose arch
+  [
+    [200, 610], [262, 610], [300, 680], [60, 760], [30, 720], [90, 690],
+  ],
+  // over the bridge
+  [
+    [30, 1000], [300, 990], [420, 1010], [430, 1070], [300, 1060], [40, 1070],
+  ],
+  // down through the woods to the blossom tree
+  [
+    [340, 1030], [730, 1030], [660, 1140], [640, 1220], [760, 1300], [960, 1360], [1020, 1440],
+    [1020, 1530], [520, 1530], [470, 1420], [420, 1330], [380, 1220], [340, 1120],
+  ],
+];
+
+interface Ellipse {
+  x: number;
+  y: number;
+  rx: number;
+  ry: number;
+}
+
+/** blockers inside the walkable areas */
+const BLOCK: Ellipse[] = [
+  { x: 508, y: 828, rx: 150, ry: 70 }, // fountain basin
+  { x: 116, y: 752, rx: 22, ry: 12 }, // lamps
+  { x: 56, y: 984, rx: 22, ry: 12 },
+  { x: 652, y: 680, rx: 20, ry: 12 },
+  { x: 966, y: 982, rx: 22, ry: 12 },
+  { x: 860, y: 1335, rx: 70, ry: 30 }, // blossom tree trunk
+];
+
+function inPoly(p: V2, poly: V2[]) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i];
+    const [xj, yj] = poly[j];
+    if (yi > p[1] !== yj > p[1] && p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+export function walkable(x: number, y: number): boolean {
+  if (!WALK.some((poly) => inPoly([x, y], poly))) return false;
+  for (const e of BLOCK) {
+    const dx = (x - e.x) / e.rx;
+    const dy = (y - e.y) / e.ry;
+    if (dx * dx + dy * dy < 1) return false;
+  }
+  return true;
+}
+
+/** Step from (x,y) towards (nx,ny), sliding along edges when blocked. */
+export function move(x: number, y: number, nx: number, ny: number): V2 {
+  if (walkable(nx, ny)) return [nx, ny];
+  if (walkable(nx, y)) return [nx, y];
+  if (walkable(x, ny)) return [x, ny];
+  return [x, y];
+}
+
+/** nearest walkable point to a tap (searching outward in rings) */
+export function snap(x: number, y: number): V2 | null {
+  if (walkable(x, y)) return [x, y];
+  for (let r = 12; r < 160; r += 12) {
+    for (let a = 0; a < 16; a++) {
+      const px = x + Math.cos((a / 16) * Math.PI * 2) * r;
+      const py = y + Math.sin((a / 16) * Math.PI * 2) * r * 0.7;
+      if (walkable(px, py)) return [px, py];
+    }
+  }
+  return null;
+}
+
+/** characters look smaller further up the map */
+export function depthScale(y: number) {
+  return 0.78 + ((y - 600) / 900) * 0.34;
+}
 
 export interface Glimmer {
   id: string;
@@ -30,16 +116,16 @@ export interface Glimmer {
 }
 
 export const GLIMMERS: Glimmer[] = [
-  { id: 'g1', pos: [3.6, 4.4], chain: 'bloom' },
-  { id: 'g2', pos: [-5.2, -6.2], chain: 'clock' },
-  { id: 'g3', pos: [6.2, -7.4], chain: 'crystal' },
-  { id: 'g4', pos: [-6.4, 4.6], chain: 'bloom' },
-  { id: 'g5', pos: [7.4, 2.8], chain: 'ink' },
-  { id: 'g6', pos: [-4.2, 13.2], chain: 'crystal' },
-  { id: 'g7', pos: [7.6, 13.0], chain: 'time' },
-  { id: 'g8', pos: [-3.6, -9.4], chain: 'clock' },
-  { id: 'g9', pos: [15.4, 4.2], chain: 'key' },
-  { id: 'g10', pos: [-16.5, 3.6], chain: 'bloom' },
+  { id: 'g1', pos: [300, 860], chain: 'bloom' },
+  { id: 'g2', pos: [590, 690], chain: 'clock' },
+  { id: 'g3', pos: [800, 900], chain: 'crystal' },
+  { id: 'g4', pos: [120, 720], chain: 'bloom' },
+  { id: 'g5', pos: [820, 790], chain: 'ink' },
+  { id: 'g6', pos: [560, 1180], chain: 'crystal' },
+  { id: 'g7', pos: [880, 1460], chain: 'time' },
+  { id: 'g8', pos: [380, 690], chain: 'clock' },
+  { id: 'g9', pos: [150, 1030], chain: 'key' },
+  { id: 'g10', pos: [660, 980], chain: 'bloom' },
 ];
 
 export const GLIMMER_RESPAWN_MS = 75_000;
@@ -51,142 +137,28 @@ export interface Spot {
   label: string;
 }
 
-/** things you can inspect */
+/** things you can look at */
 export const SPOTS: Spot[] = [
-  { id: 'fountain', pos: [0, 2.9], r: 2.4, label: 'Look at the fountain' },
-  { id: 'bird', pos: [-3.6, 3.2], r: 2.0, label: 'Look at the sparrow' },
-  { id: 'garden', pos: PLACES.gardenGate as V2, r: 2.4, label: 'Look into the garden' },
-  { id: 'bookshop', pos: [8.6, -1.5], r: 2.4, label: 'Peer into the bookshop' },
-  { id: 'canal', pos: [-4.5, 7.6], r: 2.0, label: 'Look at the canal' },
-  { id: 'tree', pos: [3.6, 15.2], r: 2.2, label: 'Something among the roots' },
-  { id: 'lamp', pos: [6.6, 6.0], r: 1.6, label: 'Look at the street lamp' },
+  { id: 'fountain', pos: [508, 920], r: 80, label: 'Look at the fountain' },
+  { id: 'bird', pos: [640, 760], r: 60, label: 'Look at the sparrow' },
+  { id: 'garden', pos: [210, 680], r: 70, label: 'Look into the garden' },
+  { id: 'bookshop', pos: [748, 735], r: 70, label: 'Peer into the bookshop' },
+  { id: 'canal', pos: [280, 1060], r: 70, label: 'Look at the canal' },
+  { id: 'tree', pos: [740, 1380], r: 90, label: 'Something among the roots' },
+  { id: 'lamp', pos: [966, 1010], r: 55, label: 'Look at the street lamp' },
 ];
 
 export const LAMPS: V2[] = [
-  [6.9, 6.3],
-  [-6.9, 6.3],
-  [7.8, -5.6],
-  [-7.8, -5.6],
-  [2.6, -9.6],
-  [-2.6, -9.6],
-  [2.4, 8.0],
-  [-2.4, 8.0],
+  [112, 598],
+  [56, 812],
+  [652, 532],
+  [968, 790],
 ];
 
-export interface Box {
-  x: number;
-  z: number;
-  hw: number;
-  hd: number;
-}
-
-/** axis-aligned blockers (buildings, hedges, canal) */
-export const BOXES: Box[] = [
-  { x: 0, z: -14, hw: 3.0, hd: 3.0 }, // tower
-  { x: 0, z: -11.1, hw: 1.8, hd: 0.35 }, // steps (him sits in front)
-  { x: 12.6, z: -1.5, hw: 3.0, hd: 3.2 }, // bookshop
-  // garden hedges (opening on the east side)
-  { x: -12.5, z: -6.0, hw: 4.9, hd: 0.45 },
-  { x: -12.5, z: 3.0, hw: 4.9, hd: 0.45 },
-  { x: -17.3, z: -1.5, hw: 0.45, hd: 4.9 },
-  { x: -7.8, z: -4.6, hw: 0.45, hd: 1.4 },
-  { x: -7.8, z: 1.6, hw: 0.45, hd: 1.4 },
-  // houses
-  { x: -8.5, z: -13.2, hw: 2.4, hd: 2.2 },
-  { x: 8.5, z: -13.2, hw: 2.4, hd: 2.2 },
-  { x: -14.5, z: -11.6, hw: 2.3, hd: 2.3 },
-  { x: 14.5, z: -10.8, hw: 2.3, hd: 2.3 },
-  { x: 13.6, z: 5.4, hw: 2.4, hd: 1.9 },
-  { x: -13.6, z: 6.0, hw: 2.4, hd: 1.9 },
-  { x: 10.6, z: -8.6, hw: 2.1, hd: 1.8 },
-  { x: -10.4, z: -9.0, hw: 2.1, hd: 1.8 },
-  // canal, either side of the bridge
-  { x: -16, z: 9.5, hw: 14.3, hd: 1.15 },
-  { x: 16, z: 9.5, hw: 14.3, hd: 1.15 },
-];
-
-/** round blossom trees dressing the town */
-export const BLOSSOMS: V2[] = [
-  [-6.2, -9.6],
-  [6.4, -10.2],
-  [10.6, 3.2],
-  [-10.4, 4.6],
-  [5.2, -5.8],
-  [-4.8, 5.6],
-  [16.4, -4.8],
-  [-18.4, -7.2],
-  [17.6, 1.6],
-  [3.8, 11.8],
-  [-3.6, 11.6],
-];
-
-export interface Circle {
-  x: number;
-  z: number;
-  r: number;
-}
-
-export const CIRCLES: Circle[] = [
-  { x: 0, z: 0, r: 2.75 }, // fountain
-  { x: 4.5, z: 16.2, r: 0.8 }, // wake tree trunk
-  { x: -16.1, z: -1.5, r: 0.7 }, // bench
-  ...BLOSSOMS.map(([x, z]) => ({ x, z, r: 0.45 })),
-  ...LAMPS.map(([x, z]) => ({ x, z, r: 0.3 })),
-];
-
-/** woodland trees: deterministic scatter south of the canal and round the edges */
-export function woodlandTrees(): { x: number; z: number; s: number; kind: number; pink: boolean; rot: number }[] {
-  let seed = 7;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  const out: { x: number; z: number; s: number; kind: number; pink: boolean; rot: number }[] = [];
-  const ok = (x: number, z: number) => {
-    // keep the path from the bridge to the wake tree clear
-    if (z > 10.5 && z < 19 && Math.abs(x - (z - 10.5) * 0.35) < 3.2) return false;
-    if (Math.hypot(x - PLACES.tree[0], z - PLACES.tree[1]) < 4) return false;
-    for (const t of out) if (Math.hypot(t.x - x, t.z - z) < 3.4) return false;
-    return true;
-  };
-  let tries = 0;
-  while (out.length < 64 && tries < 4000) {
-    tries++;
-    const x = -34 + rnd() * 68;
-    const z = -30 + rnd() * 62;
-    const south = z > 11.8 && z < 26 && Math.abs(x) < 24;
-    const edge = Math.abs(x) > 21 || z < -18.5 || z > 20.5;
-    if (!south && !edge) continue;
-    if (!ok(x, z)) continue;
-    out.push({ x, z, s: 0.85 + rnd() * 0.45, kind: Math.floor(rnd() * 3), pink: rnd() < 0.32, rot: rnd() * Math.PI * 2 });
-  }
-  return out;
-}
-
-export const TREES = woodlandTrees();
-
-for (const t of TREES) if (t.z < BOUNDS.maxZ + 1 && Math.abs(t.x) < BOUNDS.maxX + 1) CIRCLES.push({ x: t.x, z: t.z, r: 0.7 * t.s });
-
-/** Push a point out of every blocker. */
-export function collide(x: number, z: number, r = 0.4): V2 {
-  for (const b of BOXES) {
-    const dx = x - b.x;
-    const dz = z - b.z;
-    const px = b.hw + r - Math.abs(dx);
-    const pz = b.hd + r - Math.abs(dz);
-    if (px > 0 && pz > 0) {
-      if (px < pz) x += Math.sign(dx || 1) * px;
-      else z += Math.sign(dz || 1) * pz;
-    }
-  }
-  for (const c of CIRCLES) {
-    const dx = x - c.x;
-    const dz = z - c.z;
-    const d = Math.hypot(dx, dz);
-    const min = c.r + r;
-    if (d < min && d > 1e-5) {
-      x = c.x + (dx / d) * min;
-      z = c.z + (dz / d) * min;
-    }
-  }
-  x = Math.max(BOUNDS.minX, Math.min(BOUNDS.maxX, x));
-  z = Math.max(BOUNDS.minZ, Math.min(BOUNDS.maxZ, z));
-  return [x, z];
-}
+/** where each restoration blends the living city back in (ellipses, image px) */
+export const REGIONS = {
+  clock: { x: 405, y: 330, rx: 190, ry: 380 },
+  fountain: { x: 508, y: 800, rx: 300, ry: 200 },
+  garden: { x: 160, y: 650, rx: 280, ry: 220 },
+  bookshop: { x: 850, y: 560, rx: 300, ry: 270 },
+} as const;

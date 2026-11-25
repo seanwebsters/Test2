@@ -1627,3 +1627,312 @@ button:disabled {
     font-size: 17px;
   }
 }
+
+/* ---------- the painted town ---------- */
+.town {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #2c2b4a;
+  touch-action: none;
+}
+.town-backdrop {
+  position: absolute;
+  inset: -40px;
+  background-size: cover;
+  background-position: center;
+  filter: blur(28px) brightness(0.7) saturate(1.1);
+}
+.world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.layer.fx {
+  z-index: 4000;
+}
+.actor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+.actor img {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 3px 2px rgba(40, 30, 50, 0.25));
+  user-select: none;
+}
+.actor-shadow {
+  position: absolute;
+  left: -26px;
+  top: -9px;
+  width: 52px;
+  height: 16px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(50, 35, 60, 0.35), transparent);
+  z-index: -1;
+}
+.clock-hands {
+  position: absolute;
+  width: 0;
+  height: 0;
+  z-index: 5;
+}
+.hand {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  transform-origin: 50% 100%;
+  background: #3a2f3f;
+  border-radius: 3px;
+}
+.hand.hour {
+  width: 7px;
+  height: 30px;
+  margin-left: -3.5px;
+}
+.hand.minute {
+  width: 4px;
+  height: 44px;
+  margin-left: -2px;
+}
+.hand.pin {
+  width: 10px;
+  height: 10px;
+  margin: 0 0 -5px -5px;
+  border-radius: 50%;
+  background: #c98a93;
+  box-shadow: 0 0 0 2px #3a2f3f;
+}
+.lamp-glow {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  margin: -60px 0 0 -60px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 214, 150, 0.6), rgba(255, 200, 140, 0.18) 55%, transparent);
+  mix-blend-mode: screen;
+  z-index: 6;
+  pointer-events: none;
+}
+.shop-glow {
+  position: absolute;
+  width: 280px;
+  height: 150px;
+  margin: -75px 0 0 -140px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 210, 140, 0.55), transparent);
+  mix-blend-mode: screen;
+  opacity: 0;
+  z-index: 6;
+  pointer-events: none;
+}
+.bell-ring {
+  position: absolute;
+  display: none;
+  z-index: 6;
+}
+.bell-ring i {
+  position: absolute;
+  left: -60px;
+  top: -30px;
+  width: 120px;
+  height: 60px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 244, 220, 0.8);
+  animation: ring 3s ease-out infinite;
+}
+.bell-ring i:nth-child(2) {
+  animation-delay: 1s;
+}
+.bell-ring i:nth-child(3) {
+  animation-delay: 2s;
+}
+@keyframes ring {
+  from {
+    transform: scale(0.4);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+.glimmer {
+  position: absolute;
+  left: -16px;
+  top: -16px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  z-index: 3500;
+  transition: opacity 0.6s;
+  background: radial-gradient(circle, #fff 0 18%, var(--gc) 32%, transparent 70%);
+  box-shadow: 0 0 22px 8px color-mix(in srgb, var(--gc) 55%, transparent);
+  animation: twinkle 1.8s ease-in-out infinite;
+  pointer-events: none;
+}
+.glimmer.bloom { --gc: #f4a9bb; }
+.glimmer.clock { --gc: #f0cf98; }
+.glimmer.crystal { --gc: #c7b2f2; }
+.glimmer.key { --gc: #e8d6a8; }
+.glimmer.ink { --gc: #f4ecdc; }
+.glimmer.time { --gc: #a9d2ec; }
+@keyframes twinkle {
+  50% {
+    filter: brightness(1.35);
+  }
+}
+.root-letter {
+  position: absolute;
+  width: 26px;
+  height: 18px;
+  margin: -9px 0 0 -13px;
+  background: #fbf3e4;
+  border-radius: 2px;
+  transform: rotate(-14deg);
+  box-shadow: 0 0 16px 6px rgba(255, 230, 190, 0.7);
+  z-index: 1300;
+  animation: twinkle 2s ease-in-out infinite;
+}
+.map-marker {
+  position: absolute;
+  left: -17px;
+  top: -17px;
+  z-index: 4500;
+}
+
+/* ---------- dialogue plates and portraits ---------- */
+.cg {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  animation: fadein 0.9s ease both;
+}
+.cg-blur {
+  position: absolute;
+  inset: -40px;
+  background-size: cover;
+  background-position: center;
+  filter: blur(26px) brightness(0.62);
+}
+.cg-plate {
+  position: absolute;
+  left: 50%;
+  top: calc(64px + var(--safe-top));
+  transform: translateX(-50%);
+  width: min(94vw, 980px);
+  aspect-ratio: 3 / 2;
+  max-height: calc(100% - 330px);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 0 0 4px rgba(251, 246, 237, 0.92), 0 0 0 5px rgba(201, 154, 162, 0.6), 0 24px 60px rgba(10, 8, 30, 0.5);
+}
+.cg-plate img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: kenburns 18s ease-in-out infinite alternate;
+}
+@keyframes kenburns {
+  from {
+    transform: scale(1.02);
+  }
+  to {
+    transform: scale(1.1) translate(-1.5%, -1%);
+  }
+}
+.dialogue-wrap.with-cg {
+  background: none;
+}
+.bust {
+  position: absolute;
+  bottom: calc(150px + var(--safe-bottom));
+  height: min(58vh, 520px);
+  pointer-events: none;
+  filter: drop-shadow(0 12px 24px rgba(20, 16, 40, 0.35));
+  animation: bustin 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
+  z-index: -1;
+}
+.bust.him {
+  left: 50%;
+  transform: translateX(-42%);
+}
+.bust.you {
+  left: 50%;
+  transform: translateX(-58%);
+}
+@keyframes bustin {
+  from {
+    opacity: 0;
+    translate: 0 30px;
+  }
+}
+.portrait {
+  border-radius: 50%;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 40%, #f2e1ec, #b9a6d2);
+  box-shadow: 0 0 0 4px var(--paper), 0 0 0 5px rgba(201, 154, 162, 0.6), var(--shadow);
+}
+.portrait img {
+  width: 100%;
+  height: 120%;
+  object-fit: cover;
+  object-position: 50% 8%;
+}
+.portrait.mystery img {
+  filter: brightness(0.15) saturate(0);
+}
+.item-img {
+  display: block;
+  object-fit: contain;
+  pointer-events: none;
+}
+.piece .item-img {
+  width: 92%;
+  height: 92%;
+  filter: drop-shadow(0 2px 2px rgba(30, 28, 40, 0.2));
+}
+.order-item .item-img,
+.obj-items .item-img,
+.toast .item-img {
+  filter: drop-shadow(0 1px 1px rgba(30, 28, 40, 0.2));
+}
+.title-screen {
+  background-size: cover;
+  background-position: center 70%;
+}
+.title-screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(40, 34, 80, 0.35), transparent 40%, transparent 70%, rgba(40, 30, 70, 0.55));
+  z-index: -1;
+}
+.title-screen {
+  isolation: isolate;
+}
+.illus {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.illus.veiled {
+  filter: blur(6px) grayscale(0.7) opacity(0.6);
+}

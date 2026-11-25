@@ -5,7 +5,7 @@ import { questForStep } from '../game/quests';
 import { MEMORIES, STEP, TRAITS } from '../game/story';
 import { SPOTS } from '../game/layout';
 import { ItemIcon } from './ItemIcon';
-import { Portrait } from './Art';
+import { Portrait, ART } from './Art';
 import {
   Crescent,
   IconClose,
@@ -32,7 +32,7 @@ export function Title() {
   if (screen !== 'title') return null;
   const hasSave = step > STEP.title;
   return (
-    <div className="title-screen">
+    <div className="title-screen" style={{ backgroundImage: `url(${ART}title.webp)` }}>
       <div className="title-top">
         <Crescent size={44} />
         <h1 className="logo">Veloria</h1>
@@ -204,6 +204,20 @@ export function Prompt() {
   );
 }
 
+const CG: Record<string, string> = {
+  wake: 'cg_tree',
+  meet: 'cg_meet',
+  q2_done: 'cg_fountain',
+  q3_done: 'cg_garden',
+  ending1: 'cg_garden',
+  wake2: 'cg_return',
+  q4_done: 'cg_bookshop',
+  q5_done: 'cg_bell',
+  mem_boats: 'cg_boats',
+  mem_ledge: 'cg_ledge',
+};
+const heartish = (t: string) => /you|we |glad|delight|like|laugh|insufferable|smile|thank/i.test(t);
+
 export function Dialogue() {
   const d = useGame((s) => s.dialogue);
   const next = useGame((s) => s.next);
@@ -227,6 +241,9 @@ export function Dialogue() {
   }, [text, d?.i]);
   if (!d || !line) return null;
   const done = shown >= text.length;
+  const alone = useGame.getState().focus === 'alone';
+  const cg = alone ? 'cg_alone' : CG[d.id as string];
+  const bust = !cg && line.who !== 'narr' ? (line.who === 'him' ? (line.choices ? 'bust_him' : heartish(text) ? 'bust_him_smile' : 'bust_him') : 'bust_her') : null;
   const who = line.who;
   const name = who === 'him' ? (knowName ? 'Lucien' : 'Him') : who === 'you' ? 'You' : '';
   const onTap = () => {
@@ -239,7 +256,16 @@ export function Dialogue() {
     next();
   };
   return (
-    <div className="dialogue-wrap" onClick={onTap}>
+    <div className={`dialogue-wrap ${cg ? 'with-cg' : ''}`} onClick={onTap}>
+      {cg && (
+        <div className="cg" key={cg}>
+          <div className="cg-blur" style={{ backgroundImage: `url(${ART}${cg}.webp)` }} />
+          <div className="cg-plate">
+            <img src={`${ART}${cg}.webp`} alt="" draggable={false} />
+          </div>
+        </div>
+      )}
+      {bust && <img key={bust} className={`bust ${line.who}`} src={`${ART}${bust}.webp`} alt="" draggable={false} />}
       {line.choices ? (
         <div className="choices">
           {line.choices.map((c, i) => (
@@ -320,7 +346,7 @@ export function LovePanel() {
   return (
     <Sheet title="Love">
       <div className="love-card panel">
-        <Portrait size={108} mystery={!met} />
+        <Portrait size={132} mystery={!met} smile={tier.index >= 2} />
         <div className="love-name">{met ? (knowName ? 'Lucien Vale' : 'The man by the clock') : '???'}</div>
         <div className="love-epithet">{met ? 'Keeper of Veloria · Slow burn' : 'Someone is waiting beneath the clock tower.'}</div>
         {met && (

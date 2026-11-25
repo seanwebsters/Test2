@@ -1,5 +1,5 @@
-import { Suspense, useEffect } from 'react';
-import { Scene } from './world/Scene';
+import { useEffect } from 'react';
+import { Town } from './explore/Town';
 import { useGame } from './game/store';
 import { setMuted, unlockAudio } from './game/audio';
 import { SvgDefs } from './ui/ItemIcon';
@@ -22,9 +22,7 @@ export function App() {
     <div className="app">
       <SvgDefs />
       <div className="stage">
-        <Suspense fallback={null}>
-          <Scene />
-        </Suspense>
+        <Town />
       </div>
       <div className="vignette" />
       <Title />
