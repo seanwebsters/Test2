@@ -1,0 +1,4 @@
+Models from the Medieval Village MegaKit and the Fantasy Props MegaKit by Quaternius (https://quaternius.com).
+Licence: CC0 1.0 Universal (public domain dedication).
+https://creativecommons.org/publicdomain/zero/1.0/
+Textures were resized and converted to WebP for the web.
