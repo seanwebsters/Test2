@@ -6,7 +6,7 @@ import { QUESTS, questForStep, RestoreId } from './quests';
 import { CASS_GIFT, CASS_IDLE, GIFT_LINES, IDLE_LINES, INSPECT, LetterId, Line, MEMORIES, SCRIPTS, ScriptId, STEP, TIERS } from './story';
 import { GLIMMERS, GLIMMER_RESPAWN_MS, PLACES, V2 } from './layout';
 import { sfx } from './audio';
-import { makeRequest, Request } from './requests';
+import type { Request } from './requests';
 
 function buzz(p: number | number[]) {
   try {
@@ -430,15 +430,9 @@ export const useGame = create<State>()(
           const s = get();
           const c = s.board[i];
           if (!c || c.kind !== 'gen' || c.frozen) return false;
-          get().tickEnergy();
-          if (get().energy < 1) {
-            get().toast({ text: 'Out of energy. Rest a moment, or gather lights in the city.' });
-            sfx('deny');
-            return false;
-          }
           const to = nearestEmpty(s.board, i);
           if (to < 0) {
-            get().toast({ text: 'The board is full. Merge, sell or store something.' });
+            get().toast({ text: 'The board is full. Merge something, or remove an item.' });
             sfx('deny');
             return false;
           }
@@ -446,7 +440,7 @@ export const useGame = create<State>()(
           const board = s.board.slice();
           const id = uid();
           board[to] = { kind: 'item', item, uid: id };
-          set({ board, energy: get().energy - 1, fx: { kind: 'spawn', uid: id, from: i, to, combo: 0, t: Date.now() } });
+          set({ board, fx: { kind: 'spawn', uid: id, from: i, to, combo: 0, t: Date.now() } });
           sfx('spawn');
           buzz(8);
           return true;
@@ -605,12 +599,7 @@ export const useGame = create<State>()(
         },
 
         topUpRequests() {
-          const s = get();
-          if (s.step < STEP.q1) return;
-          if (s.requests.length >= 2) return;
-          const add = [...s.requests];
-          while (add.length < 2) add.push(makeRequest(s.step));
-          set({ requests: add });
+          // side requests are switched off: the game keeps to the story order
         },
 
         collectGlimmer(id) {
@@ -628,7 +617,7 @@ export const useGame = create<State>()(
             energy: Math.min(MAX_ENERGY + 50, s.energy + 3),
             glimmers: { ...s.glimmers, [id]: Date.now() + GLIMMER_RESPAWN_MS },
           });
-          get().toast({ text: to >= 0 ? `${itemName(item)}  ·  +3 energy` : 'Board full — the light slips away.', item });
+          get().toast({ text: to >= 0 ? `${itemName(item)} added to your board` : 'Board full — the light slips away.', item });
           sfx('collect');
         },
 
@@ -759,6 +748,9 @@ export const useGame = create<State>()(
       onRehydrateStorage: () => (s) => {
         if (s) {
           bumpUid(s.board);
+          // the simple game has no frosted tiles or side requests
+          s.board = s.board.map((c) => (c && c.frozen ? { ...c, frozen: false } : c));
+          s.requests = [];
           // resume mid-script safely: restart the step's opening state
           if (s.step === STEP.prologue) s.step = STEP.title;
         }

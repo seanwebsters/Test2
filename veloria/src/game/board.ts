@@ -140,18 +140,9 @@ export function starterBoard(): Board {
   put(1, 4, gen('cart'));
   put(5, 4, gen('tinker'));
   put(3, 6, gen('geode'));
-  put(3, 1, gen('desk', true));
+  put(3, 2, gen('desk'));
   put(2, 4, it('bloom:1'));
   put(3, 4, it('bloom:1'));
   put(4, 4, it('clock:1'));
-  // frozen-in-time items around the edges: merge beside them to wake them
-  const frozen: [number, number, ItemKey][] = [
-    [0, 0, 'crystal:1'], [1, 0, 'bloom:2'], [5, 0, 'clock:2'], [6, 0, 'time:1'],
-    [0, 1, 'ink:1'], [6, 1, 'key:1'], [2, 1, 'ink:2'], [4, 1, 'ink:1'],
-    [0, 8, 'bloom:1'], [1, 8, 'crystal:2'], [5, 8, 'time:1'], [6, 8, 'clock:1'],
-    [0, 7, 'key:1'], [6, 7, 'bloom:2'], [2, 8, 'clock:1'], [4, 8, 'crystal:1'],
-    [3, 0, 'time:2'], [3, 8, 'bloom:3'], [0, 4, 'crystal:1'], [6, 4, 'ink:1'],
-  ];
-  for (const [c, r, item] of frozen) put(c, r, it(item, true));
   return b;
 }

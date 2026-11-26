@@ -5,7 +5,7 @@ import { setMuted, unlockAudio } from './game/audio';
 import { SvgDefs } from './ui/ItemIcon';
 import { MergeScreen } from './ui/MergeScreen';
 import { Book } from './ui/Book';
-import { Awakening, FlyLayer, Dialogue, Fade, LovePanel, Nav, Objective, Prompt, SatchelPanel, Title, Toasts, TopBar } from './ui/Overlay';
+import { Awakening, FlyLayer, Dialogue, Fade, LovePanel, Nav, Objective, Prompt, Title, Toasts, TopBar } from './ui/Overlay';
 
 export function App() {
   const screen = useGame((s) => s.screen);
@@ -33,7 +33,6 @@ export function App() {
           <Prompt />
           {tab === 'merge' && <MergeScreen />}
           {tab === 'love' && <LovePanel />}
-          {tab === 'satchel' && <SatchelPanel />}
           <Dialogue />
           <Toasts />
           <Awakening />

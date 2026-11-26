@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type React from 'react';
-import { Look, useGame, tierOf, MAX_ENERGY, ENERGY_MS, questReady, GIFTS_PER_DAY } from '../game/store';
+import { Look, useGame, tierOf, questReady } from '../game/store';
 import { questForStep } from '../game/quests';
 import { CASS_TRAITS, MEMORIES, STEP, TRAITS } from '../game/story';
 import { SPOTS } from '../game/layout';
@@ -9,14 +9,11 @@ import { Portrait, ART, cgFile, herSuffix } from './Art';
 import {
   Crescent,
   IconClose,
-  IconDew,
-  IconEnergy,
   IconExplore,
   IconHeart,
   IconLock,
   IconLove,
   IconMerge,
-  IconSatchel,
   IconSound,
   IconStory,
   Sprig,
@@ -141,40 +138,19 @@ function Create({ onDone, onBack }: { onDone: () => void; onBack: () => void }) 
 }
 
 export function TopBar() {
-  const energy = useGame((s) => s.energy);
-  const energyAt = useGame((s) => s.energyAt);
-  const dew = useGame((s) => s.dew);
   const affection = useGame((s) => s.affection);
   const muted = useGame((s) => s.muted);
   const toggleMute = useGame((s) => s.toggleMute);
-  const buyEnergy = useGame((s) => s.buyEnergy);
   const step = useGame((s) => s.step);
-  const [, tick] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => {
-      useGame.getState().tickEnergy();
-      tick((x) => x + 1);
-    }, 1000);
-    return () => clearInterval(t);
-  }, []);
-  const secs = energy >= MAX_ENERGY ? 0 : Math.max(0, Math.ceil((ENERGY_MS - (Date.now() - energyAt)) / 1000));
   const tier = tierOf(affection);
   return (
     <div className="topbar">
-      <div className="stat" title="Affection">
-        <IconHeart size={17} />
-        <span>{step >= STEP.q1 ? tier.name : '—'}</span>
-      </div>
-      <button className="stat" onClick={buyEnergy} title="Energy · tap to buy 40 for 25 dewdrops">
-        <IconEnergy />
-        <span>{energy}</span>
-        {secs > 0 && <small>{secs}s</small>}
-        <span className="plus">+</span>
-      </button>
-      <div className="stat" title="Dewdrops">
-        <IconDew />
-        <span>{dew}</span>
-      </div>
+      {step >= STEP.q1 && (
+        <div className="stat" title="How close you are to Lucien">
+          <IconHeart size={17} />
+          <span>{tier.name}</span>
+        </div>
+      )}
       <button className="icon-btn sound" onClick={toggleMute} aria-label={muted ? 'Unmute' : 'Mute'}>
         <IconSound on={!muted} />
       </button>
@@ -245,7 +221,6 @@ export function Nav() {
     { id: 'merge', label: 'Merge', icon: <IconMerge />, badge: ready },
     { id: 'story', label: 'Story', icon: <IconStory />, badge: lettersNew > 0 },
     { id: 'love', label: 'Love', icon: <IconLove /> },
-    { id: 'satchel', label: 'Satchel', icon: <IconSatchel /> },
   ];
   return (
     <nav className="nav">
@@ -439,14 +414,12 @@ export function LovePanel() {
   const step = useGame((s) => s.step);
   const memories = useGame((s) => s.memories);
   const playMemory = useGame((s) => s.playMemory);
-  const gifts = useGame((s) => s.gifts);
   const [who, setWho] = useState<'him' | 'cass'>('him');
   const cassMet = step >= STEP.wake3;
   const isCass = who === 'cass' && cassMet;
   const aff = isCass ? affC : affection;
   const tier = tierOf(aff);
   const met = isCass || step >= STEP.q1;
-  const giftsLeft = GIFTS_PER_DAY - (gifts.day === new Date().toISOString().slice(0, 10) ? gifts.n : 0);
   const traits = isCass ? CASS_TRAITS : TRAITS;
   const mems = MEMORIES.filter((m) => m.who === (isCass ? 'cass' : 'him'));
   return (
@@ -515,12 +488,6 @@ export function LovePanel() {
               );
             })}
           </div>
-          <p className="gift-note">
-            <IconHeart size={14} />{' '}
-            {isCass
-              ? `Give him gifts from the Merge board. He is fond of crystals, keys and anything that glows. ${giftsLeft} gifts left tonight.`
-              : `Give him gifts from the Merge board. He is especially fond of books, letters and flowers. ${giftsLeft} gifts left tonight.`}
-          </p>
         </>
       )}
     </Sheet>
@@ -535,36 +502,6 @@ const CASS_TIER_LINES = [
   'He would keep every lamp in Veloria burning for you, and never ask for anything back.',
 ];
 
-export function SatchelPanel() {
-  const satchel = useGame((s) => s.satchel);
-  const unstore = useGame((s) => s.unstore);
-  const letters = useGame((s) => s.letters);
-  const openBook = useGame((s) => s.openBook);
-  const inspected = useGame((s) => s.inspected);
-  return (
-    <Sheet title="Satchel">
-      <p className="sheet-intro">Things you are keeping for later. Tap one to return it to the board.</p>
-      <div className="satchel-grid">
-        {satchel.map((it, i) => (
-          <button key={i} className="slot" disabled={!it} onClick={() => it && unstore(i)}>
-            {it && <ItemIcon item={it} size={44} />}
-          </button>
-        ))}
-      </div>
-      <h4 className="section">Keepsakes</h4>
-      <div className="keepsakes">
-        <button className="keepsake" onClick={() => openBook('letters')}>
-          <span className="k-num">{letters.length}</span>
-          <span>Letters</span>
-        </button>
-        <div className="keepsake">
-          <span className="k-num">{inspected.length}</span>
-          <span>Places noticed</span>
-        </div>
-      </div>
-    </Sheet>
-  );
-}
 
 const GLOW: Record<string, string> = { bloom: '#f4a9bb', clock: '#f0cf98', crystal: '#c7b2f2', key: '#e8d6a8', ink: '#f4ecdc', time: '#a9d2ec' };
 

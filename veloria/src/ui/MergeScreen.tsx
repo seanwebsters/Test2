@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGame, questReady } from '../game/store';
 import { COLS } from '../game/board';
-import { GeneratorId, GENERATORS, itemLore, itemName, nextOf, parse, sellValue, CHAINS, ItemKey } from '../game/items';
+import { GeneratorId, GENERATORS, itemLore, itemName, nextOf, parse, CHAINS, ItemKey } from '../game/items';
 import { questForStep } from '../game/quests';
 import { STEP } from '../game/story';
 import { ItemIcon, GenIcon } from './ItemIcon';
-import { IconHeart, Sprig } from './Icons';
+import { Sprig } from './Icons';
 import { unlockAudio } from '../game/audio';
 
 const seen = new Set<number>();
@@ -25,7 +25,6 @@ export function MergeScreen() {
   const board = useGame((s) => s.board);
   const step = useGame((s) => s.step);
   const selected = useGame((s) => s.selected);
-  const tutorial = useGame((s) => s.mergeTutorial);
   const fx = useGame((s) => s.fx);
   // the drag lives in a ref so moving a finger never re-renders the board
   const dragRef = useRef<Drag | null>(null);
@@ -166,7 +165,6 @@ export function MergeScreen() {
       </div>
 
       <InfoBar sel={sel} idx={selected} />
-      {!tutorial && step >= STEP.q1 && <Tutorial />}
     </div>
   );
 }
@@ -176,14 +174,13 @@ function Orders() {
   const board = useGame((s) => s.board);
   const deliver = useGame((s) => s.deliver);
   const delivered = useGame((s) => s.delivered);
-  const requests = useGame((s) => s.requests);
-  const fulfil = useGame((s) => s.fulfil);
+  const requests: { id: number; items: never[]; line: string; reward: { dew: number } }[] = [];
   const quest = questForStep(step);
   const story = quest && !delivered.includes(quest.id) ? quest : null;
   const ready = story ? questReady(board, story.requires) : [];
   const all = ready.length > 0 && ready.every(Boolean);
   if (!story && !requests.length) {
-    const msg = step <= STEP.explore ? 'The board is waiting. Find someone in the city first.' : 'Merge freely. New wishes are on their way.';
+    const msg = step <= STEP.explore ? 'The board is waiting. Find someone in the city first.' : 'No order right now. Wander the city, or merge for fun.';
     return (
       <div className="orders empty">
         <p>{msg}</p>
@@ -211,29 +208,6 @@ function Orders() {
           </div>
         </div>
       )}
-      {requests.map((r) => {
-        const have = questReady(board, r.items);
-        const ok = have.every(Boolean);
-        return (
-          <div key={r.id} className={`order-card wish ${ok ? 'ready' : ''}`}>
-            <div className="oc-head">
-              <img className="oc-face" src={`${import.meta.env.BASE_URL}art/bust_him.webp`} alt="" />
-              <span className="oc-line">{r.line}</span>
-            </div>
-            <div className="oc-row">
-              {r.items.map((it, i) => (
-                <div key={i} className={`order-item ${have[i] ? 'have' : ''}`} title={itemName(it)}>
-                  <ItemIcon item={it} size={30} />
-                  {have[i] && <span className="tick">✓</span>}
-                </div>
-              ))}
-              <button className="btn deliver small-give" disabled={!ok} onClick={() => fulfil(r.id)}>
-                {ok ? 'Give' : `+${r.reward.dew}`}
-              </button>
-            </div>
-          </div>
-        );
-      })}
     </div>
   );
 }
@@ -264,14 +238,13 @@ function InfoBar({ sel, idx }: { sel: ReturnType<typeof useGame.getState>['board
         <GenIcon gen={sel.gen} size={44} />
         <div className="info-main">
           <div className="info-name">{g.name}</div>
-          <div className="info-lore">{g.hint} Costs 1 energy.</div>
+          <div className="info-lore">{g.hint} Tap it as often as you like.</div>
         </div>
       </div>
     );
   }
   const { chain, level } = parse(sel.item);
   const next = nextOf(sel.item);
-  const canGift = s.step >= STEP.q1;
   return (
     <div className="infobar">
       <ItemIcon item={sel.item} size={44} />
@@ -282,46 +255,8 @@ function InfoBar({ sel, idx }: { sel: ReturnType<typeof useGame.getState>['board
         <div className="info-lore">{next ? `${itemLore(sel.item)} Merge two for a ${itemName(next)}.` : `${itemLore(sel.item)} The finest of its kind.`}</div>
       </div>
       <div className="info-actions">
-        {canGift && (
-          <button className="btn small rose" onClick={() => s.gift(idx, 'him')} title="Give to Lucien">
-            <IconHeart size={14} /> {s.step >= STEP.wake3 ? 'Lucien' : 'Gift'}
-          </button>
-        )}
-        {s.step > STEP.wake3 && (
-          <button className="btn small gold" onClick={() => s.gift(idx, 'cass')} title="Give to Cassian">
-            <IconHeart size={14} /> Cassian
-          </button>
-        )}
-        <button className="btn small" onClick={() => s.store(idx)}>
-          Store
-        </button>
-        <button className="btn small ghost-btn" onClick={() => s.sell(idx)}>
-          Sell · {sellValue(sel.item)}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function Tutorial() {
-  const done = useGame((s) => s.finishMergeTutorial);
-  const [page, setPage] = useState(0);
-  const pages = [
-    { t: 'The lights you gathered', b: 'Everything you collect in Veloria appears here. Each generator — the Flower Cart, the Clockmaker’s Box, the Moonlit Geode — makes something new for one energy.' },
-    { t: 'Two become one', b: 'Drag an item onto its twin to merge them into something finer. Items frosted over are suspended in time: merge beside them to wake them.' },
-    { t: 'Orders', b: 'The card above shows what the city needs. When everything is on the board, tap Deliver — and watch Veloria come back to life.' },
-  ];
-  const p = pages[page];
-  return (
-    <div className="tutorial">
-      <div className="tutorial-card panel">
-        <div className="tut-step">
-          {page + 1} / {pages.length}
-        </div>
-        <h3>{p.t}</h3>
-        <p>{p.b}</p>
-        <button className="btn primary" onClick={() => (page < pages.length - 1 ? setPage(page + 1) : done())}>
-          {page < pages.length - 1 ? 'Next' : 'Begin'}
+        <button className="btn small ghost-btn" onClick={() => s.sell(idx)} title="Clear this item from the board">
+          Remove
         </button>
       </div>
     </div>
