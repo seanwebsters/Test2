@@ -31,6 +31,14 @@ Open http://localhost:5174. On a phone, open the network URL Vite prints.
 
 Progress saves automatically in the browser.
 
+## Deploy on Vercel
+
+Import the repository in Vercel and set the project's **Root Directory** to
+`veloria`. Everything else comes from `vercel.json`: a Vite build into `dist`,
+with long caching for the bundled code and the art. No environment variables
+are needed. Saves live in each player's browser, so there is no server or
+database to set up.
+
 ## What is in this build
 
 - One district: clock tower, town square and fountain, Mrs Hollow's

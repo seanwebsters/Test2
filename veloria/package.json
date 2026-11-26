@@ -2,7 +2,7 @@
   "name": "veloria",
   "private": true,
   "version": "0.1.0",
-  "description": "Veloria — a cozy romantasy merge adventure, hand-painted",
+  "description": "Veloria \u2014 a cozy romantasy merge adventure, hand-painted",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -27,5 +27,8 @@
     "typescript": "5.9",
     "vite": "^8.3.8",
     "vitest": "^5.1.2"
+  },
+  "engines": {
+    "node": ">=20.19"
   }
 }
