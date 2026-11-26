@@ -596,7 +596,11 @@ export const useGame = create<State>()(
           get().say(Math.random() < 0.5 ? base : [{ who: 'him', text: line }], 'gift');
         },
         resetSave() {
-          localStorage.removeItem('veloria-save-v1');
+          try {
+            localStorage.removeItem('veloria-save-v1');
+          } catch {
+            // storage unavailable: nothing saved to forget
+          }
           location.reload();
         },
       };
