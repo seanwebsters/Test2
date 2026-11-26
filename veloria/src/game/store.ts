@@ -6,6 +6,15 @@ import { QUESTS, questForStep, RestoreId } from './quests';
 import { GIFT_LINES, IDLE_LINES, INSPECT, LetterId, Line, MEMORIES, SCRIPTS, ScriptId, STEP, TIERS } from './story';
 import { GLIMMERS, GLIMMER_RESPAWN_MS, PLACES, V2 } from './layout';
 import { sfx } from './audio';
+import { makeRequest, Request } from './requests';
+
+function buzz(p: number | number[]) {
+  try {
+    navigator.vibrate?.(p);
+  } catch {
+    // no haptics here
+  }
+}
 
 export const MAX_ENERGY = 100;
 export const ENERGY_MS = 20_000;
@@ -56,6 +65,7 @@ interface Saved {
   mergeTutorial: boolean;
   muted: boolean;
   delivered: string[];
+  requests: Request[];
 }
 
 interface Live {
@@ -73,6 +83,9 @@ interface Live {
   hint: string | null;
   near: string | null;
   himSaid: string | null;
+  /** last board event, for animations: a spawn flying out of a generator, or a merge */
+  fx: { kind: 'spawn' | 'merge'; uid: number; from: number; to: number; combo: number; t: number } | null;
+  combo: { n: number; at: number };
 }
 
 interface Actions {
@@ -93,6 +106,8 @@ interface Actions {
   unstore(slot: number): void;
   gift(i: number): void;
   deliver(questId: string): void;
+  fulfil(requestId: number): void;
+  topUpRequests(): void;
   collectGlimmer(id: string): void;
   tickEnergy(): void;
   buyEnergy(): void;
@@ -133,6 +148,7 @@ function fresh(): Saved {
     mergeTutorial: false,
     muted: false,
     delivered: [],
+    requests: [],
   };
 }
 
@@ -247,6 +263,8 @@ export const useGame = create<State>()(
         hint: null,
         near: null,
         himSaid: null,
+        fx: null,
+        combo: { n: 0, at: 0 },
 
         begin() {
           const s = get();
@@ -296,6 +314,7 @@ export const useGame = create<State>()(
             return;
           }
           set({ tab: t, selected: null });
+          if (t === 'merge') get().topUpRequests();
         },
 
         play(id) {
@@ -378,9 +397,11 @@ export const useGame = create<State>()(
           }
           const item = rollGenerator(c.gen as GeneratorId, Math.random(), Math.random());
           const board = s.board.slice();
-          board[to] = { kind: 'item', item, uid: uid() };
-          set({ board, energy: get().energy - 1 });
+          const id = uid();
+          board[to] = { kind: 'item', item, uid: id };
+          set({ board, energy: get().energy - 1, fx: { kind: 'spawn', uid: id, from: i, to, combo: 0, t: Date.now() } });
           sfx('spawn');
+          buzz(8);
           return true;
         },
 
@@ -390,8 +411,27 @@ export const useGame = create<State>()(
           if (res.type === 'none') return;
           set({ board, selected: to });
           if (res.type === 'merge') {
-            sfx('merge', parse(res.result).level);
+            const now = Date.now();
+            const n = now - s.combo.at < 2600 ? s.combo.n + 1 : 1;
+            const c = board[to];
+            set({ combo: { n, at: now }, fx: { kind: 'merge', uid: c ? c.uid : 0, from, to, combo: n, t: now } });
+            sfx('merge', parse(res.result).level + Math.min(4, n - 1));
+            buzz(n >= 3 ? [12, 30, 12] : 14);
             if (res.thawed.length) setTimeout(() => sfx('thaw'), 180);
+            // every third merge in a row drops a little bonus beside it
+            if (n % 3 === 0) {
+              const b2 = get().board.slice();
+              const at = nearestEmpty(b2, to);
+              if (at >= 0) {
+                const gen = ['bloom', 'clock', 'crystal'][Math.floor(Math.random() * 3)] as 'bloom';
+                const bid = uid();
+                b2[at] = { kind: 'item', item: key(gen, n >= 6 ? 2 : 1), uid: bid };
+                setTimeout(() => {
+                  set({ board: b2.map((x, k) => (k === at && !get().board[at] ? x : get().board[k])), fx: { kind: 'spawn', uid: bid, from: to, to: at, combo: n, t: Date.now() } });
+                  sfx('collect');
+                }, 260);
+              }
+            }
           } else sfx('place');
         },
 
@@ -488,6 +528,35 @@ export const useGame = create<State>()(
             set({ board: b });
           }
           setTimeout(() => get().play(q.after), q.restores ? 3300 : 500);
+        },
+
+        fulfil(rid) {
+          const s = get();
+          const r = s.requests.find((x) => x.id === rid);
+          if (!r) return;
+          const board = take(s.board, r.items);
+          if (!board) return;
+          set({
+            board,
+            dew: s.dew + r.reward.dew,
+            energy: Math.min(MAX_ENERGY + 50, s.energy + r.reward.energy),
+            affection: Math.min(100, s.affection + r.reward.aff),
+            requests: s.requests.filter((x) => x.id !== rid),
+            selected: null,
+          });
+          sfx('quest');
+          buzz([20, 40, 20]);
+          get().toast({ text: `+${r.reward.dew} dewdrops · +${r.reward.energy} energy · +${r.reward.aff} affection`, heart: true });
+          setTimeout(() => get().topUpRequests(), 700);
+        },
+
+        topUpRequests() {
+          const s = get();
+          if (s.step < STEP.q1) return;
+          if (s.requests.length >= 2) return;
+          const add = [...s.requests];
+          while (add.length < 2) add.push(makeRequest(s.step));
+          set({ requests: add });
         },
 
         collectGlimmer(id) {

@@ -26,6 +26,7 @@ export function MergeScreen() {
   const step = useGame((s) => s.step);
   const selected = useGame((s) => s.selected);
   const tutorial = useGame((s) => s.mergeTutorial);
+  const fx = useGame((s) => s.fx);
   // the drag lives in a ref so moving a finger never re-renders the board
   const dragRef = useRef<Drag | null>(null);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
@@ -124,6 +125,8 @@ export function MergeScreen() {
             const isNew = c && !seen.has(c.uid);
             const dragging = dragFrom === i;
             const isQuest = c?.kind === 'item' && !c.frozen && quest?.requires.includes(c.item);
+            const fresh = fx && c && fx.uid === c.uid && Date.now() - fx.t < 900 ? fx : null;
+            const fly = fresh?.kind === 'spawn' ? { '--dc': (fresh.from % COLS) - (i % COLS), '--dr': Math.floor(fresh.from / COLS) - Math.floor(i / COLS) } : undefined;
             return (
               <div
                 key={i}
@@ -132,7 +135,11 @@ export function MergeScreen() {
                 onPointerDown={(e) => onDown(e, i)}
               >
                 {c && !dragging && (
-                  <div key={c.uid} className={`piece ${isNew ? 'pop' : 'land'} ${c.kind === 'gen' ? 'gen' : ''}`}>
+                  <div
+                    key={c.uid}
+                    className={`piece ${fresh?.kind === 'spawn' ? 'fly' : fresh?.kind === 'merge' ? 'merged' : isNew ? 'pop' : 'land'} ${c.kind === 'gen' ? 'gen' : ''}`}
+                    style={fly as React.CSSProperties | undefined}
+                  >
                     {c.kind === 'item' ? <ItemIcon item={c.item} size={64} /> : <GenIcon gen={c.gen} size={64} />}
                     {c.kind === 'item' && !c.frozen && <span className="lvl">{parse(c.item).level}</span>}
                     {isQuest && <span className="quest-dot" />}
@@ -140,6 +147,11 @@ export function MergeScreen() {
                   </div>
                 )}
                 {burst?.i === i && <div key={burst.k} className="merge-burst" />}
+                {fresh?.kind === 'merge' && fresh.combo >= 2 && (
+                  <div key={`c${fresh.t}`} className="combo">
+                    Combo ×{fresh.combo}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -164,36 +176,64 @@ function Orders() {
   const board = useGame((s) => s.board);
   const deliver = useGame((s) => s.deliver);
   const delivered = useGame((s) => s.delivered);
+  const requests = useGame((s) => s.requests);
+  const fulfil = useGame((s) => s.fulfil);
   const quest = questForStep(step);
-  if (!quest || delivered.includes(quest.id)) {
-    let msg = 'Merge freely. Your next order will arrive as the story unfolds.';
-    if (step <= STEP.explore) msg = 'The board is waiting. Find someone in the city first.';
-    if (step === STEP.ch2End) msg = 'Every order is done for tonight. Merge gifts for him, or wander the city a while.';
+  const story = quest && !delivered.includes(quest.id) ? quest : null;
+  const ready = story ? questReady(board, story.requires) : [];
+  const all = ready.length > 0 && ready.every(Boolean);
+  if (!story && !requests.length) {
+    const msg = step <= STEP.explore ? 'The board is waiting. Find someone in the city first.' : 'Merge freely. New wishes are on their way.';
     return (
       <div className="orders empty">
         <p>{msg}</p>
       </div>
     );
   }
-  const ready = questReady(board, quest.requires);
-  const all = ready.every(Boolean);
   return (
-    <div className={`orders ${all ? 'ready' : ''}`}>
-      <div className="order-text">
-        <div className="order-title">{quest.title}</div>
-        <div className="order-ask">{quest.ask}</div>
-      </div>
-      <div className="order-items">
-        {quest.requires.map((it, i) => (
-          <div key={i} className={`order-item ${ready[i] ? 'have' : ''}`} title={itemName(it)}>
-            <ItemIcon item={it} size={38} />
-            {ready[i] && <span className="tick">✓</span>}
+    <div className="order-strip">
+      {story && (
+        <div className={`order-card story ${all ? 'ready' : ''}`}>
+          <div className="oc-head">
+            <span className="oc-tag">Story</span>
+            <span className="oc-title">{story.title}</span>
           </div>
-        ))}
-        <button className="btn deliver" disabled={!all} onClick={() => deliver(quest.id)}>
-          {all ? 'Deliver' : 'Needed'}
-        </button>
-      </div>
+          <div className="oc-row">
+            {story.requires.map((it, i) => (
+              <div key={i} className={`order-item ${ready[i] ? 'have' : ''}`} title={itemName(it)}>
+                <ItemIcon item={it} size={36} />
+                {ready[i] && <span className="tick">✓</span>}
+              </div>
+            ))}
+            <button className="btn deliver" disabled={!all} onClick={() => deliver(story.id)}>
+              {all ? 'Deliver' : 'Needed'}
+            </button>
+          </div>
+        </div>
+      )}
+      {requests.map((r) => {
+        const have = questReady(board, r.items);
+        const ok = have.every(Boolean);
+        return (
+          <div key={r.id} className={`order-card wish ${ok ? 'ready' : ''}`}>
+            <div className="oc-head">
+              <img className="oc-face" src={`${import.meta.env.BASE_URL}art/bust_him.webp`} alt="" />
+              <span className="oc-line">{r.line}</span>
+            </div>
+            <div className="oc-row">
+              {r.items.map((it, i) => (
+                <div key={i} className={`order-item ${have[i] ? 'have' : ''}`} title={itemName(it)}>
+                  <ItemIcon item={it} size={30} />
+                  {have[i] && <span className="tick">✓</span>}
+                </div>
+              ))}
+              <button className="btn deliver small-give" disabled={!ok} onClick={() => fulfil(r.id)}>
+                {ok ? 'Give' : `+${r.reward.dew}`}
+              </button>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

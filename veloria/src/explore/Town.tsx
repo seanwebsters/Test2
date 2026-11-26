@@ -5,6 +5,23 @@ import { STEP } from '../game/story';
 import { setTimeLevel } from '../game/audio';
 import { GLIMMERS, LAMPS, MAP_H, MAP_W, PLACES, REGIONS, SPOTS, V2, clearLine, depthScale, findPath, move, snap } from '../game/layout';
 
+const BANTER = [
+  'The fountain used to be the loudest thing in the square.',
+  'You walk like someone who has somewhere to be. I like it.',
+  'I had forgotten what footsteps sound like. Two sets.',
+  'Mind the third cobble. It has opinions.',
+  'Every light you find, the air gets warmer. Have you noticed?',
+  'I used to race the lamplighter to the bridge.',
+  'Stay on this side of the canal. The woods are for later.',
+  'You hum when you think. Did you know?',
+];
+const BANTER2 = [
+  'Six days. I would wait sixty.',
+  'Someone locked that bookshop. I keep thinking about it.',
+  'If the bell rings, everyone will hear it. Even me.',
+];
+const PICKUP = ['Another one!', 'There, by your feet.', 'That one was warm.', 'They like you.'];
+
 /** what she means to do when she arrives */
 type Intent = { kind: 'spot'; id: string } | { kind: 'him' } | null;
 const intent: { v: Intent } = { v: null };
@@ -61,6 +78,7 @@ export function Town() {
   const marker = useRef<HTMLDivElement>(null);
   const letter = useRef<HTMLDivElement>(null);
   const ripple = useRef<HTMLDivElement>(null);
+  const bubble = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const alive = img('town_alive.webp');
@@ -86,6 +104,16 @@ export function Town() {
     let path: V2[] = [];
     let knownPlayer = s0.player;
     let himPlanT = 0;
+    // little things he says while you walk together
+    let chatT = 9;
+    let bubbleT = 0;
+    const say = (text: string, secs = 4) => {
+      const b = bubble.current;
+      if (!b || himMode !== 'follow') return;
+      b.textContent = text;
+      b.classList.add('on');
+      bubbleT = secs;
+    };
     let himWp: V2 | null = null;
     let pathFor: V2 | null = null;
     const arrive = () => {
@@ -471,7 +499,17 @@ export function Town() {
       if (s.screen === 'game' && !s.dialogue && !locked) {
         if (s.step >= STEP.q1) {
           const t = Date.now();
-          for (const g of GLIMMERS) if ((s.glimmers[g.id] ?? 0) <= t && Math.hypot(g.pos[0] - her.x, g.pos[1] - her.y) < 46) s.collectGlimmer(g.id);
+          for (const g of GLIMMERS)
+            if ((s.glimmers[g.id] ?? 0) <= t && Math.hypot(g.pos[0] - her.x, g.pos[1] - her.y) < 46) {
+              const el = root.current as (HTMLDivElement & { _view?: { ox: number; oy: number; sc: number } }) | null;
+              if (el?._view) {
+                const r = el.getBoundingClientRect();
+                const v = el._view;
+                window.dispatchEvent(new CustomEvent('veloria:collect', { detail: { x: r.left + g.pos[0] * v.sc + v.ox, y: r.top + (g.pos[1] - 40) * v.sc + v.oy, chain: g.chain } }));
+              }
+              s.collectGlimmer(g.id);
+              if (Math.random() < 0.35) say(PICKUP[Math.floor(Math.random() * PICKUP.length)], 2.4);
+            }
         }
         if (s.step === STEP.explore && Math.hypot(PLACES.himSeat[0] - her.x, PLACES.himSeat[1] - her.y) < 150) {
           s.setWalkTo(null);
@@ -496,6 +534,24 @@ export function Town() {
         }
       }
       (window as unknown as { __actors: unknown }).__actors = { her, him, path };
+
+      // ---- his asides ----
+      if (bubbleT > 0) {
+        bubbleT -= dt;
+        if (bubbleT <= 0 || s.dialogue || locked) {
+          bubbleT = 0;
+          bubble.current?.classList.remove('on');
+        }
+      }
+      if (mode === 'follow' && !s.dialogue && !locked) {
+        chatT -= dt;
+        if (chatT <= 0) {
+          chatT = 22 + Math.random() * 18;
+          const pool = s.step >= STEP.wake2 ? [...BANTER, ...BANTER2] : BANTER;
+          say(pool[Math.floor(Math.random() * pool.length)], 4.5);
+        }
+      }
+      if (bubble.current) bubble.current.style.transform = `translate(${him.x}px, ${him.y - 150 * depthScale(him.y)}px) translate(-50%, -100%)`;
 
       // ---- camera ----
       let tx = her.x;
@@ -673,6 +729,7 @@ export function Town() {
           <div className="actor-shadow" />
         </div>
         <div className="tap-ripple" ref={ripple} />
+        <div className="him-bubble" ref={bubble} />
         <div className="marker map-marker" ref={marker}>
           !
         </div>

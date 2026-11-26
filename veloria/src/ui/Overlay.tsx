@@ -437,3 +437,75 @@ export function SatchelPanel() {
     </Sheet>
   );
 }
+
+const GLOW: Record<string, string> = { bloom: '#f4a9bb', clock: '#f0cf98', crystal: '#c7b2f2', key: '#e8d6a8', ink: '#f4ecdc', time: '#a9d2ec' };
+
+/** collected lights fly to the Merge button */
+export function FlyLayer() {
+  const layer = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const on = (e: Event) => {
+      const { x, y, chain } = (e as CustomEvent<{ x: number; y: number; chain: string }>).detail;
+      const target = document.querySelector('.nav-btn:nth-child(2)') as HTMLElement | null;
+      const host = layer.current;
+      if (!target || !host) return;
+      const r = target.getBoundingClientRect();
+      const tx = r.left + r.width / 2;
+      const ty = r.top + r.height / 2 - 6;
+      for (let k = 0; k < 3; k++) {
+        const orb = document.createElement('div');
+        orb.className = 'fly-orb';
+        orb.style.setProperty('--gc', GLOW[chain] ?? '#fff');
+        host.appendChild(orb);
+        const mx = (x + tx) / 2 + (k - 1) * 60;
+        const my = Math.min(y, ty) - 120 - k * 20;
+        const anim = orb.animate(
+          [
+            { transform: `translate(${x}px, ${y}px) scale(0.6)`, opacity: 1 },
+            { transform: `translate(${mx}px, ${my}px) scale(1.1)`, opacity: 1, offset: 0.45 },
+            { transform: `translate(${tx}px, ${ty}px) scale(0.5)`, opacity: 0.9 },
+          ],
+          { duration: 700 + k * 90, easing: 'cubic-bezier(0.4, 0, 0.6, 1)' },
+        );
+        anim.onfinish = () => {
+          orb.remove();
+          if (k === 0) {
+            target.classList.remove('bump');
+            void target.offsetWidth;
+            target.classList.add('bump');
+          }
+        };
+      }
+    };
+    window.addEventListener('veloria:collect', on);
+    return () => window.removeEventListener('veloria:collect', on);
+  }, []);
+  return <div className="fly-layer" ref={layer} />;
+}
+
+/** five marks for the five hours restored */
+export function Awakening() {
+  const restored = useGame((s) => s.restored);
+  const step = useGame((s) => s.step);
+  const tab = useGame((s) => s.tab);
+  const dialogue = useGame((s) => s.dialogue);
+  if (step < STEP.explore || tab !== 'explore' || dialogue) return null;
+  const marks: { id: string; label: string }[] = [
+    { id: 'clock', label: 'The clock' },
+    { id: 'fountain', label: 'The fountain' },
+    { id: 'garden', label: 'The garden' },
+    { id: 'bookshop', label: 'The bookshop' },
+    { id: 'bell', label: 'The bell' },
+  ];
+  const n = marks.filter((m) => restored[m.id as keyof typeof restored]).length;
+  return (
+    <div className="awakening" title={`${n} of 5 restored`}>
+      <span className="aw-label">Veloria awakens</span>
+      <div className="aw-marks">
+        {marks.map((m) => (
+          <i key={m.id} className={restored[m.id as keyof typeof restored] ? 'on' : ''} title={m.label} />
+        ))}
+      </div>
+    </div>
+  );
+}
