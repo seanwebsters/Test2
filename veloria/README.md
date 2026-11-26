@@ -44,14 +44,22 @@ database to set up.
 - One district: clock tower, town square and fountain, Mrs Hollow's
   bookshop, his mother's garden, a canal and bridge, and the woodland with
   the blossom tree where she wakes.
-- The whole of Chapter I, *The City That Never Woke*, and Chapter II, *You
-  Came Back*, up to its cliffhanger.
-- Five orders, each restoring something with a visible before and after:
+- Three chapters: *The City That Never Woke*, *You Came Back* and *A Night
+  Without End*, ending on a cliffhanger.
+- You are the heroine: write your name (Lucien learns it in Chapter II) and
+  choose one of three looks, which follows you into every scene.
+- Two love interests: Lucien, the trapped keeper (slow burn), and Cassian, the
+  lamplighter (dangerous attraction), each with their own affection, traits,
+  memories and gifts. Intimate choices are marked, and a Moments gallery
+  collects every scene you unlock.
+- Seven orders, each restoring something with a visible before and after:
   - the clock starts
   - the fountain flows
   - the garden blooms
   - the bookshop lights up
   - the great bell rings
+  - lanterns float on the canal
+  - festival lights are strung over the square
 - The city is frozen at first. Petals hang mid-air, a sparrow is stuck
   mid-flight, the water is glass and the clock hands are stopped at a
   quarter past eleven. Each restoration brings it back to life.

@@ -3,13 +3,15 @@
  * reply lines are inserted after it. `action` names are handled by the store.
  */
 
-export type Speaker = 'him' | 'you' | 'narr';
+export type Speaker = 'him' | 'you' | 'narr' | 'cass';
 
 export interface Choice {
   text: string;
-  /** heart = romantic, ask = curious, wry = teasing */
-  tone?: 'heart' | 'ask' | 'wry';
+  /** heart = romantic, ask = curious, wry = teasing, spicy = intimate */
+  tone?: 'heart' | 'ask' | 'wry' | 'spicy';
   aff?: number;
+  /** whose affection the choice moves (Lucien by default) */
+  to?: 'cass';
   flag?: string;
   reply?: Line[];
 }
@@ -19,6 +21,8 @@ export interface Line {
   text: string;
   action?: string;
   choices?: Choice[];
+  /** switch the painted scene behind the dialogue from this line on */
+  cg?: string;
 }
 
 export type ScriptId =
@@ -35,10 +39,17 @@ export type ScriptId =
   | 'mem_ledge'
   | 'idle_ch1'
   | 'idle_ch2'
-  | 'idle_free';
+  | 'idle_free'
+  | 'wake3'
+  | 'q6_done'
+  | 'q7_done'
+  | 'mem_almost'
+  | 'mem_lamp'
+  | 'idle_cass';
 
 const n = (text: string, action?: string): Line => ({ who: 'narr', text, action });
 const h = (text: string, action?: string): Line => ({ who: 'him', text, action });
+const c = (text: string, action?: string): Line => ({ who: 'cass', text, action });
 
 export const SCRIPTS: Record<ScriptId, Line[]> = {
   wake: [
@@ -196,6 +207,31 @@ export const SCRIPTS: Record<ScriptId, Line[]> = {
     },
     h('It has been six days. For me. The clock kept ticking after you left — I counted every hour, so I would have something to tell you.'),
     n('Six days. You have slept a single night.'),
+    h('You kept your name from me. At my request, I know. I have regretted it for six days. Will you give it to me now?'),
+    {
+      who: 'you',
+      text: '',
+      choices: [
+        {
+          text: "It's {name}.",
+          tone: 'heart',
+          aff: 3,
+          reply: [n('He repeats it under his breath, as though testing whether the city will allow it.'), h('{name}. I am going to say it far too often. I apologise in advance.')],
+        },
+        {
+          text: 'Guess.',
+          tone: 'wry',
+          aff: 2,
+          reply: [h('Something from a story. Something that makes clocks start.'), n('You tell him. {name}.'), h('{name}. Yes. Of course it is.')],
+        },
+        {
+          text: 'Come closer and I will whisper it.',
+          tone: 'spicy',
+          aff: 4,
+          reply: [n('He does. You feel him hold his breath. When you say it, his eyes close.'), h('{name}. Say it to me like that again and I will forget there was ever a curse.')],
+        },
+      ],
+    },
     h("I wrote you a letter. Is that ridiculous? Don't read it in front of me.", 'letter:sixdays'),
     h("And I found something while you were gone. Hollow & Quill — the bookshop. There's a new lock on its door. A brass one. It wasn't there before the city stopped."),
     h('Someone locked it afterwards. Which means someone else was here.', 'follow'),
@@ -247,6 +283,156 @@ export const SCRIPTS: Record<ScriptId, Line[]> = {
     n('Far below, a lamplighter you have never seen before turns mid-stride and looks up at the tower. Then he is still again.'),
     n('Lucien did not see it. You decide not to tell him. Not yet.', 'endChapter2'),
   ],
+
+  wake3: [
+    { who: 'narr', text: 'Night, this time. Real night: the kind that moves. Somewhere, a dog barks, and then looks embarrassed about it.', cg: 'cg_cassian' },
+    n('The lamps along the canal are dark. All but one, which is being lit, very carefully, by a man on a ladder.'),
+    c('Careful — the cobbles are slick when the dew comes back. Took a hundred years, but it came back.'),
+    c("You must be the dreamer. He's told the fountain all about you. The fountain, in turn, has told me."),
+    {
+      who: 'you',
+      text: '',
+      choices: [
+        {
+          text: 'Who are you?',
+          tone: 'ask',
+          aff: 2,
+          to: 'cass',
+          reply: [
+            c("Cassian Ashby. I light the lamps. Or I did, before. Lately I've mostly stood very still and waited for someone to notice I'm not a statue."),
+            { who: 'narr', text: 'He tips an imaginary hat. The real one fell in the canal in 1928.', action: 'knowCass' },
+          ],
+        },
+        {
+          text: "Where's Lucien?",
+          aff: 1,
+          reply: [c('Up the tower, I would wager. Winding something. He winds things when he is worried.'), { who: 'narr', text: '"Cassian Ashby," he adds. "Lamplighter. Charmed."', action: 'knowCass' }],
+        },
+        {
+          text: "You're staring.",
+          tone: 'spicy',
+          aff: 4,
+          to: 'cass',
+          reply: [c("You're worth staring at. Don't tell him I said that."), { who: 'narr', text: '"Cassian Ashby," he says, and does not look away. "At your service. Any service."', action: 'knowCass' }],
+        },
+      ],
+    },
+    n('His lantern swings. In its light his eyes are the colour of honey and something sharper.'),
+    c("I'll be honest, since you'll find out anyway. That was my lock on the bookshop door."),
+    {
+      who: 'you',
+      text: '',
+      choices: [
+        {
+          text: 'Why would you hide that letter?',
+          tone: 'ask',
+          aff: 2,
+          to: 'cass',
+          reply: [c('Because Isolde asked me to keep it from him until someone came who could carry it. I have kept a great many things for a great many years.')],
+        },
+        {
+          text: 'Does Lucien know?',
+          aff: 2,
+          reply: [c("No. And I'd like to be the one to tell him. Will you let me?"), n('You find, to your surprise, that you nod.')],
+        },
+      ],
+    },
+    c('Help me with the lamps along the water? He finds his way home by them. He always has.', 'follow'),
+  ],
+
+  q6_done: [
+    { who: 'narr', text: 'One by one, the canal lamps catch. Their light falls into the water and floats there, gold on black.', cg: 'cg_cassian' },
+    n('Someone is crossing the bridge too quickly. He stops when he sees who you are with.'),
+    h('{name}.'),
+    h('...Cassian.'),
+    c('Keeper.'),
+    n('The air between them is very old.'),
+    h("You're awake."),
+    c("Since the bell. You're welcome, by the way. Somebody had to keep the lamps oiled."),
+    {
+      who: 'you',
+      text: '',
+      choices: [
+        { text: 'Lucien. I was looking for you.', tone: 'heart', aff: 3, reply: [n('Something in his shoulders lets go.'), h("Were you? Good. I was — the tower. Never mind the tower.")] },
+        {
+          text: "Cassian's been keeping me company.",
+          tone: 'wry',
+          aff: 3,
+          to: 'cass',
+          reply: [n("Lucien's jaw tightens. He says nothing at all, which is somehow worse."), c("Don't sulk, Vale. It ages you. Well — it would.")],
+        },
+        { text: 'You two know each other?', tone: 'ask', aff: 1, reply: [c('We grew up three streets apart. He was insufferable then, too.'), h('He stole my kite. In 1911.'), c('Borrowed.')] },
+      ],
+    },
+    c("Tonight's the Lantern Festival. It was, the night everything stopped. Shall we finish it? The square needs light, and flowers, and a little borrowed time."),
+  ],
+
+  q7_done: [
+    { who: 'narr', text: 'Strings of light leap from roof to roof across the square. Somewhere, impossibly, a fiddle starts up.', cg: 'cg_dance' },
+    h('Dance with me. I have been practising with the fountain. It is a poor partner.'),
+    {
+      who: 'you',
+      text: '',
+      choices: [
+        { text: 'Yes.', tone: 'heart', aff: 3, reply: [n('He takes your hand as though it is the answer to something.')] },
+        {
+          text: 'Only if you hold me closer than that.',
+          tone: 'spicy',
+          aff: 5,
+          reply: [n('He does. His hand settles at the small of your back and stays there, warm through your dress.'), h('Like this?'), n('Closer.')],
+        },
+      ],
+    },
+    n('The lanterns turn above you. For one song, there is no curse, no bargain, no morning. Only the two of you, and the music, and his breath catching every time you look up.'),
+    { who: 'narr', text: 'Later, by the archway, a lantern swings into your path.', cg: 'cg_cassclose' },
+    c('A word, dreamer. Before midnight finds us.'),
+    c('The bargain needs a keeper. If Lucien walks out of Veloria with you, someone has to stay. I have been ready for a hundred years.'),
+    {
+      who: 'you',
+      text: '',
+      choices: [
+        { text: 'Why would you do that for him?', tone: 'ask', aff: 3, to: 'cass', reply: [c('For him? No. Because someone ought to get to leave. And because you look at him the way no one has ever looked at me.')] },
+        {
+          text: 'Cassian...',
+          tone: 'spicy',
+          aff: 5,
+          to: 'cass',
+          reply: [n('He tilts your chin up with one finger. Lantern light pools between you.'), c("Don't. Don't look at me like that unless you mean it.")],
+        },
+      ],
+    },
+    { who: 'narr', text: 'On the bridge, a pocket watch catches the light.', cg: 'cg_jealous' },
+    n('Lucien has seen everything. Or enough.'),
+    n('He turns and walks into the dark before you can say his name.', 'endChapter3'),
+  ],
+
+  mem_almost: [
+    { who: 'narr', text: 'He finds you beneath the clock face, where the hands sweep past so close you can hear them breathe.', cg: 'cg_almost' },
+    h('I keep thinking that if I kiss you, you will wake up.'),
+    {
+      who: 'you',
+      text: '',
+      choices: [
+        { text: 'Then let me wake.', tone: 'spicy', aff: 5, reply: [n('His forehead rests against yours. The clock ticks once, twice. Neither of you moves away.'), h('Not yet. Let me have the almost a little longer.')] },
+        { text: 'Then I will dream of you instead.', tone: 'heart', aff: 4, reply: [h('That is the most dangerous thing anyone has ever said to me.')] },
+      ],
+    },
+  ],
+
+  mem_lamp: [
+    { who: 'narr', text: 'Cassian lets you light the last lamp on the canal. He stands behind you to steady the pole, closer than he needs to.', cg: 'cg_cassian' },
+    c('There. Now there is a light in Veloria that is entirely yours.'),
+    {
+      who: 'you',
+      text: '',
+      choices: [
+        { text: 'You could have done it yourself.', tone: 'wry', aff: 3, to: 'cass', reply: [c('I could. I wanted to watch you do it.')] },
+        { text: 'Stay like this a moment.', tone: 'spicy', aff: 5, to: 'cass', reply: [n('He does not move. You feel him smile against your hair.'), c('A moment. I have a hundred years of them saved up.')] },
+      ],
+    },
+  ],
+
+  idle_cass: [c('The lamps like you. I like you. The lamps have better judgement, admittedly.')],
 
   mem_boats: [
     n('You find him at the canal, folding a torn page into a paper boat with great seriousness.'),
@@ -358,7 +544,7 @@ export interface StoryPage {
   title: string;
   /** progress step that unlocks this page */
   unlock: number;
-  art: 'tower' | 'tree' | 'meet' | 'fountain' | 'alone' | 'return' | 'bookshop' | 'bell';
+  art: 'tower' | 'tree' | 'meet' | 'fountain' | 'alone' | 'return' | 'bookshop' | 'bell' | 'lamp' | 'dance';
   text: string[];
 }
 
@@ -385,6 +571,10 @@ export const STEP = {
   q4: 10,
   q5: 11,
   ch2End: 12,
+  wake3: 13,
+  q6: 14,
+  q7: 15,
+  ch3End: 16,
 } as const;
 
 export const CHAPTERS: ChapterDef[] = [
@@ -482,7 +672,41 @@ export const CHAPTERS: ChapterDef[] = [
       },
     ],
   },
-  { num: 'III', title: 'A Night Without End', unlock: 999, pages: [] },
+  {
+    num: 'III',
+    title: 'A Night Without End',
+    unlock: STEP.wake3,
+    pages: [
+      {
+        title: 'The Last Lamp',
+        unlock: STEP.wake3,
+        art: 'lamp',
+        text: [
+          'The third night, the lamplighter was waiting.',
+          'Cassian Ashby had golden hair and a borrowed kind of smile, and he confessed within minutes that it was his lock on the bookshop door. He had been keeping a promise to Lucien\'s mother for a hundred years.',
+        ],
+      },
+      {
+        title: 'Three Streets Apart',
+        unlock: STEP.q7,
+        art: 'lamp',
+        text: [
+          'The canal lamps caught one by one, and Lucien came across the bridge too quickly, and stopped.',
+          'They had grown up three streets apart. There was a kite in 1911, and a great deal that neither of them said.',
+        ],
+      },
+      {
+        title: 'The Lantern Festival',
+        unlock: STEP.ch3End,
+        art: 'dance',
+        text: [
+          'They finished the festival the city never had. Lucien danced as though he had been practising for a century, which he had.',
+          'Then Cassian told the truth about the bargain: someone must always stay. He had been ready for a hundred years.',
+          'On the bridge, a pocket watch caught the light. Lucien walked into the dark before anyone could say his name.',
+        ],
+      },
+    ],
+  },
   { num: 'IV', title: 'The Cost of Time', unlock: 999, pages: [] },
 ];
 
@@ -503,10 +727,29 @@ export const TRAITS: { at: number; text: string }[] = [
   { at: 60, text: 'Afraid, more than anything, of being forgotten.' },
 ];
 
-export const MEMORIES: { id: ScriptId; title: string; at: number; place: 'canal' | 'tower'; blurb: string }[] = [
-  { id: 'mem_boats', title: 'Paper Boats', at: 22, place: 'canal', blurb: 'A race to the bridge, and a confession for the loser.' },
-  { id: 'mem_ledge', title: 'The Highest Window', at: 40, place: 'tower', blurb: 'The whole city below, like a story left open.' },
+export const MEMORIES: { id: ScriptId; title: string; at: number; who: 'him' | 'cass'; step: number; blurb: string }[] = [
+  { id: 'mem_boats', title: 'Paper Boats', at: 22, who: 'him', step: 10, blurb: 'A race to the bridge, and a confession for the loser.' },
+  { id: 'mem_ledge', title: 'The Highest Window', at: 40, who: 'him', step: 10, blurb: 'The whole city below, like a story left open.' },
+  { id: 'mem_almost', title: 'Beneath the Clock', at: 52, who: 'him', step: 14, blurb: 'If he kisses you, will you wake?' },
+  { id: 'mem_lamp', title: 'The Last Lamp', at: 12, who: 'cass', step: 14, blurb: 'He lets you light it. He stands very close.' },
 ];
+
+export const CASS_TRAITS: { at: number; text: string }[] = [
+  { at: 0, text: 'Lamplighter of Veloria. Lights every lamp by hand, and tells each one goodnight.' },
+  { at: 8, text: 'Kept a promise to Isolde Vale for a hundred years without telling anyone.' },
+  { at: 18, text: 'Flirts the way other people breathe. Means it more than he lets on.' },
+  { at: 30, text: 'Grew up three streets from Lucien. Still has the kite.' },
+  { at: 45, text: 'Would stay in Veloria forever if it meant someone else could leave.' },
+];
+
+export const CASS_IDLE = [
+  'Every lamp in this city has a name. That one is Margot. She is dramatic.',
+  'He watches you when you are not looking, you know. So do I. We are both terrible.',
+  'A hundred years of lighting lamps, and the brightest thing here walked in on two feet.',
+  'If you ever want the city from the rooftops, I know a ladder.',
+];
+
+export const CASS_GIFT = ['For me? I shall have to light a lamp in its honour.', 'You do know how to make a lamplighter blush. It takes some doing.'];
 
 export const GIFT_LINES: Record<string, string[]> = {
   bloom: ['You found this here? In my city? I may keep it forever.', 'My mother would have known its name. I only know I like it.'],

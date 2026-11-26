@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type React from 'react';
-import { useGame, tierOf, MAX_ENERGY, ENERGY_MS, questReady, GIFTS_PER_DAY } from '../game/store';
+import { Look, useGame, tierOf, MAX_ENERGY, ENERGY_MS, questReady, GIFTS_PER_DAY } from '../game/store';
 import { questForStep } from '../game/quests';
-import { MEMORIES, STEP, TRAITS } from '../game/story';
+import { CASS_TRAITS, MEMORIES, STEP, TRAITS } from '../game/story';
 import { SPOTS } from '../game/layout';
 import { ItemIcon } from './ItemIcon';
-import { Portrait, ART } from './Art';
+import { Portrait, ART, cgFile, herSuffix } from './Art';
 import {
   Crescent,
   IconClose,
@@ -29,8 +29,10 @@ export function Title() {
   const begin = useGame((s) => s.begin);
   const reset = useGame((s) => s.resetSave);
   const [confirm, setConfirm] = useState(false);
+  const [creating, setCreating] = useState(false);
   if (screen !== 'title') return null;
   const hasSave = step > STEP.title;
+  if (creating) return <Create onDone={() => (unlockAudio(), begin())} onBack={() => setCreating(false)} />;
   return (
     <div className="title-screen" style={{ backgroundImage: `url(${ART}title.webp)` }}>
       <div className="title-top">
@@ -48,7 +50,8 @@ export function Title() {
           className="btn primary big"
           onClick={() => {
             unlockAudio();
-            begin();
+            if (hasSave) begin();
+            else setCreating(true);
           }}
         >
           {hasSave ? 'Return to Veloria' : 'Begin your story'} <span className="chev">›</span>
@@ -70,6 +73,68 @@ export function Title() {
             </button>
           ))}
         <div className="title-hint">Best with sound · Headphones recommended</div>
+      </div>
+    </div>
+  );
+}
+
+const LOOKS: { id: Look; name: string; line: string }[] = [
+  { id: 'rose', name: 'Rose', line: 'Dark waves, a rose-red cloak' },
+  { id: 'moon', name: 'Moonlight', line: 'Silver hair, a lavender cloak' },
+  { id: 'ember', name: 'Ember', line: 'Midnight curls, a sage-green cloak' },
+];
+
+/** who she is: a name for him to learn, and a look */
+function Create({ onDone, onBack }: { onDone: () => void; onBack: () => void }) {
+  const setHero = useGame((s) => s.setHero);
+  const [name, setName] = useState('');
+  const [look, setLook] = useState<Look>('rose');
+  const ok = name.trim().length > 0;
+  return (
+    <div className="create" style={{ backgroundImage: `url(${ART}title.webp)` }}>
+      <div className="create-card">
+        <div className="create-kicker">Before you fall asleep</div>
+        <h2 className="create-title">Who are you?</h2>
+        <div className="looks">
+          {LOOKS.map((l) => (
+            <button key={l.id} className={`look ${look === l.id ? 'on' : ''}`} onClick={() => setLook(l.id)} aria-pressed={look === l.id}>
+              <img src={`${ART}bust_her${herSuffix(l.id)}.webp`} alt="" draggable={false} />
+              <span className="look-name">{l.name}</span>
+              <span className="look-line">{l.line}</span>
+            </button>
+          ))}
+        </div>
+        <label className="name-label" htmlFor="hero-name">
+          Your name, the one he will learn
+        </label>
+        <input
+          id="hero-name"
+          className="name-input"
+          value={name}
+          maxLength={18}
+          autoComplete="off"
+          placeholder="Write your name"
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && ok) {
+              setHero(name, look);
+              onDone();
+            }
+          }}
+        />
+        <button
+          className="btn primary wide"
+          disabled={!ok}
+          onClick={() => {
+            setHero(name, look);
+            onDone();
+          }}
+        >
+          Close your eyes
+        </button>
+        <button className="link dark" onClick={onBack}>
+          Back
+        </button>
       </div>
     </div>
   );
@@ -136,9 +201,12 @@ export function Objective() {
     ready = questReady(board, q.requires).every(Boolean);
     title = q.title;
     sub = ready ? 'Everything is ready · tap to deliver' : 'Gather lights, then merge what the order needs · tap to open';
-  } else if (step === STEP.ch2End) {
+  } else if (step === STEP.ch3End) {
     title = 'Veloria, awake';
-    sub = 'Wander, merge gifts for him, relive your memories';
+    sub = 'Wander, merge gifts for them, relive your memories';
+  } else if (step === STEP.q6 || step === STEP.wake3) {
+    title = 'The lamplighter';
+    sub = 'Cassian is lighting the lamps along the canal';
   } else return null;
   return (
     <button
@@ -200,12 +268,14 @@ export function Prompt() {
   const inspect = useGame((s) => s.inspect);
   const talk = useGame((s) => s.talkToHim);
   const himSaid = useGame((s) => s.himSaid);
+  const knowCass = useGame((s) => s.knowCass);
+  const talkCass = useGame((s) => s.talkToCass);
   if (!near || dialogue || tab !== 'explore') return null;
   const spot = SPOTS.find((s) => s.id === near);
-  const label = near === 'him' ? `Talk to ${knowName ? 'Lucien' : 'him'}` : spot?.label;
+  const label = near === 'him' ? `Talk to ${knowName ? 'Lucien' : 'him'}` : near === 'cass' ? `Talk to ${knowCass ? 'Cassian' : 'the lamplighter'}` : spot?.label;
   return (
-    <button className="prompt" onClick={() => (near === 'him' ? talk() : inspect(near))}>
-      {near === 'him' ? <IconHeart size={16} filled={!!himSaid} /> : <span className="eye">◦</span>}
+    <button className="prompt" onClick={() => (near === 'him' ? talk() : near === 'cass' ? talkCass() : inspect(near))}>
+      {near === 'him' || near === 'cass' ? <IconHeart size={16} filled={near === 'him' && !!himSaid} /> : <span className="eye">◦</span>}
       {label}
     </button>
   );
@@ -248,11 +318,25 @@ export function Dialogue() {
   }, [text, d?.i]);
   if (!d || !line) return null;
   const done = shown >= text.length;
-  const alone = useGame.getState().focus === 'alone';
-  const cg = alone ? 'cg_alone' : CG[d.id as string];
-  const bust = !cg && line.who !== 'narr' ? (line.who === 'him' ? (line.choices ? 'bust_him' : heartish(text) ? 'bust_him_smile' : 'bust_him') : 'bust_her') : null;
+  const st = useGame.getState();
+  const alone = st.focus === 'alone';
+  // a line can change the painted scene for the rest of the script
+  let lineCg: string | undefined;
+  for (let k = d.i; k >= 0; k--) if (d.lines[k].cg) (lineCg = d.lines[k].cg), (k = -1);
+  const cgId = alone ? 'cg_alone' : (lineCg ?? CG[d.id as string]);
+  const cg = cgId ? cgFile(cgId, st.look) : null;
+  if (cgId && !st.seenCg.includes(cgId)) setTimeout(() => useGame.getState().markCg(cgId), 0);
+  const herBust = `bust_her${herSuffix(st.look)}`;
+  const bust = !cg && line.who !== 'narr'
+    ? line.who === 'him'
+      ? line.choices ? 'bust_him' : heartish(text) ? 'bust_him_smile' : 'bust_him'
+      : line.who === 'cass'
+        ? heartish(text) ? 'bust_cass_smile' : 'bust_cass'
+        : herBust
+    : null;
   const who = line.who;
-  const name = who === 'him' ? (knowName ? 'Lucien' : 'Him') : who === 'you' ? 'You' : '';
+  const name =
+    who === 'him' ? (knowName ? 'Lucien' : 'Him') : who === 'cass' ? (st.knowCass ? 'Cassian' : 'The Lamplighter') : who === 'you' ? st.heroName || 'You' : '';
   const onTap = () => {
     if (line.choices) return;
     if (!done) {
@@ -266,26 +350,33 @@ export function Dialogue() {
     <div className={`dialogue-wrap ${cg ? 'with-cg' : ''}`} onClick={onTap}>
       {cg && (
         <div className="cg" key={cg}>
-          <div className="cg-blur" style={{ backgroundImage: `url(${ART}${cg}.webp)` }} />
+          <div className="cg-blur" style={{ backgroundImage: `url(${cg})` }} />
           <div className="cg-plate">
-            <img src={`${ART}${cg}.webp`} alt="" draggable={false} />
+            <img src={cg} alt="" draggable={false} />
           </div>
         </div>
       )}
-      {bust && <img key={bust} className={`bust ${line.who}`} src={`${ART}${bust}.webp`} alt="" draggable={false} />}
+      {bust && <img key={bust} className={`bust ${line.who === 'cass' ? 'him' : line.who}`} src={`${ART}${bust}.webp`} alt="" draggable={false} />}
       {line.choices ? (
         <div className="choices">
           {line.choices.map((c, i) => (
             <button
               key={i}
-              className={`choice ${c.tone === 'heart' ? 'heart' : ''}`}
+              className={`choice ${c.tone === 'heart' ? 'heart' : ''} ${c.tone === 'spicy' ? 'spicy' : ''}`}
               onClick={(e) => {
                 e.stopPropagation();
                 choose(i);
               }}
             >
               {c.tone === 'heart' && <IconHeart size={16} />}
+              {c.tone === 'spicy' && (
+                <span className="spice">
+                  <IconHeart size={14} />
+                  <IconHeart size={14} />
+                </span>
+              )}
               {c.text}
+              {c.to === 'cass' && <span className="for-cass">Cassian</span>}
             </button>
           ))}
         </div>
@@ -342,20 +433,46 @@ function Sheet({ title, children }: { title: string; children: React.ReactNode }
 
 export function LovePanel() {
   const affection = useGame((s) => s.affection);
+  const affC = useGame((s) => s.affC);
   const knowName = useGame((s) => s.knowName);
+  const knowCass = useGame((s) => s.knowCass);
   const step = useGame((s) => s.step);
   const memories = useGame((s) => s.memories);
   const playMemory = useGame((s) => s.playMemory);
   const gifts = useGame((s) => s.gifts);
-  const tier = tierOf(affection);
-  const met = step >= STEP.q1;
+  const [who, setWho] = useState<'him' | 'cass'>('him');
+  const cassMet = step >= STEP.wake3;
+  const isCass = who === 'cass' && cassMet;
+  const aff = isCass ? affC : affection;
+  const tier = tierOf(aff);
+  const met = isCass || step >= STEP.q1;
   const giftsLeft = GIFTS_PER_DAY - (gifts.day === new Date().toISOString().slice(0, 10) ? gifts.n : 0);
+  const traits = isCass ? CASS_TRAITS : TRAITS;
+  const mems = MEMORIES.filter((m) => m.who === (isCass ? 'cass' : 'him'));
   return (
     <Sheet title="Love">
-      <div className="love-card panel">
-        <Portrait size={132} mystery={!met} smile={tier.index >= 2} />
-        <div className="love-name">{met ? (knowName ? 'Lucien Vale' : 'The man by the clock') : '???'}</div>
-        <div className="love-epithet">{met ? 'Keeper of Veloria · Slow burn' : 'Someone is waiting beneath the clock tower.'}</div>
+      {cassMet && (
+        <div className="love-tabs">
+          <button className={!isCass ? 'on' : ''} onClick={() => setWho('him')}>
+            {knowName ? 'Lucien' : 'Him'}
+          </button>
+          <button className={isCass ? 'on' : ''} onClick={() => setWho('cass')}>
+            {knowCass ? 'Cassian' : 'The Lamplighter'}
+          </button>
+        </div>
+      )}
+      <div className={`love-card panel ${isCass ? 'cass' : ''}`}>
+        {isCass ? (
+          <div className="portrait" style={{ width: 132, height: 132 }}>
+            <img src={`${ART}${tier.index >= 2 ? 'bust_cass_smile' : 'bust_cass'}.webp`} alt="" draggable={false} />
+          </div>
+        ) : (
+          <Portrait size={132} mystery={!met} smile={tier.index >= 2} />
+        )}
+        <div className="love-name">{isCass ? (knowCass ? 'Cassian Ashby' : 'The Lamplighter') : met ? (knowName ? 'Lucien Vale' : 'The man by the clock') : '???'}</div>
+        <div className="love-epithet">
+          {isCass ? 'Lamplighter of Veloria · Dangerous attraction' : met ? 'Keeper of Veloria · Slow burn' : 'Someone is waiting beneath the clock tower.'}
+        </div>
         {met && (
           <>
             <div className="tier">
@@ -369,43 +486,54 @@ export function LovePanel() {
                 ))}
               </div>
             </div>
-            <p className="tier-line">{tier.line}</p>
+            <p className="tier-line">{isCass ? CASS_TIER_LINES[tier.index] : tier.line}</p>
           </>
         )}
       </div>
       {met && (
         <>
-          <h4 className="section">What you know of him</h4>
+          <h4 className="section">What you know of {isCass ? 'him' : 'him'}</h4>
           <ul className="traits">
-            {TRAITS.map((t, i) => (
-              <li key={i} className={affection >= t.at ? '' : 'locked'}>
-                {affection >= t.at ? t.text : 'Grow closer to learn more…'}
+            {traits.map((t, i) => (
+              <li key={i} className={aff >= t.at ? '' : 'locked'}>
+                {aff >= t.at ? t.text : 'Grow closer to learn more…'}
               </li>
             ))}
           </ul>
           <h4 className="section">Memories</h4>
           <div className="memories">
-            {MEMORIES.map((m) => {
-              const open = affection >= m.at && step >= STEP.q4;
+            {mems.map((m) => {
+              const open = aff >= m.at && step >= m.step;
               return (
                 <button key={m.id} className={`memory ${open ? '' : 'locked'}`} disabled={!open} onClick={() => playMemory(m.id)}>
                   <div className="memory-title">
                     {!open && <IconLock />} {m.title}
                     {memories.includes(m.id) && <span className="seen">relived</span>}
                   </div>
-                  <div className="memory-blurb">{open ? m.blurb : step < STEP.q4 ? 'Unlocks in Chapter II' : `Unlocks at ${m.at} affection`}</div>
+                  <div className="memory-blurb">{open ? m.blurb : step < m.step ? `Unlocks in Chapter ${m.step >= STEP.wake3 + 1 ? 'III' : 'II'}` : `Unlocks at ${m.at} affection`}</div>
                 </button>
               );
             })}
           </div>
           <p className="gift-note">
-            <IconHeart size={14} /> Give him gifts from the Merge board. He is especially fond of books, letters and flowers. {giftsLeft} gifts left tonight.
+            <IconHeart size={14} />{' '}
+            {isCass
+              ? `Give him gifts from the Merge board. He is fond of crystals, keys and anything that glows. ${giftsLeft} gifts left tonight.`
+              : `Give him gifts from the Merge board. He is especially fond of books, letters and flowers. ${giftsLeft} gifts left tonight.`}
           </p>
         </>
       )}
     </Sheet>
   );
 }
+
+const CASS_TIER_LINES = [
+  'He watches you the way he watches a flame: carefully, and a little too long.',
+  'He has started lighting the lamp nearest wherever you are.',
+  'He tells you things he has never told anyone. Then pretends he was joking.',
+  'He stopped flirting. Now he just looks at you. It is worse.',
+  'He would keep every lamp in Veloria burning for you, and never ask for anything back.',
+];
 
 export function SatchelPanel() {
   const satchel = useGame((s) => s.satchel);

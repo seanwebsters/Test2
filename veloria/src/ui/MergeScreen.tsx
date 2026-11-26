@@ -283,8 +283,13 @@ function InfoBar({ sel, idx }: { sel: ReturnType<typeof useGame.getState>['board
       </div>
       <div className="info-actions">
         {canGift && (
-          <button className="btn small rose" onClick={() => s.gift(idx)} title="Give to him">
-            <IconHeart size={14} /> Gift
+          <button className="btn small rose" onClick={() => s.gift(idx, 'him')} title="Give to Lucien">
+            <IconHeart size={14} /> {s.step >= STEP.wake3 ? 'Lucien' : 'Gift'}
+          </button>
+        )}
+        {s.step > STEP.wake3 && (
+          <button className="btn small gold" onClick={() => s.gift(idx, 'cass')} title="Give to Cassian">
+            <IconHeart size={14} /> Cassian
           </button>
         )}
         <button className="btn small" onClick={() => s.store(idx)}>

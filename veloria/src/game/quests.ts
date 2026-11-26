@@ -1,7 +1,7 @@
 import { ItemKey } from './items';
 import { ScriptId, STEP } from './story';
 
-export type RestoreId = 'clock' | 'fountain' | 'garden' | 'bookshop' | 'bell';
+export type RestoreId = 'clock' | 'fountain' | 'garden' | 'bookshop' | 'bell' | 'lanterns' | 'festival';
 
 export interface Quest {
   id: string;
@@ -14,7 +14,7 @@ export interface Quest {
   /** script played once the order is delivered */
   after: ScriptId;
   /** where in the world the restoration happens (camera focus) */
-  place: 'square' | 'garden' | 'bookshop' | 'tower';
+  place: 'square' | 'garden' | 'bookshop' | 'tower' | 'canal';
 }
 
 export const QUESTS: Quest[] = [
@@ -71,6 +71,28 @@ export const QUESTS: Quest[] = [
     restores: 'bell',
     after: 'q5_done',
     place: 'tower',
+  },
+  {
+    id: 'q6',
+    step: STEP.q6,
+    title: 'Lanterns on the Water',
+    ask: 'Cassian needs a Silver Key for the lamp lockers and a Moonstone for the flames, so Lucien can find his way down.',
+    requires: ['key:3', 'crystal:4'],
+    reward: { dew: 50, energy: 30 },
+    restores: 'lanterns',
+    after: 'q6_done',
+    place: 'canal',
+  },
+  {
+    id: 'q7',
+    step: STEP.q7,
+    title: 'A Night Without End',
+    ask: 'Finish the Lantern Festival the city never had: a Moonbloom for the square and a Shard of Time to keep the night from ending.',
+    requires: ['bloom:5', 'time:4'],
+    reward: { dew: 60, energy: 40 },
+    restores: 'festival',
+    after: 'q7_done',
+    place: 'square',
   },
 ];
 

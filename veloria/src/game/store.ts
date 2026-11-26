@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { Board, bumpUid, drop, nearestEmpty, firstEmpty, starterBoard, take, uid, idx } from './board';
 import { GeneratorId, ItemKey, key, parse, rollGenerator, sellValue, itemName } from './items';
 import { QUESTS, questForStep, RestoreId } from './quests';
-import { GIFT_LINES, IDLE_LINES, INSPECT, LetterId, Line, MEMORIES, SCRIPTS, ScriptId, STEP, TIERS } from './story';
+import { CASS_GIFT, CASS_IDLE, GIFT_LINES, IDLE_LINES, INSPECT, LetterId, Line, MEMORIES, SCRIPTS, ScriptId, STEP, TIERS } from './story';
 import { GLIMMERS, GLIMMER_RESPAWN_MS, PLACES, V2 } from './layout';
 import { sfx } from './audio';
 import { makeRequest, Request } from './requests';
@@ -22,7 +22,8 @@ export const SATCHEL_SIZE = 10;
 export const GIFTS_PER_DAY = 4;
 
 export type Tab = 'explore' | 'merge' | 'story' | 'love' | 'satchel';
-export type Focus = 'square' | 'garden' | 'bookshop' | 'tower' | 'tree' | 'alone' | null;
+export type Focus = 'square' | 'garden' | 'bookshop' | 'tower' | 'tree' | 'alone' | 'canal' | null;
+export type Look = 'rose' | 'moon' | 'ember';
 
 interface Toast {
   id: number;
@@ -39,7 +40,7 @@ interface Dialogue {
 
 interface BookState {
   open: boolean;
-  view: 'chapters' | 'chapter' | 'letters' | 'letter' | 'end';
+  view: 'chapters' | 'chapter' | 'letters' | 'letter' | 'end' | 'moments';
   chapter: number;
   page: number;
   letter?: LetterId;
@@ -66,6 +67,11 @@ interface Saved {
   muted: boolean;
   delivered: string[];
   requests: Request[];
+  heroName: string;
+  look: Look;
+  affC: number;
+  knowCass: boolean;
+  seenCg: string[];
 }
 
 interface Live {
@@ -104,7 +110,10 @@ interface Actions {
   sell(i: number): void;
   store(i: number): void;
   unstore(slot: number): void;
-  gift(i: number): void;
+  gift(i: number, to?: 'him' | 'cass'): void;
+  setHero(name: string, look: Look): void;
+  markCg(id: string): void;
+  talkToCass(): void;
   deliver(questId: string): void;
   fulfil(requestId: number): void;
   topUpRequests(): void;
@@ -149,10 +158,26 @@ function fresh(): Saved {
     muted: false,
     delivered: [],
     requests: [],
+    heroName: '',
+    look: 'rose',
+    affC: 0,
+    knowCass: false,
+    seenCg: [],
   };
 }
 
 let toastId = 1;
+
+/** put her name into a script */
+function personalise(lines: Line[], name: string): Line[] {
+  const n = name || 'Dreamer';
+  const fix = (t: string) => t.replace(/\{name\}/g, n);
+  return lines.map((l) => ({
+    ...l,
+    text: fix(l.text),
+    choices: l.choices?.map((c) => ({ ...c, text: fix(c.text), reply: c.reply ? personalise(c.reply, n) : undefined })),
+  }));
+}
 const today = () => new Date().toISOString().slice(0, 10);
 
 export function timeLevel(restored: Saved['restored']): number {
@@ -201,8 +226,16 @@ export const useGame = create<State>()(
           case 'q4_done':
             set({ step: STEP.q5, focus: null });
             break;
+          case 'wake3':
+            set({ step: STEP.q6, focus: null });
+            break;
+          case 'q6_done':
+            set({ step: STEP.q7, focus: null });
+            break;
           case 'mem_boats':
           case 'mem_ledge':
+          case 'mem_almost':
+          case 'mem_lamp':
             if (!s.memories.includes(id)) set({ memories: [...s.memories, id] });
             set({ focus: null });
             break;
@@ -221,6 +254,8 @@ export const useGame = create<State>()(
           set({ focus: null });
         } else if (a === 'knowName') {
           set({ knowName: true });
+        } else if (a === 'knowCass') {
+          set({ knowCass: true });
         } else if (a.startsWith('letter:')) {
           const id = a.slice(7) as LetterId;
           if (!s.letters.includes(id)) {
@@ -245,6 +280,11 @@ export const useGame = create<State>()(
           setTimeout(() => {
             set({ step: STEP.ch2End, focus: null, book: { open: true, view: 'end', chapter: 1, page: 0 } });
           }, 1200);
+        } else if (a === 'endChapter3') {
+          setTimeout(() => {
+            set({ fade: 1 });
+            setTimeout(() => set({ step: STEP.ch3End, focus: null, fade: 0, book: { open: true, view: 'end', chapter: 2, page: 0 } }), 1300);
+          }, 900);
         }
       };
 
@@ -282,6 +322,10 @@ export const useGame = create<State>()(
           } else if (s.step === STEP.wake2) {
             set({ focus: 'tree' });
             setTimeout(() => get().play('wake2'), 1200);
+          } else if (s.step === STEP.wake3) {
+            setTimeout(() => get().play('wake3'), 900);
+          } else if (s.step === STEP.ch2End) {
+            set({ book: { open: true, view: 'end', chapter: 1, page: 0 } });
           } else {
             // a delivered order whose scene was interrupted by closing the game
             const q = questForStep(s.step);
@@ -320,8 +364,9 @@ export const useGame = create<State>()(
         play(id) {
           get().say(SCRIPTS[id], id);
         },
-        say(lines, id = 'inspect') {
-          set({ dialogue: { id, lines: lines.slice(), i: 0 }, tab: 'explore' });
+        say(raw, id = 'inspect') {
+          const lines = personalise(raw, get().heroName);
+          set({ dialogue: { id, lines, i: 0 }, tab: 'explore' });
           const first = lines[0];
           if (first?.action) runAction(first.action);
           sfx('blip');
@@ -351,9 +396,11 @@ export const useGame = create<State>()(
           const lines = d.lines.slice();
           lines.splice(d.i, 1, { who: 'you', text: c.text }, ...(c.reply ?? []));
           if (c.aff) {
-            set({ affection: Math.min(100, get().affection + c.aff) });
-            if (c.tone === 'heart') sfx('heart');
-            get().toast({ text: c.aff >= 3 ? 'He will remember that.' : 'He noticed.', heart: true });
+            if (c.to === 'cass') set({ affC: Math.min(100, get().affC + c.aff) });
+            else set({ affection: Math.min(100, get().affection + c.aff) });
+            if (c.tone === 'heart' || c.tone === 'spicy') sfx('heart');
+            const who = c.to === 'cass' ? (get().knowCass ? 'Cassian' : 'The lamplighter') : get().knowName ? 'Lucien' : 'He';
+            get().toast({ text: c.tone === 'spicy' ? `${who} won't forget that.` : c.aff >= 3 ? `${who} will remember that.` : `${who} noticed.`, heart: true });
           }
           sfx('choose');
           set({ dialogue: { ...d, lines } });
@@ -479,7 +526,7 @@ export const useGame = create<State>()(
           sfx('spawn');
         },
 
-        gift(i) {
+        gift(i, to = 'him') {
           const s = get();
           const c = s.board[i];
           if (!c || c.kind !== 'item' || c.frozen) return;
@@ -494,10 +541,17 @@ export const useGame = create<State>()(
           const gain = Math.max(1, Math.round(level * mult));
           const board = s.board.slice();
           board[i] = null;
+          if (to === 'cass') {
+            set({ board, affC: Math.min(100, s.affC + gain), gifts: { day: g.day, n: g.n + 1 }, selected: null });
+            get().toast({ text: `You gave Cassian a ${itemName(c.item)}  ·  +${gain} affection`, heart: true });
+            get().say([{ who: 'cass', text: CASS_GIFT[Math.floor(Math.random() * CASS_GIFT.length)] }], 'gift');
+            sfx('heart');
+            return;
+          }
           set({ board, affection: Math.min(100, s.affection + gain), gifts: { day: g.day, n: g.n + 1 }, selected: null });
           const lines = GIFT_LINES[chain];
           set({ himSaid: lines[Math.floor(Math.random() * lines.length)] });
-          get().toast({ text: `You gave him a ${itemName(c.item)}  ·  +${gain} affection`, heart: true });
+          get().toast({ text: `You gave Lucien a ${itemName(c.item)}  ·  +${gain} affection`, heart: true });
           sfx('heart');
         },
 
@@ -625,6 +679,15 @@ export const useGame = create<State>()(
         },
         sleepAgain() {
           const s = get();
+          if (s.step === STEP.ch2End) {
+            set({ book: { ...s.book, open: false }, fade: 1, vanish: 0 });
+            setTimeout(() => {
+              set({ step: STEP.wake3, player: [...PLACES.wake] as V2, focus: null, energy: Math.max(get().energy, 80), requests: [] });
+              setTimeout(() => set({ fade: 0 }), 500);
+              setTimeout(() => get().play('wake3'), 1600);
+            }, 1300);
+            return;
+          }
           if (s.step !== STEP.ch1End) return;
           set({ book: { ...s.book, open: false }, fade: 1, vanish: 0 });
           setTimeout(() => {
@@ -634,9 +697,22 @@ export const useGame = create<State>()(
             setTimeout(() => get().play('wake2'), 2200);
           }, 1300);
         },
+        setHero(name, look) {
+          set({ heroName: name.trim().slice(0, 18), look });
+        },
+        markCg(id) {
+          if (!get().seenCg.includes(id)) set({ seenCg: [...get().seenCg, id] });
+        },
+        talkToCass() {
+          const s = get();
+          if (s.dialogue) return;
+          const line = CASS_IDLE[Math.floor(Math.random() * CASS_IDLE.length)];
+          get().say(Math.random() < 0.3 ? SCRIPTS.idle_cass : [{ who: 'cass', text: line }], 'gift');
+        },
         playMemory(id) {
           const m = MEMORIES.find((x) => x.id === id);
-          if (!m || get().affection < m.at) return;
+          const s = get();
+          if (!m || (m.who === 'cass' ? s.affC : s.affection) < m.at || s.step < m.step) return;
           set({ tab: 'explore' });
           get().play(id);
         },

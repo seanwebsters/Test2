@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useGame, timeLevel } from '../game/store';
+import { herSuffix } from '../ui/Art';
 import { RestoreId } from '../game/quests';
 import { STEP } from '../game/story';
 import { setTimeLevel } from '../game/audio';
@@ -22,8 +23,30 @@ const BANTER2 = [
 ];
 const PICKUP = ['Another one!', 'There, by your feet.', 'That one was warm.', 'They like you.'];
 
+const CANAL_LANTERNS: V2[] = [
+  [60, 1200], [150, 1225], [240, 1265], [300, 1330], [350, 1400], [390, 1470], [110, 1320], [200, 1380], [280, 1455], [40, 1440],
+];
+/** [from, to, sag] */
+const GARLANDS: [V2, V2, number][] = [
+  [[110, 600], [650, 530], 70],
+  [[650, 530], [965, 780], 60],
+  [[60, 815], [965, 790], 90],
+  [[110, 600], [60, 815], 30],
+  [[400, 640], [968, 790], 80],
+];
+
+/** the lamplighter's evening round */
+const LAMP_ROUND: V2[] = [
+  [300, 1040],
+  [120, 1015],
+  [90, 900],
+  [600, 1000],
+  [930, 1000],
+  [700, 1060],
+];
+
 /** what she means to do when she arrives */
-type Intent = { kind: 'spot'; id: string } | { kind: 'him' } | null;
+type Intent = { kind: 'spot'; id: string } | { kind: 'him' } | { kind: 'cass' } | null;
 const intent: { v: Intent } = { v: null };
 
 const ART = `${import.meta.env.BASE_URL}art/`;
@@ -55,6 +78,7 @@ interface Actor {
 }
 
 const FOCI: Record<string, { at: V2; zoom: number }> = {
+  canal: { at: [230, 1220], zoom: 1.25 },
   square: { at: [508, 780], zoom: 1.25 },
   garden: { at: [180, 650], zoom: 1.3 },
   bookshop: { at: [830, 600], zoom: 1.3 },
@@ -69,6 +93,7 @@ export function Town() {
   const fx = useRef<HTMLCanvasElement>(null);
   const herEl = useRef<HTMLDivElement>(null);
   const himEl = useRef<HTMLDivElement>(null);
+  const cassEl = useRef<HTMLDivElement>(null);
   const hourEl = useRef<HTMLDivElement>(null);
   const minEl = useRef<HTMLDivElement>(null);
   const glimEls = useRef<(HTMLDivElement | null)[]>([]);
@@ -94,6 +119,7 @@ export function Town() {
     void sprites;
     const s0 = useGame.getState();
     const her: Actor = { x: s0.player[0], y: s0.player[1], vx: 0, vy: 0, phase: 0, face: 'front', flip: false, fade: 0 };
+    const cass = { x: 0, y: 0, vx: 0, vy: 0, phase: 0, face: 'front' as 'front' | 'back', flip: false, fade: 0, init: false, leg: 0, wait: 2, path: [] as V2[] };
     const him: Actor = { x: PLACES.himSeat[0], y: PLACES.himSeat[1], vx: 0, vy: 0, phase: 0, face: 'front', flip: false, fade: 0 };
     let himMode = '';
     const cam = { x: her.x, y: her.y - 120, z: 1 };
@@ -123,6 +149,8 @@ export function Town() {
       const st = useGame.getState();
       if (it.kind === 'him') {
         if (Math.hypot(her.x - him.x, her.y - him.y) < 140) st.talkToHim();
+      } else if (it.kind === 'cass') {
+        if (Math.hypot(her.x - cass.x, her.y - cass.y) < 140) st.talkToCass();
       } else st.inspect(it.id);
     };
     let saveT = 0;
@@ -306,6 +334,80 @@ export function Town() {
           ctx.globalAlpha = 1;
         }
       }
+      // lanterns set floating on the canal
+      const lp = ease(prog('lanterns', 3500));
+      if (lp > 0) {
+        const now = performance.now() / 1000;
+        CANAL_LANTERNS.forEach(([lx, ly], i) => {
+          const k2 = Math.min(1, Math.max(0, lp * 1.6 - i * 0.07));
+          if (k2 <= 0) return;
+          const x = lx + Math.sin(now * 0.4 + i) * 10;
+          const y = ly + Math.sin(now * 0.9 + i * 2) * 3;
+          const g = ctx.createRadialGradient(x, y, 0, x, y, 46);
+          g.addColorStop(0, `rgba(255,214,150,${0.55 * k2})`);
+          g.addColorStop(1, 'rgba(255,200,140,0)');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(x, y, 46, 0, Math.PI * 2);
+          ctx.fill();
+          // reflection
+          ctx.fillStyle = `rgba(255,210,150,${0.35 * k2})`;
+          ctx.beginPath();
+          ctx.ellipse(x, y + 16, 9, 3, 0, 0, Math.PI * 2);
+          ctx.fill();
+          // the paper lantern
+          ctx.fillStyle = `rgba(255,236,200,${k2})`;
+          ctx.beginPath();
+          ctx.moveTo(x - 9, y + 6);
+          ctx.lineTo(x + 9, y + 6);
+          ctx.lineTo(x + 6, y - 9);
+          ctx.lineTo(x - 6, y - 9);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = `rgba(255,170,110,${0.8 * k2})`;
+          ctx.fillRect(x - 3, y - 4, 6, 7);
+        });
+      }
+      // the Lantern Festival: strings of light over the square
+      const fp2 = ease(prog('festival', 3500));
+      if (fp2 > 0) {
+        const now = performance.now() / 1000;
+        const cols = ['255,222,160', '255,190,205', '214,196,255'];
+        GARLANDS.forEach(([a, b, sag], gi) => {
+          const n = Math.floor(Math.hypot(b[0] - a[0], b[1] - a[1]) / 26);
+          ctx.strokeStyle = `rgba(70,50,70,${0.45 * fp2})`;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          for (let i = 0; i <= n; i++) {
+            const t = i / n;
+            const x = a[0] + (b[0] - a[0]) * t;
+            const y = a[1] + (b[1] - a[1]) * t + Math.sin(t * Math.PI) * sag;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+          for (let i = 1; i < n; i++) {
+            const t = i / n;
+            if (t > fp2 * 1.3) break;
+            const x = a[0] + (b[0] - a[0]) * t;
+            const y = a[1] + (b[1] - a[1]) * t + Math.sin(t * Math.PI) * sag + 4;
+            const tw = 0.7 + 0.3 * Math.sin(now * 3 + i * 1.7 + gi);
+            const c = cols[(i + gi) % 3];
+            const g = ctx.createRadialGradient(x, y, 0, x, y, 22);
+            g.addColorStop(0, `rgba(${c},${tw * fp2})`);
+            g.addColorStop(1, `rgba(${c},0)`);
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(x, y, 22, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = `rgba(255,252,240,${tw * fp2})`;
+            ctx.beginPath();
+            ctx.arc(x, y, 3.6, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        });
+      }
+
       // rising light where a place has just been restored
       const s = useGame.getState();
       let latest: RestoreId | null = null;
@@ -313,7 +415,7 @@ export function Town() {
       for (const id of Object.keys(s.restored) as RestoreId[]) if (s.restored[id]! > at) (at = s.restored[id]!), (latest = id);
       const age = (Date.now() - at) / 1000;
       if (latest && age > 0 && age < 4.5) {
-        const centre: Record<RestoreId, V2> = { clock: PLACES.clockFace as V2, fountain: [508, 760], garden: [160, 660], bookshop: [840, 620], bell: [405, 220] };
+        const centre: Record<RestoreId, V2> = { clock: PLACES.clockFace as V2, fountain: [508, 760], garden: [160, 660], bookshop: [840, 620], bell: [405, 220], lanterns: [220, 1300], festival: [508, 700] };
         const [cx, cy] = centre[latest];
         for (let i = 0; i < 60; i++) {
           const a = i * 2.399;
@@ -437,15 +539,17 @@ export function Town() {
         her.flip = him.x > her.x;
       }
       her.fade += (s.vanish - her.fade) * Math.min(1, dt * 0.5);
-      const lying = s.step <= STEP.wake || (s.step === STEP.wake2 && !s.dialogue && s.focus === 'tree');
+      const lying = s.step <= STEP.wake || (s.step === STEP.wake2 && !s.dialogue && s.focus === 'tree') || (s.step === STEP.wake3 && !s.dialogue);
 
       // ---- him ----
       let mode = 'follow';
       if (s.step <= STEP.explore) mode = 'seat';
       else if (s.step === STEP.ch1End) mode = 'alone';
       else if (s.step === STEP.wake2 && (s.focus === 'tree' || !s.dialogue)) mode = 'tree';
+      else if (s.step === STEP.wake3 || s.step === STEP.q6) mode = 'away';
       if (mode !== himMode) {
         if (mode === 'seat') [him.x, him.y] = PLACES.himSeat;
+        else if (mode === 'away') [him.x, him.y] = [300, 1040];
         else if (mode === 'tree') [him.x, him.y] = [PLACES.wake[0] + 90, PLACES.wake[1] - 40];
         else if (mode === 'alone') [him.x, him.y] = [180, 700];
         else if (!himMode) [him.x, him.y] = [her.x + 70, her.y - 20];
@@ -489,10 +593,65 @@ export function Town() {
         him.face = 'front';
         him.flip = her.x > him.x;
       }
+      // he is up the tower while she meets the lamplighter, then waits on the bridge
+      him.fade += ((mode === 'away' && !(s.dialogue?.id === 'q6_done') ? 1 : 0) - him.fade) * Math.min(1, dt * 3);
+
+      // ---- the lamplighter ----
+      const cassOn = s.step >= STEP.wake3 && s.step !== STEP.ch3End + 99;
+      if (cassOn) {
+        if (!cass.init) {
+          [cass.x, cass.y] = [PLACES.wake[0] - 100, PLACES.wake[1] - 70];
+          cass.init = true;
+        }
+        let cx = 0;
+        let cy = 0;
+        const talking = !!s.dialogue && Math.hypot(cass.x - her.x, cass.y - her.y) < 400;
+        if (!talking && s.step > STEP.wake3) {
+          const [wx, wy] = LAMP_ROUND[cass.leg % LAMP_ROUND.length];
+          const dd = Math.hypot(wx - cass.x, wy - cass.y);
+          if (dd < 10) {
+            cass.wait -= dt;
+            if (cass.wait <= 0) {
+              cass.leg++;
+              cass.wait = 3 + Math.random() * 3;
+              cass.path = findPath([cass.x, cass.y], LAMP_ROUND[cass.leg % LAMP_ROUND.length]) ?? [];
+            }
+          } else {
+            if (!cass.path.length) cass.path = findPath([cass.x, cass.y], [wx, wy]) ?? [[wx, wy]];
+            const wp = cass.path[0];
+            const ex = wp[0] - cass.x;
+            const ey = wp[1] - cass.y;
+            const d2 = Math.hypot(ex, ey) || 1;
+            if (d2 < 14) cass.path.shift();
+            // he stops to chat if she is right there
+            const near = Math.hypot(her.x - cass.x, her.y - cass.y) < 90;
+            if (!near) {
+              cx = (ex / d2) * 0.55;
+              cy = (ey / d2) * 0.55;
+            }
+          }
+        }
+        cass.vx += (cx * SPEED - cass.vx) * Math.min(1, dt * 6);
+        cass.vy += (cy * SPEED * 0.85 - cass.vy) * Math.min(1, dt * 6);
+        [cass.x, cass.y] = move(cass.x, cass.y, cass.x + cass.vx * dt, cass.y + cass.vy * dt);
+        const cs = Math.hypot(cass.vx, cass.vy);
+        cass.phase += dt * cs * 0.05;
+        if (cs > 20) {
+          if (Math.abs(cass.vy) > Math.abs(cass.vx) * 0.6) cass.face = cass.vy < 0 ? 'back' : 'front';
+          if (Math.abs(cass.vx) > 15) cass.flip = cass.vx > 0;
+        }
+        if (talking) {
+          cass.face = 'front';
+          cass.flip = her.x > cass.x;
+        }
+      }
+      if (cassEl.current) cassEl.current.style.display = cassOn ? 'block' : 'none';
+      if (cassOn) place(cassEl.current, cass, 128, cass.face === 'back' ? 'cass_back.webp' : 'cass_front.webp');
       const d = s.dialogue;
       const seated = mode === 'seat' && !(d?.id === 'meet' && d.i >= 7);
 
-      place(herEl.current, her, lying ? 64 : 118, lying ? 'her_sleep.webp' : her.face === 'back' ? 'her_back.webp' : 'her_front.webp');
+      const sfx2 = herSuffix(s.look);
+      place(herEl.current, her, lying ? 64 : 118, lying ? `her_sleep${sfx2}.webp` : her.face === 'back' ? `her_back${sfx2}.webp` : `her_front${sfx2}.webp`);
       place(himEl.current, him, seated ? 104 : 132, seated ? 'him_sit.webp' : him.face === 'back' ? 'him_back.webp' : 'him_front.webp');
 
       // ---- proximity ----
@@ -521,7 +680,8 @@ export function Town() {
           const dd = Math.hypot(sp.pos[0] - her.x, sp.pos[1] - her.y);
           if (dd < sp.r && dd < best) (best = dd), (near = sp.id);
         }
-        if (s.step >= STEP.q1 && Math.hypot(him.x - her.x, him.y - her.y) < 95) near = 'him';
+        if (s.step >= STEP.q1 && him.fade < 0.5 && Math.hypot(him.x - her.x, him.y - her.y) < 95) near = 'him';
+        if (s.step > STEP.wake3 && Math.hypot(cass.x - her.x, cass.y - her.y) < 95 && (near !== 'him' || Math.hypot(cass.x - her.x, cass.y - her.y) < Math.hypot(him.x - her.x, him.y - her.y))) near = 'cass';
         s.setNear(near);
       } else if (s.near) s.setNear(null);
       saveT += dt;
@@ -533,7 +693,7 @@ export function Town() {
           knownPlayer = useGame.getState().player;
         }
       }
-      (window as unknown as { __actors: unknown }).__actors = { her, him, path };
+      (window as unknown as { __actors: unknown }).__actors = { her, him, path, cass };
 
       // ---- his asides ----
       if (bubbleT > 0) {
@@ -564,6 +724,10 @@ export function Town() {
       } else if (s.focus && FOCI[s.focus]) {
         [tx, ty] = FOCI[s.focus].at;
         tz = FOCI[s.focus].zoom;
+      } else if (s.dialogue && s.step >= STEP.wake3 && (s.dialogue.lines[s.dialogue.i]?.who === 'cass' || s.dialogue.id === 'gift') && Math.hypot(cass.x - her.x, cass.y - her.y) < 400 && Math.hypot(cass.x - her.x, cass.y - her.y) < Math.hypot(him.x - her.x, him.y - her.y)) {
+        tx = (her.x + cass.x) / 2;
+        ty = (her.y + cass.y) / 2 + 40;
+        tz = 1.3;
       } else if (s.dialogue && s.step >= STEP.explore && Math.hypot(him.x - her.x, him.y - her.y) < 400) {
         tx = (her.x + him.x) / 2;
         ty = (her.y + him.y) / 2 + 40;
@@ -658,6 +822,16 @@ export function Town() {
         return;
       }
     }
+    const cs = (window as unknown as { __actors?: { cass?: { x: number; y: number } } }).__actors?.cass;
+    if (first && cs && s.step > STEP.wake3 && Math.hypot(p[0] - cs.x, p[1] - (cs.y - 60)) < 75) {
+      const her = (window as unknown as { __actors: { her: Actor } }).__actors.her;
+      if (Math.hypot(her.x - cs.x, her.y - cs.y) < 120) s.talkToCass();
+      else {
+        intent.v = { kind: 'cass' };
+        s.setWalkTo(snap(cs.x + (her.x < cs.x ? -60 : 60), cs.y + 10));
+      }
+      return;
+    }
     if (first) {
       // tapping something worth looking at walks her there and looks
       const spot = SPOTS.find((sp) => Math.hypot(p[0] - sp.pos[0], p[1] - sp.pos[1]) < sp.r * 0.9);
@@ -721,6 +895,10 @@ export function Town() {
           }} />
         ))}
         <div className="actor" ref={herEl}>
+          <img alt="" draggable={false} />
+          <div className="actor-shadow" />
+        </div>
+        <div className="actor" ref={cassEl} style={{ display: 'none' }}>
           <img alt="" draggable={false} />
           <div className="actor-shadow" />
         </div>

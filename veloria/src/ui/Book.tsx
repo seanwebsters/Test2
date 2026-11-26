@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useGame } from '../game/store';
 import { CHAPTERS, LETTERS, LetterId, STEP, StoryPage } from '../game/story';
-import { Illustration } from './Art';
+import { Illustration, cgFile } from './Art';
 import { IconBack, IconClose, IconEnvelope, IconLock, IconNext } from './Icons';
 import { sfx } from '../game/audio';
 
@@ -26,13 +26,17 @@ export function Book() {
         {book.view === 'letters' && <Letters />}
         {book.view === 'letter' && book.letter && <LetterView id={book.letter} />}
         {book.view === 'end' && <ChapterEnd />}
-        {(book.view === 'chapters' || book.view === 'letters') && (
+        {book.view === 'moments' && <Moments />}
+        {(book.view === 'chapters' || book.view === 'letters' || book.view === 'moments') && (
           <div className="book-tabs">
             <button className={book.view === 'chapters' ? 'on' : ''} onClick={() => (sfx('page'), setBook({ view: 'chapters' }))}>
               Chapters
             </button>
             <button className={book.view === 'letters' ? 'on' : ''} onClick={() => (sfx('page'), setBook({ view: 'letters' }))}>
               Letters
+            </button>
+            <button className={book.view === 'moments' ? 'on' : ''} onClick={() => (sfx('page'), setBook({ view: 'moments' }))}>
+              Moments
             </button>
           </div>
         )}
@@ -231,43 +235,109 @@ function LetterView({ id }: { id: LetterId }) {
   );
 }
 
+const ENDS = [
+  {
+    art: 'alone' as const,
+    num: 'I',
+    title: 'The City That Never Woke',
+    text: ['You wake in your own bed, the novel still open on your chest. The lamp is still burning.', 'Behind your ear, impossibly, there is the faint scent of roses.'],
+  },
+  {
+    art: 'bell' as const,
+    num: 'II',
+    title: 'You Came Back',
+    text: ['The hours are coming back to Veloria, one by one. So is he.', 'Tonight, when you sleep, someone else in the city will be awake.'],
+  },
+  {
+    art: 'dance' as const,
+    num: 'III',
+    title: 'A Night Without End',
+    text: ['You wake with lantern light still in your eyes, and two names on your lips.', 'One of them walked away from you on a bridge. The other would stay forever so that you could leave.'],
+  },
+];
+
 function ChapterEnd() {
   const book = useGame((s) => s.book);
   const sleepAgain = useGame((s) => s.sleepAgain);
   const closeBook = useGame((s) => s.closeBook);
-  const first = book.chapter === 0;
+  const e = ENDS[book.chapter] ?? ENDS[0];
+  const last = book.chapter >= 2;
   return (
     <div className="page-inner end">
       <div className="page-art tall">
-        <Illustration art={first ? 'alone' : 'bell'} />
+        <Illustration art={e.art} />
       </div>
-      <div className="page-chapter">End of Chapter {first ? 'I' : 'II'}</div>
-      <h2 className="page-title">{first ? 'The City That Never Woke' : 'You Came Back'}</h2>
+      <div className="page-chapter">End of Chapter {e.num}</div>
+      <h2 className="page-title">{e.title}</h2>
       <div className="page-text">
-        {first ? (
-          <>
-            <p>You wake in your own bed, the novel still open on your chest. The lamp is still burning.</p>
-            <p>Behind your ear, impossibly, there is the faint scent of roses.</p>
-          </>
-        ) : (
-          <>
-            <p>The hours are coming back to Veloria, one by one. So is he.</p>
-            <p className="next-up">
-              Chapter III · <em>A Night Without End</em>
-              <br />
-              <span>Arrives in a coming update. Until then, the city is yours to wander.</span>
-            </p>
-          </>
+        {e.text.map((t, i) => (
+          <p key={i}>{t}</p>
+        ))}
+        {last && (
+          <p className="next-up">
+            Chapter IV · <em>The Cost of Time</em>
+            <br />
+            <span>Arrives in a coming update. Until then, the city is yours, and so are they.</span>
+          </p>
         )}
       </div>
-      {first ? (
-        <button className="btn primary wide" onClick={sleepAgain}>
-          Fall asleep again
-        </button>
-      ) : (
+      {last ? (
         <button className="btn primary wide" onClick={closeBook}>
           Return to Veloria
         </button>
+      ) : (
+        <button className="btn primary wide" onClick={sleepAgain}>
+          Fall asleep again
+        </button>
+      )}
+    </div>
+  );
+}
+
+const MOMENTS: { id: string; title: string }[] = [
+  { id: 'cg_tree', title: 'Beneath the Blossom' },
+  { id: 'cg_meet', title: 'The Clock Begins' },
+  { id: 'cg_fountain', title: 'What the Water Remembered' },
+  { id: 'cg_garden', title: 'A Rose Behind Your Ear' },
+  { id: 'cg_alone', title: 'Not Tonight' },
+  { id: 'cg_return', title: 'You Came Back' },
+  { id: 'cg_bookshop', title: 'Hollow & Quill' },
+  { id: 'cg_bell', title: 'The Great Bell' },
+  { id: 'cg_cassian', title: 'The Lamplighter' },
+  { id: 'cg_dance', title: 'The Lantern Festival' },
+  { id: 'cg_cassclose', title: 'Unless You Mean It' },
+  { id: 'cg_jealous', title: 'The Bridge' },
+  { id: 'cg_boats', title: 'Paper Boats' },
+  { id: 'cg_ledge', title: 'The Highest Window' },
+  { id: 'cg_almost', title: 'Beneath the Clock' },
+];
+
+function Moments() {
+  const seen = useGame((s) => s.seenCg);
+  const look = useGame((s) => s.look);
+  const [open, setOpen] = useState<string | null>(null);
+  return (
+    <div className="page-inner">
+      <h1 className="script-title">Moments</h1>
+      <div className="flourish">
+        {seen.filter((x) => MOMENTS.some((m) => m.id === x)).length} of {MOMENTS.length}
+      </div>
+      <div className="moments">
+        {MOMENTS.map((m) => {
+          const have = seen.includes(m.id);
+          return (
+            <button key={m.id} className={`moment ${have ? '' : 'locked'}`} disabled={!have} onClick={() => (sfx('page'), setOpen(m.id))}>
+              <img src={cgFile(m.id, look)} alt="" draggable={false} />
+              <span>{have ? m.title : '· · ·'}</span>
+            </button>
+          );
+        })}
+      </div>
+      {open && (
+        <div className="moment-view" onClick={() => setOpen(null)}>
+          <img src={cgFile(open, look)} alt="" draggable={false} />
+          <div className="moment-caption">{MOMENTS.find((m) => m.id === open)?.title}</div>
+        </div>
       )}
     </div>
   );
