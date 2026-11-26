@@ -73,11 +73,11 @@ function inPoly(p: V2, poly: V2[]) {
   return inside;
 }
 
-export function walkable(x: number, y: number): boolean {
+export function walkable(x: number, y: number, pad = 0): boolean {
   if (!WALK.some((poly) => inPoly([x, y], poly))) return false;
   for (const e of BLOCK) {
-    const dx = (x - e.x) / e.rx;
-    const dy = (y - e.y) / e.ry;
+    const dx = (x - e.x) / (e.rx + pad);
+    const dy = (y - e.y) / (e.ry + pad * 0.7);
     if (dx * dx + dy * dy < 1) return false;
   }
   return true;
@@ -162,3 +162,98 @@ export const REGIONS = {
   garden: { x: 160, y: 650, rx: 280, ry: 220 },
   bookshop: { x: 850, y: 560, rx: 300, ry: 270 },
 } as const;
+
+// ---------- pathfinding: A* over a coarse grid of the walkable map ----------
+const CELL = 16;
+/** planned routes keep this far from obstacles so she never scrapes along them */
+const PAD = 22;
+const GW = Math.ceil(MAP_W / CELL);
+const GH = Math.ceil(MAP_H / CELL);
+let grid: Uint8Array | null = null;
+function walkGrid() {
+  if (grid) return grid;
+  grid = new Uint8Array(GW * GH);
+  for (let gy = 0; gy < GH; gy++)
+    for (let gx = 0; gx < GW; gx++) grid[gy * GW + gx] = walkable(gx * CELL + CELL / 2, gy * CELL + CELL / 2, PAD) ? 1 : 0;
+  return grid;
+}
+
+/** can she walk in a straight line from a to b? */
+export function clearLine(a: V2, b: V2): boolean {
+  const d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const n = Math.max(1, Math.ceil(d / 8));
+  for (let i = 1; i <= n; i++) {
+    const t = i / n;
+    if (!walkable(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, t < 0.05 || t > 0.95 ? 0 : PAD)) return false;
+  }
+  return true;
+}
+
+/** waypoints from a to b around obstacles (b itself last), or null if unreachable */
+export function findPath(a: V2, b: V2): V2[] | null {
+  if (clearLine(a, b)) return [b];
+  const g = walkGrid();
+  const idx = (x: number, y: number) => y * GW + x;
+  const sx = Math.min(GW - 1, Math.max(0, Math.floor(a[0] / CELL)));
+  const sy = Math.min(GH - 1, Math.max(0, Math.floor(a[1] / CELL)));
+  const tx = Math.min(GW - 1, Math.max(0, Math.floor(b[0] / CELL)));
+  const ty = Math.min(GH - 1, Math.max(0, Math.floor(b[1] / CELL)));
+  const start = idx(sx, sy);
+  const goal = idx(tx, ty);
+  const cost = new Float32Array(GW * GH).fill(Infinity);
+  const from = new Int32Array(GW * GH).fill(-1);
+  const open: number[] = [start];
+  const f = new Float32Array(GW * GH).fill(Infinity);
+  cost[start] = 0;
+  f[start] = Math.hypot(tx - sx, ty - sy);
+  const closed = new Uint8Array(GW * GH);
+  let found = false;
+  let guard = 0;
+  while (open.length && guard++ < 20000) {
+    let bi = 0;
+    for (let i = 1; i < open.length; i++) if (f[open[i]] < f[open[bi]]) bi = i;
+    const cur = open[bi];
+    open.splice(bi, 1);
+    if (cur === goal) {
+      found = true;
+      break;
+    }
+    closed[cur] = 1;
+    const cx = cur % GW;
+    const cy = (cur / GW) | 0;
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        const nx = cx + dx;
+        const ny = cy + dy;
+        if (nx < 0 || ny < 0 || nx >= GW || ny >= GH) continue;
+        const n = idx(nx, ny);
+        if (closed[n] || (!g[n] && n !== goal)) continue;
+        if (dx && dy && (!g[idx(cx + dx, cy)] || !g[idx(cx, cy + dy)])) continue;
+        const c = cost[cur] + (dx && dy ? 1.414 : 1);
+        if (c < cost[n]) {
+          cost[n] = c;
+          from[n] = cur;
+          f[n] = c + Math.hypot(tx - nx, ty - ny);
+          if (!open.includes(n)) open.push(n);
+        }
+      }
+  }
+  if (!found) return null;
+  const cells: V2[] = [];
+  for (let c = goal; c !== -1 && c !== start; c = from[c]) cells.push([(c % GW) * CELL + CELL / 2, ((c / GW) | 0) * CELL + CELL / 2]);
+  cells.reverse();
+  cells[cells.length - 1] = b;
+  // string-pull: skip every waypoint she can see past
+  const out: V2[] = [];
+  let at = a;
+  let i = 0;
+  while (i < cells.length) {
+    let j = cells.length - 1;
+    while (j > i && !clearLine(at, cells[j])) j--;
+    out.push(cells[j]);
+    at = cells[j];
+    i = j + 1;
+  }
+  return out;
+}

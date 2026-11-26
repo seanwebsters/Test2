@@ -135,13 +135,20 @@ export function Objective() {
   } else if (q && !delivered.includes(q.id)) {
     ready = questReady(board, q.requires).every(Boolean);
     title = q.title;
-    sub = ready ? 'Everything is ready — open Merge to deliver' : 'Gather lights, then merge what the order needs';
+    sub = ready ? 'Everything is ready · tap to deliver' : 'Gather lights, then merge what the order needs · tap to open';
   } else if (step === STEP.ch2End) {
     title = 'Veloria, awake';
     sub = 'Wander, merge gifts for him, relive your memories';
   } else return null;
   return (
-    <button className={`objective ${ready ? 'ready' : ''}`} onClick={() => q && setTab('merge')}>
+    <button
+      className={`objective ${ready ? 'ready' : ''}`}
+      onClick={() => {
+        if (!q) return;
+        if (ready) useGame.getState().deliver(q.id);
+        else setTab('merge');
+      }}
+    >
       <div className="obj-title">{title}</div>
       <div className="obj-sub">{sub}</div>
       {q && !delivered.includes(q.id) && (
@@ -232,7 +239,7 @@ export function Dialogue() {
     if (!text) return;
     let n = 0;
     const step = () => {
-      n += 1.4;
+      n += 2.6;
       setShown(Math.min(text.length, Math.floor(n)));
       if (n < text.length) raf.current = requestAnimationFrame(step);
     };

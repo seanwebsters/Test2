@@ -284,7 +284,7 @@ export const useGame = create<State>()(
           if (s.step === STEP.prologue) {
             set({ step: STEP.wake, player: [...PLACES.wake] as V2, fade: 1 });
             setTimeout(() => set({ fade: 0 }), 300);
-            setTimeout(() => get().play('wake'), 1800);
+            setTimeout(() => get().play('wake'), 1200);
           }
         },
 
@@ -339,10 +339,8 @@ export const useGame = create<State>()(
           sfx('choose');
           set({ dialogue: { ...d, lines } });
           // jump past "your" spoken line straight to his reply
-          setTimeout(() => {
-            const dd = get().dialogue;
-            if (dd && dd.lines === lines) get().next();
-          }, 650);
+          // skip straight past her echoed line to his answer
+          get().next();
         },
 
         inspect(id) {
@@ -489,7 +487,7 @@ export const useGame = create<State>()(
             const b = get().board.map((c) => (c && c.kind === 'gen' && c.gen === 'desk' ? { ...c, frozen: false } : c));
             set({ board: b });
           }
-          setTimeout(() => get().play(q.after), q.restores ? 4200 : 900);
+          setTimeout(() => get().play(q.after), q.restores ? 3300 : 500);
         },
 
         collectGlimmer(id) {

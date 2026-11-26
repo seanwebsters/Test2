@@ -26,10 +26,14 @@ export function MergeScreen() {
   const step = useGame((s) => s.step);
   const selected = useGame((s) => s.selected);
   const tutorial = useGame((s) => s.mergeTutorial);
-  const [drag, setDrag] = useState<Drag | null>(null);
-  const [hover, setHover] = useState<number | null>(null);
+  // the drag lives in a ref so moving a finger never re-renders the board
+  const dragRef = useRef<Drag | null>(null);
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [burst, setBurst] = useState<{ i: number; k: number } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+  const ghostRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const hoverRef = useRef<HTMLElement | null>(null);
   const quest = questForStep(step);
 
   useEffect(() => {
@@ -37,9 +41,16 @@ export function MergeScreen() {
     board.forEach((c) => c && seen.add(c.uid));
   });
 
-  const cellAt = (x: number, y: number): number | null => {
-    const el = document.elementFromPoint(x, y)?.closest('[data-cell]') as HTMLElement | null;
-    return el ? Number(el.dataset.cell) : null;
+  const cellEl = (x: number, y: number) => document.elementFromPoint(x, y)?.closest('[data-cell]') as HTMLElement | null;
+
+  const setHover = (el: HTMLElement | null, d: Drag) => {
+    if (hoverRef.current === el) return;
+    hoverRef.current?.classList.remove('hover', 'can-merge');
+    hoverRef.current = el;
+    if (!el) return;
+    const c = useGame.getState().board[Number(el.dataset.cell)];
+    const merge = c && c.kind === 'item' && !!d.item && c.item === d.item && !!nextOf(c.item) && Number(el.dataset.cell) !== d.from;
+    el.classList.add(merge ? 'can-merge' : 'hover');
   };
 
   const onDown = (e: React.PointerEvent, i: number) => {
@@ -49,39 +60,56 @@ export function MergeScreen() {
       if (c?.frozen) useGame.getState().setSelected(i);
       return;
     }
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-    setDrag({ from: i, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false, item: c.kind === 'item' ? c.item : undefined, gen: c.kind === 'gen' });
+    // capture on the whole screen so the drag survives leaving the cell
+    rootRef.current?.setPointerCapture?.(e.pointerId);
+    dragRef.current = { from: i, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false, item: c.kind === 'item' ? c.item : undefined, gen: c.kind === 'gen' };
   };
   const onMove = (e: React.PointerEvent) => {
-    if (!drag) return;
-    const moved = drag.moved || Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 8;
-    setDrag({ ...drag, x: e.clientX, y: e.clientY, moved });
-    if (moved) setHover(cellAt(e.clientX, e.clientY));
+    const d = dragRef.current;
+    if (!d) return;
+    d.x = e.clientX;
+    d.y = e.clientY;
+    if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) > 6) {
+      d.moved = true;
+      setDragFrom(d.from);
+    }
+    if (d.moved) {
+      if (ghostRef.current) ghostRef.current.style.transform = `translate(${d.x}px, ${d.y}px) translate(-50%, -62%) scale(1.12)`;
+      setHover(cellEl(e.clientX, e.clientY), d);
+    }
   };
   const onUp = (e: React.PointerEvent) => {
-    if (!drag) return;
+    const d = dragRef.current;
+    if (!d) return;
+    dragRef.current = null;
     const s = useGame.getState();
-    if (!drag.moved) {
-      const c = board[drag.from];
-      if (c?.kind === 'gen') s.tapGenerator(drag.from);
-      s.setSelected(drag.from);
+    if (!d.moved) {
+      const c = board[d.from];
+      if (c?.kind === 'gen') s.tapGenerator(d.from);
+      s.setSelected(d.from);
     } else {
-      const to = cellAt(e.clientX, e.clientY);
-      if (to !== null && to !== drag.from) {
+      const el = cellEl(e.clientX, e.clientY);
+      const to = el ? Number(el.dataset.cell) : null;
+      if (to !== null && to !== d.from) {
         const before = s.board[to];
-        const wasMerge = before && before.kind === 'item' && drag.item && before.item === drag.item;
-        s.dropCell(drag.from, to);
+        const wasMerge = before && before.kind === 'item' && d.item && before.item === d.item;
+        s.dropCell(d.from, to);
         if (wasMerge && useGame.getState().board[to] !== before) setBurst({ i: to, k: Date.now() });
       }
     }
-    setDrag(null);
-    setHover(null);
+    hoverRef.current?.classList.remove('hover', 'can-merge');
+    hoverRef.current = null;
+    setDragFrom(null);
   };
+  const dragItem = dragFrom !== null ? board[dragFrom] : null;
 
   const sel = selected !== null ? board[selected] : null;
 
   return (
-    <div className="merge-screen" onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => setDrag(null)}>
+    <div className="merge-screen" ref={rootRef} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => {
+        dragRef.current = null;
+        setDragFrom(null);
+      }}>
       <div className="merge-head">
         <Sprig />
         <div className="pill-title">Merge</div>
@@ -94,14 +122,13 @@ export function MergeScreen() {
         <div className="board" ref={gridRef} style={{ gridTemplateColumns: `repeat(${COLS}, 1fr)` }}>
           {board.map((c, i) => {
             const isNew = c && !seen.has(c.uid);
-            const dragging = drag?.moved && drag.from === i;
-            const canMerge = drag?.moved && hover === i && c && c.kind === 'item' && drag.item === c.item && !!nextOf(c.item);
+            const dragging = dragFrom === i;
             const isQuest = c?.kind === 'item' && !c.frozen && quest?.requires.includes(c.item);
             return (
               <div
                 key={i}
                 data-cell={i}
-                className={`cell ${c?.frozen ? 'frozen' : ''} ${selected === i ? 'sel' : ''} ${hover === i && drag?.moved ? 'hover' : ''} ${canMerge ? 'can-merge' : ''}`}
+                className={`cell ${c?.frozen ? 'frozen' : ''} ${selected === i ? 'sel' : ''}`}
                 onPointerDown={(e) => onDown(e, i)}
               >
                 {c && !dragging && (
@@ -117,11 +144,13 @@ export function MergeScreen() {
             );
           })}
         </div>
-        {drag?.moved && (
-          <div className="ghost" style={{ left: drag.x, top: drag.y }}>
-            {drag.item ? <ItemIcon item={drag.item} size={56} /> : board[drag.from]?.kind === 'gen' ? <GenIcon gen={(board[drag.from] as { gen: GeneratorId }).gen} size={56} /> : null}
-          </div>
-        )}
+        <div
+          className="ghost"
+          ref={ghostRef}
+          style={{ display: dragItem ? 'block' : 'none', transform: dragRef.current ? `translate(${dragRef.current.x}px, ${dragRef.current.y}px) translate(-50%, -62%) scale(1.12)` : undefined }}
+        >
+          {dragItem?.kind === 'item' ? <ItemIcon item={dragItem.item} size={64} /> : dragItem?.kind === 'gen' ? <GenIcon gen={dragItem.gen as GeneratorId} size={64} /> : null}
+        </div>
       </div>
 
       <InfoBar sel={sel} idx={selected} />

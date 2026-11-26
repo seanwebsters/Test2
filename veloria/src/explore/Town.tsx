@@ -3,10 +3,14 @@ import { useGame, timeLevel } from '../game/store';
 import { RestoreId } from '../game/quests';
 import { STEP } from '../game/story';
 import { setTimeLevel } from '../game/audio';
-import { GLIMMERS, LAMPS, MAP_H, MAP_W, PLACES, REGIONS, SPOTS, V2, depthScale, move, snap } from '../game/layout';
+import { GLIMMERS, LAMPS, MAP_H, MAP_W, PLACES, REGIONS, SPOTS, V2, clearLine, depthScale, findPath, move, snap } from '../game/layout';
+
+/** what she means to do when she arrives */
+type Intent = { kind: 'spot'; id: string } | { kind: 'him' } | null;
+const intent: { v: Intent } = { v: null };
 
 const ART = `${import.meta.env.BASE_URL}art/`;
-const SPEED = 210; // map px per second
+const SPEED = 300; // map px per second
 
 function img(src: string) {
   const i = new Image();
@@ -56,6 +60,7 @@ export function Town() {
   const bellRing = useRef<HTMLDivElement>(null);
   const marker = useRef<HTMLDivElement>(null);
   const letter = useRef<HTMLDivElement>(null);
+  const ripple = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const alive = img('town_alive.webp');
@@ -78,6 +83,20 @@ export function Town() {
     let aliveT = 0;
     let clockT = 0;
     let lastSig = '';
+    let path: V2[] = [];
+    let knownPlayer = s0.player;
+    let himPlanT = 0;
+    let himWp: V2 | null = null;
+    let pathFor: V2 | null = null;
+    const arrive = () => {
+      const it = intent.v;
+      intent.v = null;
+      if (!it) return;
+      const st = useGame.getState();
+      if (it.kind === 'him') {
+        if (Math.hypot(her.x - him.x, her.y - him.y) < 140) st.talkToHim();
+      } else st.inspect(it.id);
+    };
     let saveT = 0;
     let level = -1;
     let last = performance.now();
@@ -324,9 +343,14 @@ export function Town() {
 
       // ---- her ----
       const locked = !!s.dialogue || s.screen !== 'game' || s.book.open || s.tab !== 'explore' || s.vanish > 0 || !!s.focus || s.step < STEP.explore;
-      if (Math.hypot(s.player[0] - her.x, s.player[1] - her.y) > 260 && !s.dialogue) {
-        her.x = s.player[0];
-        her.y = s.player[1];
+      // the story can move her (waking, chapter two): follow only real changes to the saved spot
+      if (s.player !== knownPlayer) {
+        knownPlayer = s.player;
+        if (Math.hypot(s.player[0] - her.x, s.player[1] - her.y) > 4) {
+          her.x = s.player[0];
+          her.y = s.player[1];
+          pathFor = null;
+        }
       }
       let dx = 0;
       let dy = 0;
@@ -340,22 +364,38 @@ export function Town() {
           dx /= l;
           dy /= l;
           if (s.walkTo) s.setWalkTo(null);
+          intent.v = null;
         } else if (s.walkTo) {
-          const ex = s.walkTo[0] - her.x;
-          const ey = s.walkTo[1] - her.y;
-          const d = Math.hypot(ex, ey);
-          if (d < 8) s.setWalkTo(null);
-          else {
-            const k = Math.min(1, d / 30);
+          if (s.walkTo !== pathFor) {
+            pathFor = s.walkTo;
+            path = findPath([her.x, her.y], s.walkTo) ?? [];
+            if (!path.length) s.setWalkTo(null);
+          }
+          let wp = path[0];
+          while (wp && Math.hypot(wp[0] - her.x, wp[1] - her.y) < (path.length > 1 ? 22 : 6)) {
+            path.shift();
+            wp = path[0];
+          }
+          if (!wp) {
+            s.setWalkTo(null);
+            arrive();
+          } else {
+            const ex = wp[0] - her.x;
+            const ey = wp[1] - her.y;
+            const d = Math.hypot(ex, ey);
+            const k = path.length > 1 ? 1 : Math.min(1, d / 26);
             dx = (ex / d) * k;
             dy = (ey / d) * k;
           }
         }
       } else if (s.walkTo) s.setWalkTo(null);
-      her.vx += (dx * SPEED - her.vx) * Math.min(1, dt * 10);
-      her.vy += (dy * SPEED * 0.85 - her.vy) * Math.min(1, dt * 10);
+      her.vx += (dx * SPEED - her.vx) * Math.min(1, dt * 14);
+      her.vy += (dy * SPEED * 0.9 - her.vy) * Math.min(1, dt * 14);
       const [nx, ny] = move(her.x, her.y, her.x + her.vx * dt, her.y + her.vy * dt);
-      if (nx === her.x && ny === her.y && s.walkTo) s.setWalkTo(null);
+      if (nx === her.x && ny === her.y && s.walkTo && Math.hypot(her.vx, her.vy) > 40) {
+        // nudged into a corner: plan again from here
+        pathFor = null;
+      }
       her.x = nx;
       her.y = ny;
       const hs = Math.hypot(her.vx, her.vy);
@@ -393,9 +433,19 @@ export function Town() {
           him.x = her.x - (ex / d) * 90;
           him.y = her.y - (ey / d) * 60;
         } else if (d > 85) {
+          // re-plan a few times a second so he goes round things rather than into them
+          himPlanT -= dt;
+          if (himPlanT <= 0) {
+            himPlanT = 0.35;
+            himWp = clearLine([him.x, him.y], [her.x, her.y]) ? null : (findPath([him.x, him.y], [her.x, her.y])?.[0] ?? null);
+          }
+          const gx = himWp ? himWp[0] - him.x : ex;
+          const gy = himWp ? himWp[1] - him.y : ey;
+          const gd = Math.hypot(gx, gy) || 1;
+          if (himWp && gd < 20) himPlanT = 0;
           const k = Math.min(1.08, (d - 70) / 90);
-          hx = (ex / d) * k;
-          hy = (ey / d) * k;
+          hx = (gx / gd) * k;
+          hy = (gy / gd) * k;
         }
       }
       him.vx += (hx * SPEED - him.vx) * Math.min(1, dt * 7);
@@ -440,9 +490,12 @@ export function Town() {
       if (saveT > 2 && !locked) {
         saveT = 0;
         const p: V2 = [Math.round(her.x), Math.round(her.y)];
-        if (p[0] !== s.player[0] || p[1] !== s.player[1]) s.setPlayer(p);
+        if (p[0] !== s.player[0] || p[1] !== s.player[1]) {
+          s.setPlayer(p);
+          knownPlayer = useGame.getState().player;
+        }
       }
-      (window as unknown as { __actors: unknown }).__actors = { her, him };
+      (window as unknown as { __actors: unknown }).__actors = { her, him, path };
 
       // ---- camera ----
       let tx = her.x;
@@ -540,14 +593,38 @@ export function Town() {
     const actors = (window as unknown as { __actors?: { her: Actor; him: Actor } }).__actors;
     if (first && actors && s.step >= STEP.q1) {
       const { her, him } = actors;
-      if (Math.hypot(p[0] - him.x, p[1] - (him.y - 60)) < 70) {
-        if (Math.hypot(her.x - him.x, her.y - him.y) < 110) s.talkToHim();
-        else s.setWalkTo(snap(him.x, him.y + 40));
+      if (Math.hypot(p[0] - him.x, p[1] - (him.y - 60)) < 75) {
+        if (Math.hypot(her.x - him.x, her.y - him.y) < 120) s.talkToHim();
+        else {
+          intent.v = { kind: 'him' };
+          s.setWalkTo(snap(him.x + (her.x < him.x ? -60 : 60), him.y + 10));
+        }
         return;
       }
     }
+    if (first) {
+      // tapping something worth looking at walks her there and looks
+      const spot = SPOTS.find((sp) => Math.hypot(p[0] - sp.pos[0], p[1] - sp.pos[1]) < sp.r * 0.9);
+      if (spot) {
+        intent.v = { kind: 'spot', id: spot.id };
+        s.setWalkTo(snap(spot.pos[0], spot.pos[1]));
+        return;
+      }
+      intent.v = null;
+    }
     const to = snap(p[0], p[1]);
-    if (to) s.setWalkTo(to);
+    if (!to) return;
+    if (first && ripple.current) {
+      const r = ripple.current;
+      r.style.left = `${to[0]}px`;
+      r.style.top = `${to[1]}px`;
+      r.classList.remove('go');
+      void r.offsetWidth;
+      r.classList.add('go');
+    }
+    const cur = s.walkTo;
+    if (!first && cur && Math.hypot(cur[0] - to[0], cur[1] - to[1]) < 24) return;
+    s.setWalkTo(to);
   };
 
   return (
@@ -595,6 +672,7 @@ export function Town() {
           <img alt="" draggable={false} />
           <div className="actor-shadow" />
         </div>
+        <div className="tap-ripple" ref={ripple} />
         <div className="marker map-marker" ref={marker}>
           !
         </div>
