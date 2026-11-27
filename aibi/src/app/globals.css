@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f6f2ff;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+}
+
+html,
+body {
+  background: #e9e1ff;
+  color: #1e1538;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+body {
+  font-family: "Nunito Variable", system-ui, sans-serif;
+  min-height: 100dvh;
+}
+
+/* Desktop: present the app as a centred phone-width column on a soft gradient. */
+.app-backdrop {
+  background:
+    radial-gradient(1200px 600px at 10% -10%, #c9b6ff 0%, transparent 60%),
+    radial-gradient(900px 600px at 110% 20%, #ffd6f0 0%, transparent 55%),
+    linear-gradient(180deg, #ece5ff 0%, #ddd1ff 100%);
+}
+
+.app-frame {
+  background: var(--bg);
+}
+@media (min-width: 520px) {
+  .app-frame {
+    box-shadow: 0 30px 80px -30px rgba(46, 24, 112, 0.45), 0 0 0 1px rgba(124, 77, 255, 0.08);
+  }
+}
+
+.font-display {
+  font-family: "Fredoka Variable", "Nunito Variable", system-ui, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+
+.prose-ai p { margin: 0 0 0.6em; }
+.prose-ai ul { margin: 0 0 0.6em; padding-left: 1.1em; list-style: disc; }
+.prose-ai ol { margin: 0 0 0.6em; padding-left: 1.2em; list-style: decimal; }
+.prose-ai li { margin: 0.15em 0; }
+.prose-ai h3, .prose-ai h4 { font-weight: 800; margin: 0.6em 0 0.3em; }
+.prose-ai table { width: 100%; border-collapse: collapse; margin: 0.4em 0 0.8em; font-size: 0.85em; }
+.prose-ai th, .prose-ai td { border: 1px solid #e3dbff; padding: 6px 8px; text-align: left; vertical-align: top; }
+.prose-ai th { background: #f3efff; font-weight: 800; }
+.prose-ai blockquote { border-left: 3px solid #bca3ff; padding-left: 10px; color: #4a3f6b; margin: 0.4em 0; }
+.prose-ai code { background: #f3efff; padding: 1px 5px; border-radius: 6px; font-size: 0.9em; }
+.prose-ai strong { font-weight: 800; }
+
+.shine {
+  background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.55) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: shimmer 2.6s linear infinite;
+}
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+}
