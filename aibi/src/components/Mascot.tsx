@@ -93,7 +93,8 @@ export default function Mascot({ size = 160, mood = "happy", wave = false, float
         {/* hover shadow + soft lift glow (Aibi floats instead of walking) */}
         <motion.ellipse
           cx="100" cy="210" rx="44" ry="7" fill={`url(#${g("shadow")})`}
-          animate={float && !reduce ? { rx: [44, 36, 44], opacity: [1, 0.7, 1] } : undefined}
+          style={{ originX: 0.5, originY: 0.5 }}
+          animate={float && !reduce ? { scaleX: [1, 0.82, 1], opacity: [1, 0.7, 1] } : undefined}
           transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
         />
         <ellipse cx="100" cy="195" rx="16" ry="6" fill="#FFD66B" opacity="0.55" filter={`url(#${g("eyeglow")})`} />
