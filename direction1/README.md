@@ -14,7 +14,7 @@ npm run build      # type-check + production build into dist/
 npm run preview    # serve the production build
 ```
 
-It's a static site with no backend and no paid services. Progress is saved to `localStorage` under the key `direction-v1`. On Vercel/Netlify, set the root directory to `direction1` and the output directory to `dist`.
+It's a static site with no backend and no paid services. **Vercel:** create a project from this repo, set **Root Directory** to `direction1` (Settings → Build and Deployment), and leave the other settings on default; `direction1/vercel.json` sets the Vite build and `dist` output. Progress is saved to `localStorage` under the key `direction-v1`. On Vercel/Netlify, set the root directory to `direction1` and the output directory to `dist`.
 
 ## What's inside
 

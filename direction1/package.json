@@ -2,7 +2,7 @@
   "name": "direction",
   "private": true,
   "version": "0.1.0",
-  "description": "DIRECTION — Find your thing. Build your future.",
+  "description": "DIRECTION \u2014 Find your thing. Build your future.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -27,5 +27,8 @@
     "tailwindcss": "^3.4.19",
     "typescript": "^5.9.2",
     "vite": "^7.3.8"
+  },
+  "engines": {
+    "node": ">=20.19"
   }
 }
