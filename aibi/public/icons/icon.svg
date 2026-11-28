@@ -7,14 +7,16 @@
   </defs>
   <rect width="512" height="512" fill="url(#bg)"/>
   <g transform="translate(256 276)">
-    <ellipse cx="-150" cy="0" rx="30" ry="46" fill="url(#pur)"/>
-    <ellipse cx="150" cy="0" rx="30" ry="46" fill="url(#pur)"/>
-    <rect x="-8" y="-178" width="16" height="44" rx="8" fill="#E3DBFF"/>
-    <circle cx="0" cy="-182" r="22" fill="url(#pur)"/>
-    <rect x="-146" y="-136" width="292" height="240" rx="110" fill="url(#body)"/>
+    <circle cx="-150" cy="-10" r="20" fill="url(#pur)"/>
+    <circle cx="150" cy="-10" r="20" fill="url(#pur)"/>
+    <path d="M0 -134 Q0 -164 24 -178" stroke="#E3DBFF" stroke-width="12" stroke-linecap="round" fill="none"/>
+    <path d="M30 -222 Q34 -196 58 -192 Q34 -188 30 -162 Q26 -188 2 -192 Q26 -196 30 -222Z" fill="#FFC53D" stroke="#F5A70B" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M-76 -136 H76 A106 106 0 0 1 146 -30 V-2 A106 106 0 0 1 66 104 H-30 L-118 150 L-96 84 A106 106 0 0 1 -146 -2 V-30 A106 106 0 0 1 -76 -136Z" fill="url(#body)"/>
     <rect x="-114" y="-96" width="228" height="164" rx="78" fill="url(#visor)"/>
     <path d="M-78 -4 Q-52 -36 -26 -4 M26 -4 Q52 -36 78 -4" stroke="#D9CBFF" stroke-width="16" stroke-linecap="round" fill="none"/>
     <path d="M-24 30 Q0 54 24 30" stroke="#D9CBFF" stroke-width="12" stroke-linecap="round" fill="none"/>
-    <ellipse cx="-64" cy="-118" rx="44" ry="15" fill="#fff" opacity=".9"/>
+    <ellipse cx="-64" cy="-118" rx="44" ry="13" fill="#fff" opacity=".9"/>
+    <ellipse cx="-80" cy="44" rx="18" ry="10" fill="#FF8DC4" opacity=".55"/>
+    <ellipse cx="80" cy="44" rx="18" ry="10" fill="#FF8DC4" opacity=".55"/>
   </g>
 </svg>

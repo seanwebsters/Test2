@@ -90,43 +90,86 @@ export default function Mascot({ size = 160, mood = "happy", wave = false, float
           </linearGradient>
         </defs>
 
-        {/* ground shadow */}
-        <ellipse cx="100" cy="210" rx="56" ry="8" fill={`url(#${g("shadow")})`} />
+        {/* hover shadow + soft lift glow (Aibi floats instead of walking) */}
+        <motion.ellipse
+          cx="100" cy="210" rx="44" ry="7" fill={`url(#${g("shadow")})`}
+          animate={float && !reduce ? { rx: [44, 36, 44], opacity: [1, 0.7, 1] } : undefined}
+          transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <ellipse cx="100" cy="195" rx="16" ry="6" fill="#FFD66B" opacity="0.55" filter={`url(#${g("eyeglow")})`} />
 
-        {/* neck accessory behind body? no — body first */}
-        {/* legs */}
-        <rect x="70" y="178" width="24" height="26" rx="12" fill={`url(#${g("body")})`} />
-        <rect x="106" y="178" width="24" height="26" rx="12" fill={`url(#${g("body")})`} />
-        <ellipse cx="82" cy="203" rx="15" ry="7" fill={`url(#${g("purple")})`} />
-        <ellipse cx="118" cy="203" rx="15" ry="7" fill={`url(#${g("purple")})`} />
+        {/* bean body */}
+        <path d="M66 140 Q66 124 100 124 Q134 124 134 140 Q136 182 100 194 Q64 182 66 140Z" fill={`url(#${g("body")})`} />
+        <path d="M74 136 Q80 128 96 128" stroke="#fff" strokeWidth="5" strokeLinecap="round" fill="none" opacity="0.8" />
+        {/* chest badge: three "typing" dots, Aibi's signature */}
+        <rect x="80" y="148" width="40" height="20" rx="10" fill={`url(#${g("purple")})`} />
+        {[90, 100, 110].map((cx, i) => (
+          <motion.circle key={cx} cx={cx} cy="158" r="3.2" fill="#fff"
+            animate={!reduce ? { opacity: [0.35, 1, 0.35] } : undefined}
+            transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }} />
+        ))}
 
-        {/* left arm (static) */}
+        {/* floating mitten hands */}
         <motion.g
-          style={{ originX: 0.85, originY: 0.08 }}
-          animate={mood === "cheer" && !reduce ? { rotate: [0, -25, 0] } : { rotate: 0 }}
-          transition={{ duration: 0.7, repeat: mood === "cheer" ? Infinity : 0, ease: "easeInOut" }}
+          animate={mood === "cheer" && !reduce ? { x: [0, -10, 0], y: [0, -52, 0] } : float && !reduce ? { y: [0, 3, 0] } : undefined}
+          transition={{ duration: mood === "cheer" ? 0.8 : 2.6, repeat: Infinity, ease: "easeInOut" }}
         >
-          <rect x="34" y="132" width="26" height="44" rx="13" fill={`url(#${g("body")})`} transform="rotate(18 47 150)" />
-          <circle cx="40" cy="176" r="11" fill={`url(#${g("purple")})`} />
+          <ellipse cx="48" cy="160" rx="13" ry="14" fill={`url(#${g("purple")})`} />
+          <circle cx="57" cy="152" r="5.5" fill={`url(#${g("purple")})`} />
+          <ellipse cx="44" cy="155" rx="4" ry="3" fill="#fff" opacity="0.4" />
+        </motion.g>
+        <motion.g
+          style={{ originX: 0.5, originY: 0.5 }}
+          animate={
+            (wave || mood === "cheer") && !reduce
+              ? { x: [0, 16, 16, 16, 16, 0], y: [0, -58, -58, -58, -58, 0], rotate: [0, -12, 14, -12, 14, 0] }
+              : float && !reduce ? { y: [0, 3, 0] } : undefined
+          }
+          transition={{ duration: wave || mood === "cheer" ? 2.4 : 2.6, repeat: Infinity, repeatDelay: wave ? 0.8 : 0, ease: "easeInOut" }}
+        >
+          <ellipse cx="152" cy="160" rx="13" ry="14" fill={`url(#${g("purple")})`} />
+          <circle cx="143" cy="152" r="5.5" fill={`url(#${g("purple")})`} />
+          <ellipse cx="148" cy="155" rx="4" ry="3" fill="#fff" opacity="0.4" />
         </motion.g>
 
-        {/* body */}
-        <rect x="56" y="122" width="88" height="70" rx="32" fill={`url(#${g("body")})`} />
-        <path d="M86 168 L100 148 L114 168" fill="none" stroke={`url(#${g("purple")})`} strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" />
-
-        {/* right arm (waves) */}
-        <motion.g
-          style={{ originX: 0.15, originY: 0.08 }}
-          animate={(wave || mood === "cheer") && !reduce ? { rotate: [0, -105, -80, -105, -80, 0] } : { rotate: 0 }}
-          transition={{ duration: 2.2, repeat: wave || mood === "cheer" ? Infinity : 0, repeatDelay: 0.8, ease: "easeInOut" }}
-        >
-          <rect x="140" y="132" width="26" height="44" rx="13" fill={`url(#${g("body")})`} transform="rotate(-18 153 150)" />
-          <circle cx="160" cy="176" r="11" fill={`url(#${g("purple")})`} />
-        </motion.g>
+        {/* head: a speech bubble, because Aibi is all about talking to AI */}
+        <g>
+          {/* sparkle antenna */}
+          <path d="M100 28 Q100 16 110 10" stroke="#C9B8FF" strokeWidth="5" strokeLinecap="round" fill="none" />
+          <motion.g
+            style={{ originX: 0.5, originY: 0.5 }}
+            animate={!reduce ? { scale: [1, 1.25, 1], rotate: [0, 45, 0] } : undefined}
+            transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <path d="M112 -6 Q114 4 124 6 Q114 8 112 18 Q110 8 100 6 Q110 4 112 -6Z" fill={`url(#${g("gold")})`} stroke="#F5A70B" strokeWidth="1.2" strokeLinejoin="round" />
+          </motion.g>
+          {/* side speaker dots */}
+          <circle cx="33" cy="78" r="8" fill={`url(#${g("purple")})`} />
+          <circle cx="167" cy="78" r="8" fill={`url(#${g("purple")})`} />
+          <path
+            d="M80 26 H120 A46 46 0 0 1 166 72 V80 A46 46 0 0 1 120 126 H90 L54 146 L64 118 A46 46 0 0 1 34 80 V72 A46 46 0 0 1 80 26Z"
+            fill={`url(#${g("body")})`}
+            strokeLinejoin="round"
+          />
+          {/* screen */}
+          <rect x="48" y="42" width="104" height="70" rx="30" fill={`url(#${g("visor")})`} />
+          <rect x="50" y="44" width="100" height="66" rx="28" fill="none" stroke="#B69CFF" strokeOpacity="0.35" strokeWidth="1.5" />
+          <ellipse cx="76" cy="54" rx="18" ry="5" fill="#fff" opacity="0.14" />
+          {/* blush */}
+          <ellipse cx="62" cy="98" rx="8" ry="4.5" fill="#FF8DC4" opacity="0.5" />
+          <ellipse cx="138" cy="98" rx="8" ry="4.5" fill="#FF8DC4" opacity="0.5" />
+          {/* face */}
+          <g filter={`url(#${g("eyeglow")})`} opacity="0.85">
+            <Face mood={mood} blink={blink} glow="#B69CFF" />
+          </g>
+          <Face mood={mood} blink={blink} glow={`url(#${g("glow")})`} />
+          {/* gloss */}
+          <ellipse cx="74" cy="34" rx="20" ry="6" fill="#fff" opacity="0.9" />
+        </g>
 
         {/* neck accessories */}
         {eq.neck === "bowtie" && (
-          <g transform="translate(100 126)">
+          <g transform="translate(100 134)">
             <path d="M0 0 L-18 -10 L-18 10 Z" fill="#F5564A" />
             <path d="M0 0 L18 -10 L18 10 Z" fill="#F5564A" />
             <circle r="5" fill="#D93D32" />
@@ -134,9 +177,9 @@ export default function Mascot({ size = 160, mood = "happy", wave = false, float
         )}
         {eq.neck === "scarf" && (
           <g>
-            <path d="M62 122 Q100 138 138 122 L138 132 Q100 148 62 132 Z" fill="#FF6FB5" />
-            <rect x="112" y="128" width="14" height="32" rx="6" fill="#F0479A" transform="rotate(-8 119 144)" />
-            <path d="M68 125 L68 133 M80 128 L80 137 M92 130 L92 139 M108 130 L108 139 M120 128 L120 136 M132 125 L132 133" stroke="#fff" strokeOpacity="0.5" strokeWidth="2" />
+            <path d="M66 128 Q100 142 134 128 L134 138 Q100 152 66 138 Z" fill="#FF6FB5" />
+            <rect x="112" y="134" width="14" height="32" rx="6" fill="#F0479A" transform="rotate(-8 119 144)" />
+            <path d="M72 131 L72 139 M84 134 L84 143 M96 136 L96 145 M108 136 L108 145 M120 134 L120 142 M130 131 L130 139" stroke="#fff" strokeOpacity="0.5" strokeWidth="2" />
           </g>
         )}
         {eq.neck === "medal" && (
@@ -146,35 +189,6 @@ export default function Mascot({ size = 160, mood = "happy", wave = false, float
             <path d="M100 150 l2.4 5 5.4.6-4 3.7 1.1 5.3-4.9-2.7-4.9 2.7 1.1-5.3-4-3.7 5.4-.6z" fill="#fff" fillOpacity="0.85" />
           </g>
         )}
-
-        {/* head */}
-        <g>
-          {/* ear pods */}
-          <ellipse cx="34" cy="78" rx="14" ry="20" fill={`url(#${g("purple")})`} />
-          <ellipse cx="166" cy="78" rx="14" ry="20" fill={`url(#${g("purple")})`} />
-          {/* antenna */}
-          <rect x="97" y="12" width="6" height="18" rx="3" fill="#C9B8FF" />
-          <motion.circle
-            cx="100"
-            cy="12"
-            r="9"
-            fill={`url(#${g("purple")})`}
-            animate={!reduce ? { scale: [1, 1.15, 1] } : undefined}
-            transition={{ duration: 1.8, repeat: Infinity }}
-            style={{ originX: 0.5, originY: 0.5 }}
-          />
-          <rect x="36" y="26" width="128" height="104" rx="48" fill={`url(#${g("body")})`} />
-          {/* visor */}
-          <rect x="50" y="44" width="100" height="70" rx="34" fill={`url(#${g("visor")})`} />
-          <ellipse cx="78" cy="56" rx="18" ry="6" fill="#fff" opacity="0.14" />
-          {/* face */}
-          <g filter={`url(#${g("eyeglow")})`} opacity="0.85">
-            <Face mood={mood} blink={blink} glow="#B69CFF" />
-          </g>
-          <Face mood={mood} blink={blink} glow={`url(#${g("glow")})`} />
-          {/* gloss */}
-          <ellipse cx="72" cy="38" rx="20" ry="7" fill="#fff" opacity="0.9" />
-        </g>
 
         {/* face accessories */}
         {eq.face === "glasses" && (
