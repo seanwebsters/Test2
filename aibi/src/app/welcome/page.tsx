@@ -103,7 +103,15 @@ export default function Welcome() {
             className="px-5 pb-32 pt-6"
           >
             {step === 1 && (
-              <Question title="How familiar are you with AI?" mascot={<Mascot size={110} mood="thinking" />}>
+              <Question
+                title="How familiar are you with AI?"
+                mascot={
+                  <div className="relative">
+                    <Mascot size={118} mood="happy" />
+                    <motion.span initial={{ scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 8 }} transition={{ delay: 0.25, type: "spring" }} className="absolute -right-7 -top-1 font-display text-[54px] font-bold leading-none text-sun-400 drop-shadow-[0_3px_0_#F5A70B]">?</motion.span>
+                  </div>
+                }
+              >
                 <div className="flex flex-col gap-3">
                   {FAMILIARITY.map((o) => (
                     <Option key={o.id} icon={o.icon} title={o.title} sub={o.sub} selected={familiarity === o.id} onClick={() => setFamiliarity(o.id)} />
@@ -268,13 +276,29 @@ function Intro({ onStart }: { onStart: () => void }) {
 }
 
 function Hills() {
+  const trees = [
+    [28, 178, 1.1], [70, 196, 0.8], [330, 170, 1.2], [372, 188, 0.9], [300, 214, 0.7], [12, 226, 0.9], [388, 232, 1],
+  ];
   return (
-    <svg className="absolute inset-x-0 bottom-0 z-0 w-full" viewBox="0 0 400 300" preserveAspectRatio="none" style={{ height: "46%" }} aria-hidden>
-      <path d="M0 120 Q80 60 160 110 T320 90 T400 100 V300 H0Z" fill="#A58BFF" opacity="0.55" />
-      <path d="M0 170 Q100 110 200 160 T400 150 V300 H0Z" fill="#7FD88F" />
-      <path d="M0 210 Q120 170 240 205 T400 200 V300 H0Z" fill="#5CC06F" />
-      <circle cx="40" cy="160" r="18" fill="#3FA65A" />
-      <circle cx="362" cy="150" r="22" fill="#3FA65A" />
+    <svg className="absolute inset-x-0 bottom-0 z-0 w-full" viewBox="0 0 400 300" preserveAspectRatio="none" style={{ height: "52%" }} aria-hidden>
+      <defs>
+        <linearGradient id="mnt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#C7B4FF" /><stop offset="1" stopColor="#9D86F0" /></linearGradient>
+        <linearGradient id="grass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#8EE09A" /><stop offset="1" stopColor="#4FB466" /></linearGradient>
+      </defs>
+      <path d="M0 120 L50 70 L95 105 L150 40 L205 100 L250 60 L300 95 L350 50 L400 90 V300 H0Z" fill="url(#mnt)" opacity="0.7" />
+      <path d="M140 52 L150 40 L162 54 Z M340 62 L350 50 L360 62 Z" fill="#fff" opacity="0.7" />
+      <ellipse cx="80" cy="150" rx="70" ry="14" fill="#fff" opacity="0.35" />
+      <ellipse cx="320" cy="132" rx="60" ry="12" fill="#fff" opacity="0.3" />
+      <path d="M0 170 Q100 112 200 158 T400 146 V300 H0Z" fill="url(#grass)" />
+      <path d="M0 215 Q120 175 240 208 T400 202 V300 H0Z" fill="#45A95C" />
+      {trees.map(([x, y, sc], i) => (
+        <g key={i} transform={`translate(${x} ${y}) scale(${sc})`}>
+          <rect x="-2.5" y="4" width="5" height="12" rx="2" fill="#7A5A3C" />
+          <circle cx="0" cy="-2" r="11" fill="#3FA65A" />
+          <circle cx="-7" cy="4" r="8" fill="#4CB868" />
+          <circle cx="7" cy="4" r="8" fill="#36994F" />
+        </g>
+      ))}
     </svg>
   );
 }
@@ -337,7 +361,13 @@ function Summary({
   return (
     <div className="relative flex min-h-[100dvh] flex-1 flex-col overflow-hidden bg-gradient-to-b from-lav-100 via-lav-50 to-[#9EE0A8]">
       <Confetti count={50} />
-      <div className="px-5 pt-[calc(28px+var(--safe-top))] text-center">
+      <div className="flex items-center gap-2 px-5 pt-[calc(14px+var(--safe-top))]">
+        <Mascot size={34} float={false} bare />
+        <span className="mr-auto font-display text-[24px] font-semibold">AIBI</span>
+        <span className="flex items-center gap-1 rounded-full bg-white px-3 py-1.5 font-display text-[15px] font-semibold shadow-card"><span>🔥</span><span className="text-sun-500">0</span></span>
+        <span className="flex items-center gap-1 rounded-full bg-white px-3 py-1.5 font-display text-[15px] font-semibold shadow-card"><span className="text-grape-500">◆</span>0 XP</span>
+      </div>
+      <div className="px-5 pt-4 text-center">
         <h1 className="font-display text-[30px] font-semibold leading-tight">
           {name ? `${name}, here's your` : "Your personalised"}
           <br />
@@ -348,6 +378,13 @@ function Summary({
         <svg className="absolute bottom-0 w-full" viewBox="0 0 400 120" preserveAspectRatio="none" style={{ height: 110 }} aria-hidden>
           <path d="M0 60 Q100 10 200 50 T400 40 V120 H0Z" fill="#7FD88F" />
           <path d="M150 120 Q190 80 230 70 Q280 60 300 40" stroke="#fff" strokeWidth="16" fill="none" strokeLinecap="round" opacity="0.8" />
+          {[[52, 30], [338, 22]].map(([x, y]) => (
+            <g key={x} transform={`translate(${x} ${y})`}>
+              <rect x="0" y="0" width="3.5" height="40" rx="1.5" fill="#5B4B8A" />
+              <path d="M3.5 1 L30 8 L3.5 17Z" fill="#7C4DFF" />
+              <path d="M10 12 L14 6 L18 12" stroke="#fff" strokeWidth="2.2" fill="none" strokeLinecap="round" />
+            </g>
+          ))}
         </svg>
         <Mascot size={150} mood="cheer" sparkles />
       </div>

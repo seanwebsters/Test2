@@ -6,7 +6,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import Confetti from "@/components/Confetti";
 import Mascot from "@/components/Mascot";
 import { Button, Progress, Sheet } from "@/components/ui";
-import { Crown, Flame, Gem, Heart, IconClose, IconShare } from "@/components/icons";
+import { Crown, Flame, Gem, Heart, IconCheck, IconClose, IconShare } from "@/components/icons";
 import { BuildStep, ChoiceStep, CompareStep, ImageStep, JudgeStep, MultiStep, SortStep, SpotStep, TeachStep, WriteStep } from "@/components/lesson/steps";
 import { getLesson, getWorld } from "@/content/curriculum";
 import type { Step } from "@/content/types";
@@ -179,10 +179,10 @@ function Player({ lessonId, jump }: { lessonId: string; jump: boolean }) {
   const encourage = ENCOURAGE[(pos + attempt.current) % ENCOURAGE.length];
 
   return (
-    <div className="flex min-h-[100dvh] flex-1 flex-col bg-gradient-to-b from-lav-100 via-lav-50 to-white">
-      <header className="sticky top-0 z-20 flex items-center gap-3 bg-lav-100/80 px-4 pb-3 pt-[calc(14px+var(--safe-top))] backdrop-blur-xl">
-        <button aria-label="Quit lesson" onClick={() => setQuit(true)} className="grid h-10 w-10 place-items-center rounded-full bg-white text-ink shadow-card active:scale-95">
-          <IconClose size={20} />
+    <div className="flex min-h-[100dvh] flex-1 flex-col bg-gradient-to-b from-white via-lav-50 to-white">
+      <header className="sticky top-0 z-20 flex items-center gap-3 bg-white/85 px-4 pb-2 pt-[calc(14px+var(--safe-top))] backdrop-blur-xl">
+        <button aria-label="Quit lesson" onClick={() => setQuit(true)} className="grid h-10 w-10 place-items-center rounded-full text-ink active:bg-lav-100">
+          <IconClose size={26} strokeWidth={2.6} />
         </button>
         <div className="relative flex-1">
           <Progress value={progress} height={14} />
@@ -194,16 +194,24 @@ function Player({ lessonId, jump }: { lessonId: string; jump: boolean }) {
             )}
           </AnimatePresence>
         </div>
-        <div className="flex items-center gap-1 rounded-full bg-white px-3 py-1.5 font-display font-semibold shadow-card">
-          {store.plan === "plus" ? <><Crown size={18} /><span className="text-sun-500">∞</span></> : <><Heart size={20} /><span className="text-coral-500">{hearts}</span></>}
+        <div className="flex items-center gap-1 rounded-full bg-white px-3 py-1.5 font-display text-[17px] font-semibold shadow-card">
+          {store.plan === "plus" ? <><Crown size={20} /><span className="text-sun-500">∞</span></> : <><Heart size={24} /><span className="text-coral-500">{hearts}</span></>}
         </div>
       </header>
 
-      <div className="px-5 pt-3 text-xs font-black uppercase tracking-widest text-ink-mute">
-        {jump ? `Jump to World ${world.n}` : `${world.title} · ${lesson.type === "boss" ? "Challenge" : lesson.type === "checkpoint" ? "Checkpoint" : `Lesson ${lesson.index}`}`}
+      <div className="flex items-center justify-between px-5 pt-2">
+        <div className="flex min-w-0 items-center gap-1.5 text-[14px] font-bold text-ink-soft">
+          <Gem size={18} />
+          <span className="truncate">
+            {jump ? `Jump to World ${world.n}` : `${lesson.type === "boss" ? "Challenge" : lesson.type === "checkpoint" ? "Checkpoint" : `Lesson ${lesson.index}`} · ${lesson.type === "lesson" ? lesson.title : world.title}`}
+          </span>
+        </div>
+        <div className="flex shrink-0 items-center gap-1 font-display text-[15px] font-semibold text-sun-500">
+          <Flame size={20} /> {liveStreak(store)} day{liveStreak(store) === 1 ? "" : "s"}
+        </div>
       </div>
 
-      <main className="flex-1 px-5 pb-48 pt-3">
+      <main className="flex-1 px-5 pb-36 pt-3">
         <AnimatePresence mode="wait">
           <motion.div key={`${pos}-${stepIdx}`} initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }} transition={{ type: "spring", stiffness: 340, damping: 32 }}>
             {step?.kind === "teach" && <TeachStep step={step} />}
@@ -218,51 +226,50 @@ function Player({ lessonId, jump }: { lessonId: string; jump: boolean }) {
             {step?.kind === "image" && <ImageStep task={step.task} onDone={onWriteDone} />}
           </motion.div>
         </AnimatePresence>
+
+        <AnimatePresence>
+          {phase === "feedback" && result && (
+            <motion.div
+              key="fb"
+              ref={(el) => {
+                if (el) setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "end" }), 60);
+              }}
+              initial={{ opacity: 0, y: 24, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ type: "spring", stiffness: 380, damping: 28 }}
+              className={`mt-5 rounded-[26px] border-2 p-4 ${result.correct ? "border-mint-400/40 bg-mint-100" : "border-coral-400/40 bg-coral-100"}`}
+            >
+              <div className="flex items-center gap-2.5">
+                <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-white ${result.correct ? "bg-mint-500" : "bg-coral-500"}`}>
+                  {result.correct ? <IconCheck size={20} strokeWidth={3.4} /> : <IconClose size={18} strokeWidth={3.4} />}
+                </span>
+                <span className="font-display text-[22px] font-semibold text-ink">
+                  {result.correct ? (
+                    <>
+                      {praise} <span className="text-mint-600">+{Math.round(lesson.xp / Math.max(1, gradable))} XP</span>
+                    </>
+                  ) : (
+                    encourage
+                  )}
+                </span>
+              </div>
+              <p className="mt-2 text-[15px] leading-snug text-ink-soft">{result.text}</p>
+              {!result.correct && <p className="mt-1.5 text-xs font-bold text-coral-600">We&apos;ll come back to this one.</p>}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
 
-      {/* bottom action bar / feedback panel */}
       {!selfManaged && phase !== "nohearts" && (
-        <div className="fixed bottom-0 left-1/2 z-30 w-full max-w-[480px] -translate-x-1/2">
-          <AnimatePresence mode="wait">
-            {phase === "feedback" && result ? (
-              <motion.div
-                key="fb"
-                initial={{ y: 120 }}
-                animate={{ y: 0 }}
-                exit={{ y: 120 }}
-                transition={{ type: "spring", stiffness: 380, damping: 34 }}
-                className={`rounded-t-[28px] px-5 pb-[calc(20px+var(--safe-bottom))] pt-5 ${result.correct ? "bg-mint-100" : "bg-coral-100"}`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-full text-xl text-white ${result.correct ? "bg-mint-500" : "bg-coral-500"}`}>{result.correct ? "✓" : "✕"}</div>
-                  <div className="flex-1">
-                    <div className={`font-display text-[22px] font-semibold ${result.correct ? "text-mint-600" : "text-coral-600"}`}>
-                      {result.correct ? (
-                        <>
-                          {praise} <span className="text-[17px]">+{Math.round(lesson.xp / Math.max(1, gradable))} XP</span>
-                        </>
-                      ) : (
-                        encourage
-                      )}
-                    </div>
-                    <p className="mt-0.5 text-[14.5px] font-semibold text-ink-soft">{result.text}</p>
-                    {!result.correct && <p className="mt-1 text-xs font-bold text-coral-600">We&apos;ll come back to this one.</p>}
-                  </div>
-                </div>
-                <Button full variant={result.correct ? "success" : "danger"} className="mt-4" onClick={onContinue}>
-                  Continue
-                </Button>
-              </motion.div>
-            ) : (
-              <motion.div key="act" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-gradient-to-t from-white via-white to-white/0 px-5 pb-[calc(20px+var(--safe-bottom))] pt-8">
-                {step?.kind === "teach" ? (
-                  <Button full onClick={() => advance()}>Continue</Button>
-                ) : (
-                  <Button full disabled={!canCheck} onClick={onCheck}>Check</Button>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
+        <div className="fixed bottom-0 left-1/2 z-30 w-full max-w-[480px] -translate-x-1/2 bg-gradient-to-t from-white via-white/95 to-white/0 px-5 pb-[calc(20px+var(--safe-bottom))] pt-6">
+          {phase === "feedback" ? (
+            <Button full onClick={onContinue}>Continue</Button>
+          ) : step?.kind === "teach" ? (
+            <Button full onClick={() => advance()}>Continue</Button>
+          ) : (
+            <Button full disabled={!canCheck} onClick={onCheck}>Check</Button>
+          )}
         </div>
       )}
 

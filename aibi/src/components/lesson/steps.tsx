@@ -29,6 +29,15 @@ function useShuffled<T>(items: T[], key: string): { item: T; orig: number }[] {
   }, [key]);
 }
 
+function QHead({ children, compact }: { children: React.ReactNode; compact?: boolean }) {
+  return (
+    <div className="flex flex-col items-center text-center">
+      <Mascot size={compact ? 76 : 112} mood="happy" wave sparkles />
+      <h2 className={`mt-1 whitespace-pre-line font-display font-semibold leading-snug ${compact ? "text-[21px]" : "text-[25px]"}`}>{children}</h2>
+    </div>
+  );
+}
+
 function Title({ children }: { children: React.ReactNode }) {
   return <h2 className="whitespace-pre-line font-display text-[23px] font-semibold leading-snug">{children}</h2>;
 }
@@ -43,14 +52,14 @@ function ContextBox({ label, text }: { label: string; text: string }) {
 }
 
 const optionCls = (state: "idle" | "selected" | "correct" | "wrong") =>
-  `w-full rounded-2xl border-2 px-4 py-3.5 text-left text-[15px] font-semibold transition-all active:scale-[0.99] ${
+  `w-full rounded-[20px] border-2 px-5 py-4 text-left text-[16px] font-semibold leading-snug transition-all active:scale-[0.99] ${
     state === "selected"
       ? "border-grape-400 bg-grape-50 shadow-[0_3px_0_0_#BCA3FF]"
       : state === "correct"
-        ? "border-mint-400 bg-mint-100 shadow-[0_3px_0_0_#4CD47E]"
+        ? "border-mint-500 bg-mint-100/70 shadow-[0_0_0_3px_rgba(76,212,126,0.18)]"
         : state === "wrong"
           ? "border-coral-400 bg-coral-100 shadow-[0_3px_0_0_#FF7A70]"
-          : "border-grape-100 bg-white shadow-[0_3px_0_0_#E3DBFF]"
+          : "border-[#E7E2F3] bg-white shadow-[0_2px_8px_-2px_rgba(46,24,112,0.12)]"
   }`;
 
 // ---------------------------------------------------------------- Teach
@@ -90,7 +99,7 @@ export function ChoiceStep({ step, setCheck, revealed, sk }: { step: Extract<Ste
   }, [sel, step.answer, setCheck]);
   return (
     <div>
-      <Title>{step.question}</Title>
+      <QHead>{step.question}</QHead>
       {step.context && <ContextBox {...step.context} />}
       <div className="mt-5 flex flex-col gap-3">
         {opts.map(({ item, orig }) => {
@@ -122,8 +131,8 @@ export function MultiStep({ step, setCheck, revealed, sk }: { step: Extract<Step
   }, [sel, step.answers, setCheck]);
   return (
     <div>
-      <Title>{step.question}</Title>
-      <p className="mt-1 text-sm font-bold text-ink-mute">Select all that apply</p>
+      <QHead>{step.question}</QHead>
+      <p className="mt-1 text-center text-sm font-bold text-ink-mute">Select all that apply</p>
       <div className="mt-5 grid grid-cols-1 gap-3">
         {opts.map(({ item, orig }) => {
           const on = sel.includes(orig);
@@ -163,8 +172,8 @@ export function BuildStep({ step, setCheck, revealed, sk }: { step: Extract<Step
   const remaining = pool.filter(({ item }) => !chosen.includes(item));
   return (
     <div>
-      <Title>{step.question}</Title>
-      <p className="mt-1 text-sm font-bold text-ink-mute">{step.ordered ? "Tap pieces to add them, then drag to put them in order." : "Tap the pieces that belong. Drag to reorder."}</p>
+      <QHead compact>{step.question}</QHead>
+      <p className="mt-1 text-center text-sm font-bold text-ink-mute">{step.ordered ? "Tap pieces to add them, then drag to put them in order." : "Tap the pieces that belong. Drag to reorder."}</p>
 
       <div className="mt-4 min-h-[148px] rounded-3xl border-2 border-dashed border-grape-200 bg-white/70 p-2">
         {chosen.length === 0 && <div className="grid h-[128px] place-items-center text-sm font-bold text-ink-mute">Your prompt appears here</div>}
@@ -227,7 +236,7 @@ export function CompareStep({ step, setCheck, revealed }: { step: Extract<Step, 
   }, [sel, step.answer, setCheck]);
   return (
     <div>
-      <Title>{step.question}</Title>
+      <QHead compact>{step.question}</QHead>
       {step.prompt && <ContextBox label="Prompt" text={step.prompt} />}
       <div className="mt-4 flex flex-col gap-3">
         {(["a", "b"] as const).map((k) => {
@@ -252,7 +261,7 @@ export function JudgeStep({ step, setCheck, revealed }: { step: Extract<Step, { 
   }, [sel, step.good, setCheck]);
   return (
     <div>
-      <Title>{step.question}</Title>
+      <QHead compact>{step.question}</QHead>
       <div className="mt-4 space-y-3">
         {step.prompt && (
           <div className="ml-auto max-w-[85%] rounded-3xl rounded-br-md bg-grape-500 px-4 py-3 text-[15px] font-semibold text-white">{step.prompt}</div>
@@ -289,8 +298,8 @@ export function SpotStep({ step, setCheck, revealed }: { step: Extract<Step, { k
   }, [sel, step.sentences, setCheck]);
   return (
     <div>
-      <Title>{step.question}</Title>
-      {step.intro && <p className="mt-2 text-sm font-bold text-ink-mute">{step.intro}</p>}
+      <QHead compact>{step.question}</QHead>
+      {step.intro && <p className="mt-2 text-center text-sm font-bold text-ink-mute">{step.intro}</p>}
       <div className="mt-4 rounded-3xl bg-white p-2 shadow-card">
         <div className="flex items-center gap-2 px-2 pb-1 pt-1 text-xs font-black uppercase tracking-widest text-ink-mute">🤖 AI answer</div>
         {step.sentences.map((s, i) => {
@@ -333,7 +342,7 @@ export function SortStep({ step, setCheck, revealed }: { step: Extract<Step, { k
   };
   return (
     <div>
-      <Title>{step.question}</Title>
+      <QHead compact>{step.question}</QHead>
       <div className="relative mt-5 h-[124px]">
         <AnimatePresence>
           {current && (

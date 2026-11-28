@@ -81,6 +81,9 @@ export default function Mascot({ size = 160, mood = "happy", wave = false, float
             <stop offset="0%" stopColor="#4C2CB0" stopOpacity="0.28" />
             <stop offset="100%" stopColor="#4C2CB0" stopOpacity="0" />
           </radialGradient>
+          <filter id={g("eyeglow")} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3.5" />
+          </filter>
           <linearGradient id={g("gold")} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#FFE58A" />
             <stop offset="100%" stopColor="#F5A70B" />
@@ -114,7 +117,7 @@ export default function Mascot({ size = 160, mood = "happy", wave = false, float
         {/* right arm (waves) */}
         <motion.g
           style={{ originX: 0.15, originY: 0.08 }}
-          animate={(wave || mood === "cheer") && !reduce ? { rotate: [0, -150, -120, -150, -120, 0] } : { rotate: 0 }}
+          animate={(wave || mood === "cheer") && !reduce ? { rotate: [0, -105, -80, -105, -80, 0] } : { rotate: 0 }}
           transition={{ duration: 2.2, repeat: wave || mood === "cheer" ? Infinity : 0, repeatDelay: 0.8, ease: "easeInOut" }}
         >
           <rect x="140" y="132" width="26" height="44" rx="13" fill={`url(#${g("body")})`} transform="rotate(-18 153 150)" />
@@ -165,6 +168,9 @@ export default function Mascot({ size = 160, mood = "happy", wave = false, float
           <rect x="50" y="44" width="100" height="70" rx="34" fill={`url(#${g("visor")})`} />
           <ellipse cx="78" cy="56" rx="18" ry="6" fill="#fff" opacity="0.14" />
           {/* face */}
+          <g filter={`url(#${g("eyeglow")})`} opacity="0.85">
+            <Face mood={mood} blink={blink} glow="#B69CFF" />
+          </g>
           <Face mood={mood} blink={blink} glow={`url(#${g("glow")})`} />
           {/* gloss */}
           <ellipse cx="72" cy="38" rx="20" ry="7" fill="#fff" opacity="0.9" />

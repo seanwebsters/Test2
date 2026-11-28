@@ -9,12 +9,12 @@ import { play } from "@/lib/feedback";
 import { MAX_HEARTS, activeToday, currentHearts, dailyGoal, liveStreak, nextHeartIn, todayXp, useStore } from "@/lib/store";
 import Mascot from "./Mascot";
 import { Button, Progress, Sheet } from "./ui";
-import { Crown, Flame, Gem, Heart, IconCompass, IconHome, IconSpark, IconTrophy, IconUser } from "./icons";
+import { Crown, Flame, Gem, Heart, IconCompass, IconDiamond, IconHome, IconStar, IconUser } from "./icons";
 
 const TABS = [
   { href: "/learn", label: "Learn", Icon: IconHome },
-  { href: "/challenges", label: "Challenges", Icon: IconTrophy },
-  { href: "/playground", label: "Playground", Icon: IconSpark },
+  { href: "/challenges", label: "Challenges", Icon: IconStar },
+  { href: "/playground", label: "Playground", Icon: IconDiamond },
   { href: "/discover", label: "Discover", Icon: IconCompass },
   { href: "/profile", label: "Profile", Icon: IconUser },
 ];
@@ -27,10 +27,11 @@ export function TabBar() {
         {TABS.map(({ href, label, Icon }) => {
           const active = pathname.startsWith(href);
           return (
-            <Link key={href} href={href} onClick={() => play("tap")} className="relative flex flex-col items-center gap-0.5 pb-2 pt-2.5" aria-current={active ? "page" : undefined}>
-              {active && <motion.span layoutId="tab-pill" className="absolute inset-x-3 top-1.5 h-9 rounded-2xl bg-grape-100" transition={{ type: "spring", stiffness: 400, damping: 32 }} />}
-              <Icon size={24} className={`relative ${active ? "text-grape-600" : "text-ink-mute"}`} strokeWidth={active ? 2.5 : 2} />
-              <span className={`relative text-[11px] font-bold ${active ? "text-grape-600" : "text-ink-mute"}`}>{label}</span>
+            <Link key={href} href={href} onClick={() => play("tap")} className="relative flex flex-col items-center gap-1 pb-2.5 pt-3" aria-current={active ? "page" : undefined}>
+              <motion.span animate={{ scale: active ? 1.08 : 1, y: active ? -1 : 0 }} transition={{ type: "spring", stiffness: 500, damping: 26 }} className="relative">
+                <Icon size={27} className={active ? "text-grape-600" : "text-ink-mute"} fill={active ? "currentColor" : "none"} fillOpacity={active ? 0.9 : 0} strokeWidth={active ? 2.2 : 1.8} />
+              </motion.span>
+              <span className={`relative text-[11.5px] ${active ? "font-extrabold text-grape-600" : "font-semibold text-ink-mute"}`}>{label}</span>
             </Link>
           );
         })}
@@ -48,7 +49,7 @@ export function useNow(interval = 30000) {
   return now;
 }
 
-export function StatsBar({ showLogo = true }: { showLogo?: boolean }) {
+export function StatsBar({ showLogo = true, hearts: showHearts = true }: { showLogo?: boolean; hearts?: boolean }) {
   const s = useStore();
   const now = useNow();
   const streak = liveStreak(s);
@@ -69,11 +70,11 @@ export function StatsBar({ showLogo = true }: { showLogo?: boolean }) {
           <Flame lit={lit} /> <span className={lit ? "text-sun-500" : "text-ink-mute"}>{streak}</span>
         </button>
         <Link href="/profile" className="flex items-center gap-1 rounded-full bg-white px-3 py-1.5 font-display text-[15px] font-semibold shadow-card active:scale-95" aria-label={`${s.xp} XP`}>
-          <Gem /> <span className="text-grape-600">{s.xp}</span>
+          <Gem /> <span className="text-ink">{s.xp} XP</span>
         </Link>
-        <button onClick={() => setSheet("hearts")} className="flex items-center gap-1 rounded-full bg-white px-3 py-1.5 font-display text-[15px] font-semibold shadow-card active:scale-95" aria-label="Hearts">
+        {showHearts && <button onClick={() => setSheet("hearts")} className="flex items-center gap-1 rounded-full bg-white px-3 py-1.5 font-display text-[15px] font-semibold shadow-card active:scale-95" aria-label="Hearts">
           {s.plan === "plus" ? <><Crown size={20} /><span className="text-sun-500">∞</span></> : <><Heart /> <span className="text-coral-500">{hearts}</span></>}
-        </button>
+        </button>}
       </div>
       <StreakSheet open={sheet === "streak"} onClose={() => setSheet(null)} />
       <HeartsSheet open={sheet === "hearts"} onClose={() => setSheet(null)} />

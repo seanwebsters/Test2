@@ -23,6 +23,9 @@ export const IconStar = ({ size, ...r }: P) => (
 export const IconSpark = ({ size, ...r }: P) => (
   <svg {...base(size, r)}><path d="M12 2 14.2 9.8 22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" /></svg>
 );
+export const IconDiamond = ({ size, ...r }: P) => (
+  <svg {...base(size, r)}><path d="M12 2.5 21 12l-9 9.5L3 12z" /><path d="M12 7.5 16.5 12 12 16.5 7.5 12z" fill="white" fillOpacity={r.fill && r.fill !== "none" ? 1 : 0} stroke={r.fill && r.fill !== "none" ? "white" : "currentColor"} /></svg>
+);
 export const IconCompass = ({ size, ...r }: P) => (
   <svg {...base(size, r)}><circle cx="12" cy="12" r="9" /><path d="m15.5 8.5-2 5-5 2 2-5z" /></svg>
 );
