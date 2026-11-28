@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9C77FF"/><stop offset="1" stop-color="#5726CC"/></linearGradient>
+    <radialGradient id="body" cx="38%" cy="28%" r="80%"><stop offset="0" stop-color="#fff"/><stop offset=".6" stop-color="#F1ECFF"/><stop offset="1" stop-color="#C9B8FF"/></radialGradient>
+    <linearGradient id="visor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3B2A6B"/><stop offset="1" stop-color="#140C2E"/></linearGradient>
+    <radialGradient id="pur" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#B79BFF"/><stop offset="1" stop-color="#6233D6"/></radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g transform="translate(256 276)">
+    <circle cx="-150" cy="-10" r="20" fill="url(#pur)"/>
+    <circle cx="150" cy="-10" r="20" fill="url(#pur)"/>
+    <path d="M0 -134 Q0 -164 24 -178" stroke="#E3DBFF" stroke-width="12" stroke-linecap="round" fill="none"/>
+    <path d="M30 -222 Q34 -196 58 -192 Q34 -188 30 -162 Q26 -188 2 -192 Q26 -196 30 -222Z" fill="#FFC53D" stroke="#F5A70B" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M-76 -136 H76 A106 106 0 0 1 146 -30 V-2 A106 106 0 0 1 66 104 H-30 L-118 150 L-96 84 A106 106 0 0 1 -146 -2 V-30 A106 106 0 0 1 -76 -136Z" fill="url(#body)"/>
+    <rect x="-114" y="-96" width="228" height="164" rx="78" fill="url(#visor)"/>
+    <path d="M-78 -4 Q-52 -36 -26 -4 M26 -4 Q52 -36 78 -4" stroke="#D9CBFF" stroke-width="16" stroke-linecap="round" fill="none"/>
+    <path d="M-24 30 Q0 54 24 30" stroke="#D9CBFF" stroke-width="12" stroke-linecap="round" fill="none"/>
+    <ellipse cx="-64" cy="-118" rx="44" ry="13" fill="#fff" opacity=".9"/>
+    <ellipse cx="-80" cy="44" rx="18" ry="10" fill="#FF8DC4" opacity=".55"/>
+    <ellipse cx="80" cy="44" rx="18" ry="10" fill="#FF8DC4" opacity=".55"/>
+  </g>
+</svg>
