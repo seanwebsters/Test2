@@ -341,27 +341,26 @@ function IslandImpl(p: Props) {
     <svg viewBox={`0 0 ${ISLAND_W} ${ISLAND_H}`} width="100%" height="100%" className="island-svg" preserveAspectRatio="xMidYMid meet">
       <defs>
         <linearGradient id="isl-grass" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#b6e07e" />
-          <stop offset="60%" stopColor="#8fcb64" />
-          <stop offset="100%" stopColor="#6fb352" />
+          <stop offset="0%" stopColor="#9ccf6c" />
+          <stop offset="100%" stopColor="#9ccf6c" />
         </linearGradient>
         <linearGradient id="isl-cliff" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#c99b76" />
-          <stop offset="50%" stopColor="#a8795a" />
-          <stop offset="100%" stopColor="#7d5a49" />
+          <stop offset="0%" stopColor="#b98a68" />
+          <stop offset="100%" stopColor="#b98a68" />
         </linearGradient>
         <linearGradient id="isl-cliff2" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#000" stopOpacity=".18" />
-          <stop offset="40%" stopColor="#000" stopOpacity="0" />
-          <stop offset="100%" stopColor="#000" stopOpacity=".22" />
+          <stop offset="0%" stopColor="#000" stopOpacity="0" />
+          <stop offset="55%" stopColor="#000" stopOpacity="0" />
+          <stop offset="55.1%" stopColor="#000" stopOpacity=".1" />
+          <stop offset="100%" stopColor="#000" stopOpacity=".1" />
         </linearGradient>
         <linearGradient id="isl-water" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#9fe0f5" />
-          <stop offset="100%" stopColor="#5fb5e3" />
+          <stop offset="0%" stopColor="#6cc5ea" />
+          <stop offset="100%" stopColor="#6cc5ea" />
         </linearGradient>
         <linearGradient id="isl-fall" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#bdeefc" />
-          <stop offset="100%" stopColor="#7dc8ee" stopOpacity=".8" />
+          <stop offset="100%" stopColor="#bdeefc" />
         </linearGradient>
         <radialGradient id="isl-glow">
           <stop offset="0%" stopColor="#ffe9a8" stopOpacity=".9" />
@@ -433,7 +432,7 @@ function IslandImpl(p: Props) {
       </g>
 
       {/* Grass top */}
-      <path d="M86 400 Q70 330 150 280 Q250 220 400 222 Q560 220 660 286 Q740 340 714 400 Q700 470 560 500 Q400 530 240 500 Q100 470 86 400Z" fill="#5f9e4a" transform="translate(0 10)" />
+      <path d="M86 400 Q70 330 150 280 Q250 220 400 222 Q560 220 660 286 Q740 340 714 400 Q700 470 560 500 Q400 530 240 500 Q100 470 86 400Z" fill="#7fb552" transform="translate(0 12)" />
       <path d="M86 400 Q70 330 150 280 Q250 220 400 222 Q560 220 660 286 Q740 340 714 400 Q700 470 560 500 Q400 530 240 500 Q100 470 86 400Z" fill="url(#isl-grass)" />
       {/* grass texture tufts */}
       {Array.from({ length: 26 }, (_, i) => {

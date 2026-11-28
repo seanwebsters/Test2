@@ -51,7 +51,7 @@ export function PieceDefs() {
           <stop offset="100%" stopColor="#8a5428" />
         </linearGradient>
         <filter id="pg-shadow" x="-20%" y="-20%" width="140%" height="150%">
-          <feDropShadow dx="0" dy="4" stdDeviation="2.4" floodColor="#3a2140" floodOpacity="0.32" />
+          <feDropShadow dx="0" dy="5" stdDeviation="0" floodColor="#2d2a32" floodOpacity="0.2" />
         </filter>
       </defs>
     </svg>

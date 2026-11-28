@@ -30,8 +30,8 @@ export function Sky({ phase }: { phase: Phase }) {
           width: phase === 'night' ? 46 : 64,
           height: phase === 'night' ? 46 : 64,
           borderRadius: '50%',
-          background: phase === 'night' ? 'radial-gradient(circle at 35% 35%, #fffbe8, #e8e2c4)' : 'radial-gradient(circle, #fff7d6 30%, #ffd98a 70%)',
-          boxShadow: phase === 'night' ? '0 0 40px 10px rgba(255,250,220,.35)' : '0 0 80px 30px rgba(255,220,150,.55)',
+          background: phase === 'night' ? '#fff6d6' : '#ffd84d',
+          boxShadow: phase === 'night' ? '0 0 0 10px rgba(255,250,220,.12)' : '0 0 0 12px rgba(255,216,77,.25)',
           opacity: phase === 'day' ? 0.85 : 1,
           transition: 'all 1s',
         }}
@@ -86,14 +86,29 @@ export function AnimatedNumber({ n }: { n: number }) {
 export function TabBar({ tab, onTab, badges }: { tab: Tab; onTab: (t: Tab) => void; badges: Partial<Record<Tab, number>> }) {
   const tabs: { id: Tab; label: string }[] = [
     { id: 'world', label: 'World' },
-    { id: 'play', label: 'Play' },
     { id: 'adventure', label: 'Adventure' },
+    { id: 'play', label: 'Play' },
     { id: 'diary', label: 'Diary' },
     { id: 'friends', label: 'Friends' },
   ];
   return (
     <nav className="tabbar" aria-label="Main">
-      {tabs.map((t) => (
+      {tabs.map((t) =>
+        t.id === 'play' ? (
+          <button key={t.id} className={`tab centre ${tab === t.id ? 'on' : ''}`} onClick={() => onTab(t.id)} aria-current={tab === t.id} aria-label="Play">
+            <motion.span className="centre-btn" whileTap={{ scale: 0.9 }} animate={{ rotate: tab === 'play' ? 360 : 0 }} transition={{ duration: 0.6 }}>
+              <span>
+                <svg viewBox="0 0 40 40" width="34" height="34">
+                  <circle cx="14" cy="17" r="2.6" fill="#2d2a32" />
+                  <circle cx="26" cy="17" r="2.6" fill="#2d2a32" />
+                  <path d="M13 24 Q20 30 27 24" stroke="#2d2a32" strokeWidth="2.8" fill="none" strokeLinecap="round" />
+                </svg>
+              </span>
+            </motion.span>
+            {t.label}
+            {!!badges[t.id] && <span className="badge" style={{ top: -4, right: '18%' }}>{badges[t.id]}</span>}
+          </button>
+        ) : (
         <button key={t.id} className={`tab ${tab === t.id ? 'on' : ''}`} onClick={() => onTab(t.id)} aria-current={tab === t.id}>
           {tab === t.id && <motion.span layoutId="tabbg" className="tab-bg" transition={{ type: 'spring', stiffness: 500, damping: 36 }} />}
           <motion.span animate={tab === t.id ? { y: [0, -4, 0] } : {}} transition={{ duration: 0.35 }}>
@@ -102,7 +117,8 @@ export function TabBar({ tab, onTab, badges }: { tab: Tab; onTab: (t: Tab) => vo
           {t.label}
           {!!badges[t.id] && <span className="badge">{badges[t.id]}</span>}
         </button>
-      ))}
+        ),
+      )}
     </nav>
   );
 }
@@ -191,7 +207,7 @@ export function RewardOverlay() {
         <motion.div key={(r.title ?? '') + rewards.length} style={{ position: 'absolute', inset: 0, zIndex: 80, display: 'grid', placeItems: 'center', background: 'rgba(40,26,70,.55)', padding: 20 }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
           <Rays />
           <Confetti />
-          <motion.div className="card" initial={{ scale: 0.6, y: 40 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.8, opacity: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 20 }} style={{ position: 'relative', width: '100%', maxWidth: 340, padding: '26px 20px 20px', textAlign: 'center', background: 'linear-gradient(180deg,#fffaf0,#f8ecd6)' }}>
+          <motion.div className="card" initial={{ scale: 0.6, y: 40 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.8, opacity: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 20 }} style={{ position: 'relative', width: '100%', maxWidth: 340, padding: '26px 20px 20px', textAlign: 'center', background: '#f8ecd6' }}>
             <div className="banner" style={{ position: 'absolute', top: -22, left: '50%', transform: 'translateX(-50%) rotate(-2deg)', whiteSpace: 'nowrap' }}>
               {r.title}
             </div>
@@ -228,7 +244,7 @@ export function RewardOverlay() {
                   </motion.div>
                 ))}
                 {r.creature && (
-                  <motion.div className="tile" style={{ width: 110, background: 'linear-gradient(180deg,#fff,#efe9fc)' }} initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.6, type: 'spring' }}>
+                  <motion.div className="tile" style={{ width: 110, background: '#efe9fc' }} initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.6, type: 'spring' }}>
                     <div className="float">
                       <Creature id={r.creature} size={56} />
                     </div>

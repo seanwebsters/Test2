@@ -75,20 +75,17 @@ export function Onboarding() {
       <AnimatePresence mode="wait">
         {step === 'hello' && (
           <motion.div key="hello" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, y: -30 }} style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 28, textAlign: 'center' }}>
-            <motion.div initial={{ scale: 0.4, y: 40 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 160, damping: 12 }}>
+            <motion.div initial={{ y: 120, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ type: 'spring', stiffness: 120, damping: 14, delay: 0.5 }} style={{ marginBottom: -46, zIndex: 0 }}>
+              <Dog look={{ ...look, hat: 'explorer' }} pose="wave" size={230} shadow={false} />
+            </motion.div>
+            <div style={{ position: 'relative', zIndex: 1 }}>
               <Logo />
-            </motion.div>
-            <motion.h2 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} style={{ fontSize: 28, color: '#fff', textShadow: '0 2px 12px rgba(80,50,140,.4)', marginTop: 8 }}>
-              A little world for your best friend.
-            </motion.h2>
-            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.9 }} style={{ color: '#fff', fontWeight: 700, marginTop: 10, maxWidth: 300, textShadow: '0 1px 8px rgba(80,50,140,.4)' }}>
-              Every real-life adventure with your dog brings their magical world to life.
+            </div>
+            <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1 }} style={{ fontFamily: 'var(--font-chunk)', fontSize: 22, color: '#fff', textShadow: '0 3px 0 rgba(30,40,20,.2)', marginTop: 26, maxWidth: 320, lineHeight: 1.2 }}>
+              Every real-life adventure with your dog brings their world to life.
             </motion.p>
-            <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.2 }} style={{ marginTop: 26 }}>
-              <Dog look={look} pose="happy" size={150} />
-            </motion.div>
-            <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.6 }} className="btn full" style={{ marginTop: 26, maxWidth: 320 }} onClick={() => go(1)}>
-              Begin our story
+            <motion.button initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.3 }} className="btn full" style={{ marginTop: 24, maxWidth: 330, minHeight: 66, fontSize: 28 }} onClick={() => go(1)}>
+              begin our story
             </motion.button>
           </motion.div>
         )}
@@ -350,18 +347,27 @@ export function Onboarding() {
 }
 
 export function Logo({ size = 1 }: { size?: number }) {
+  const small = 'A LITTLE WORLD'.split('');
   return (
-    <div style={{ display: 'grid', justifyItems: 'center', transform: `scale(${size})` }}>
-      <svg viewBox="0 0 80 60" width="74">
-        <g fill="#fff" stroke="#c8b6f5" strokeWidth="2">
-          <ellipse cx="40" cy="42" rx="15" ry="12" />
-          <ellipse cx="18" cy="26" rx="7" ry="9" />
-          <ellipse cx="31" cy="14" rx="7" ry="9" />
-          <ellipse cx="49" cy="14" rx="7" ry="9" />
-          <ellipse cx="62" cy="26" rx="7" ry="9" />
-        </g>
-      </svg>
-      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 84, lineHeight: 0.9, color: '#fffaf0', letterSpacing: '-0.02em', textShadow: '0 5px 0 #c8b6f5, 0 10px 0 #8c76d6, 0 18px 30px rgba(60,30,110,.35)' }}>WAG</div>
+    <div style={{ display: 'grid', justifyItems: 'center', gap: 10, transform: `scale(${size})` }}>
+      <div className="tiles" style={{ gap: 3 }}>
+        {small.map((ch, i) =>
+          ch === ' ' ? (
+            <span key={i} style={{ width: 8 }} />
+          ) : (
+            <motion.span key={i} className="tile-letter small" initial={{ y: -30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 + i * 0.04, type: 'spring', stiffness: 400, damping: 14 }} style={{ width: 24, height: 28, fontSize: 18, transform: `rotate(${(i % 3) - 1}deg)` }}>
+              {ch}
+            </motion.span>
+          ),
+        )}
+      </div>
+      <div className="tiles" style={{ gap: 8 }}>
+        {['W', 'A', 'G'].map((ch, i) => (
+          <motion.span key={ch} className="tile-letter" initial={{ y: 40, scale: 0.6, opacity: 0 }} animate={{ y: 0, scale: 1, opacity: 1 }} transition={{ delay: 0.05 + i * 0.12, type: 'spring', stiffness: 300, damping: 12 }} style={{ width: 92, height: 100, fontSize: 84, transform: `rotate(${[-4, 2, -2][i]}deg)` }}>
+            {ch}
+          </motion.span>
+        ))}
+      </div>
     </div>
   );
 }

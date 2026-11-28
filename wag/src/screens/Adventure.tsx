@@ -85,7 +85,7 @@ export function AdventureScreen({ onAcademy }: { onAcademy: () => void }) {
   const group = ageGroup(dog.ageYears);
 
   return (
-    <div className="screen" style={{ background: 'linear-gradient(180deg,#dcebd0 0%, #f5ecd6 50%, #fbe7d6 100%)' }}>
+    <div className="screen" style={{ background: 'var(--grass)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 style={{ fontSize: 26 }}>Adventure</h1>
         <Currencies stars={false} />
@@ -137,7 +137,7 @@ export function AdventureScreen({ onAcademy }: { onAcademy: () => void }) {
       </div>
 
       {/* rest */}
-      <div className="row" style={{ marginTop: 14, background: 'linear-gradient(135deg,#efe9fc,#fff)' }}>
+      <div className="row" style={{ marginTop: 14, background: '#fff' }}>
         <div className="thumb" style={{ background: '#e3dcfb' }}>
           <Dog look={dog.look} pose="sleep" size={48} shadow={false} />
         </div>
@@ -152,7 +152,7 @@ export function AdventureScreen({ onAcademy }: { onAcademy: () => void }) {
 
       {/* academy */}
       <motion.button whileTap={{ scale: 0.98 }} onClick={onAcademy} className="card" style={{ marginTop: 14, padding: 14, width: '100%', display: 'flex', gap: 12, alignItems: 'center', textAlign: 'left' }}>
-        <div className="thumb" style={{ width: 56, height: 56, borderRadius: 18, background: 'linear-gradient(180deg,#e3e7fb,#c9d1f6)', display: 'grid', placeItems: 'center', color: '#5a6fc8' }}>
+        <div className="thumb" style={{ width: 56, height: 56, borderRadius: 18, background: '#c9d1f6', display: 'grid', placeItems: 'center', color: '#5a6fc8' }}>
           <Icon name="cap" size={32} />
         </div>
         <div style={{ flex: 1 }}>
@@ -415,7 +415,7 @@ function Walk({ onClose }: { onClose: () => void }) {
   const progress = Math.min(1, elapsed / (30 * 60));
 
   return (
-    <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', stiffness: 260, damping: 32 }} style={{ position: 'absolute', inset: 0, zIndex: 55, background: 'linear-gradient(180deg,#bfe3f7 0%, #dff0c8 55%, #c4e3a2 100%)', overflowY: 'auto' }}>
+    <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', stiffness: 260, damping: 32 }} style={{ position: 'absolute', inset: 0, zIndex: 55, background: 'var(--sky-flat)', overflowY: 'auto' }}>
       {!summary ? (
         <div style={{ padding: 'calc(var(--safe-top) + 14px) 16px calc(var(--safe-bottom) + 24px)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -429,7 +429,7 @@ function Walk({ onClose }: { onClose: () => void }) {
           </div>
 
           {/* illustrated trail */}
-          <div style={{ position: 'relative', height: 250, marginTop: 14, borderRadius: 28, overflow: 'hidden', background: 'linear-gradient(180deg,#a9daf5,#e7f4d6)', boxShadow: 'var(--shadow)' }}>
+          <div style={{ position: 'relative', height: 250, marginTop: 14, borderRadius: 28, overflow: 'hidden', background: '#e7f4d6', boxShadow: 'var(--shadow)' }}>
             <svg viewBox="0 0 360 250" width="100%" height="100%" preserveAspectRatio="xMidYMid slice">
               <path d="M0 150 Q80 100 160 140 Q240 90 360 130 L360 250 L0 250Z" fill="#9fd27e" />
               <path d="M0 190 Q100 160 200 190 Q290 210 360 180 L360 250 L0 250Z" fill="#7fbf5f" />
@@ -573,7 +573,7 @@ function Summary({ rec, photo, onDone }: { rec: AdventureRecord; photo?: string;
         <div className="banner" style={{ position: 'absolute', top: -18, left: '50%', transform: 'translateX(-50%) rotate(-2deg)', whiteSpace: 'nowrap' }}>
           What a day!
         </div>
-        <div style={{ height: 190, borderRadius: 18, overflow: 'hidden', position: 'relative', marginTop: 14, background: 'linear-gradient(180deg,#f9c9a0,#f6b3c8 50%,#cfe8a8 51%,#9fd27e)' }}>
+        <div style={{ height: 190, borderRadius: 18, overflow: 'hidden', position: 'relative', marginTop: 14, background: 'linear-gradient(180deg,#f6b3c8 0 58%,#8fcb64 58%)' }}>
           {photo && <img src={photo} alt="" style={{ position: 'absolute', right: 10, top: 10, width: 96, height: 96, objectFit: 'cover', borderRadius: 6, border: '5px solid #fff', transform: 'rotate(5deg)', boxShadow: 'var(--shadow-sm)' }} />}
           <div style={{ position: 'absolute', left: '50%', bottom: 4, transform: 'translateX(-50%)' }}>
             <Dog look={dog.look} pose="celebrate" size={120} />

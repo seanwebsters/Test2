@@ -14,8 +14,8 @@ export function Academy({ onClose, onPlus }: { onClose: () => void; onPlus: () =
   const [lesson, setLesson] = useState<{ l: Lesson; u: Unit } | null>(null);
 
   return (
-    <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', stiffness: 300, damping: 34 }} style={{ position: 'absolute', inset: 0, zIndex: 55, background: 'linear-gradient(180deg,#e3e7fb,#f7f1e6)', overflowY: 'auto' }}>
-      <div style={{ position: 'sticky', top: 0, zIndex: 3, padding: 'calc(var(--safe-top) + 12px) 16px 10px', background: 'linear-gradient(180deg,#e3e7fb 75%, transparent)', display: 'flex', alignItems: 'center', gap: 10 }}>
+    <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', stiffness: 300, damping: 34 }} style={{ position: 'absolute', inset: 0, zIndex: 55, background: '#f7f1e6', overflowY: 'auto' }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 3, padding: 'calc(var(--safe-top) + 12px) 16px 10px', background: '#b7c4f2', display: 'flex', alignItems: 'center', gap: 10 }}>
         <button className="icon-btn" onClick={onClose} aria-label="Back">
           <Icon name="back" />
         </button>
@@ -47,7 +47,7 @@ export function Academy({ onClose, onPlus }: { onClose: () => void; onPlus: () =
                       whileTap={{ scale: 0.92 }}
                       className="lesson-node"
                       onClick={() => (locked ? onPlus() : setLesson({ l, u }))}
-                      style={{ background: locked ? '#cfc6e0' : stars ? `linear-gradient(180deg, #ffe08a, #f5b53d)` : `linear-gradient(180deg, color-mix(in srgb, ${u.color} 70%, #fff), ${u.color})`, boxShadow: `0 6px 0 ${locked ? '#aea4c4' : stars ? '#c98610' : `color-mix(in srgb, ${u.color} 70%, #000)`}` }}
+                      style={{ background: locked ? '#cfc6e0' : stars ? `#f5b53d` : u.color, boxShadow: `0 6px 0 ${locked ? '#aea4c4' : stars ? '#c98610' : `color-mix(in srgb, ${u.color} 70%, #000)`}` }}
                     >
                       {locked ? <Icon name="lock" /> : stars ? <Icon name="check" size={30} /> : <Icon name={l.trick ? 'sparkle' : 'book'} size={28} />}
                     </motion.button>
@@ -98,7 +98,7 @@ function LessonPlayer({ lesson, unit, onClose }: { lesson: Lesson; unit: Unit; o
           <Icon name="close" />
         </button>
         <div className="progress" style={{ flex: 1, height: 14 }}>
-          <i style={{ width: `${((done ? lesson.steps.length : i) / lesson.steps.length) * 100}%`, background: `linear-gradient(180deg, color-mix(in srgb, ${unit.color} 60%, #fff), ${unit.color})` }} />
+          <i style={{ width: `${((done ? lesson.steps.length : i) / lesson.steps.length) * 100}%`, background: unit.color }} />
         </div>
       </div>
       <div style={{ display: 'grid', placeItems: 'center', marginTop: 10 }}>

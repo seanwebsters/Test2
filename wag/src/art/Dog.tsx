@@ -193,33 +193,33 @@ export function Dog({ look, pose = 'idle', size = 160, className, onClick, shado
         {/* tail */}
         <motion.path
           d="M140 160 Q176 150 172 116 Q170 104 162 108 Q164 136 136 148 Z"
-          fill={`url(#${id}-body)`}
+          fill={c.base}
           animate={{ rotate: [-14, 16, -14] }}
           transition={{ duration: wagSpeed, repeat: Infinity, ease: 'easeInOut' }}
           style={{ originX: '138px', originY: '156px', transformBox: 'view-box' }}
         />
         {/* body */}
-        <path d="M58 190 Q50 132 100 120 Q150 132 142 190 Z" fill={`url(#${id}-body)`} />
+        <path d="M58 190 Q50 132 100 120 Q150 132 142 190 Z" fill={c.base} />
         <ellipse cx="66" cy="180" rx="20" ry="15" fill={c.shade} />
         <ellipse cx="134" cy="180" rx="20" ry="15" fill={c.shade} />
         {/* chest */}
-        <path d="M80 134 Q100 128 120 134 Q118 172 100 178 Q82 172 80 134 Z" fill={`url(#${id}-muzzle)`} opacity={look.pattern === 'blaze' || dark ? 1 : 0.85} />
+        <path d="M80 134 Q100 128 120 134 Q118 172 100 178 Q82 172 80 134 Z" fill={dark ? '#efe4da' : c.light} opacity={look.pattern === 'blaze' || dark ? 1 : 0.85} />
         {/* front legs */}
         <motion.g
           animate={pose === 'wave' ? { rotate: [0, -70, -50, -70, 0] } : pose === 'walk' ? { y: [0, -4, 0] } : {}}
           transition={{ duration: pose === 'walk' ? 0.42 : 1.2, repeat: Infinity, repeatDelay: pose === 'wave' ? 0.4 : 0 }}
           style={{ originX: '84px', originY: '150px', transformBox: 'view-box' }}
         >
-          <rect x="74" y="150" width="20" height="42" rx="10" fill={`url(#${id}-body)`} />
+          <rect x="74" y="150" width="20" height="42" rx="10" fill={c.base} />
           <ellipse cx="84" cy="190" rx="13" ry="8" fill={look.pattern === 'socks' ? '#fffaf2' : c.light} />
         </motion.g>
         <motion.g animate={pose === 'walk' ? { y: [-4, 0, -4] } : {}} transition={{ duration: 0.42, repeat: Infinity }}>
-          <rect x="106" y="150" width="20" height="42" rx="10" fill={`url(#${id}-body)`} />
+          <rect x="106" y="150" width="20" height="42" rx="10" fill={c.base} />
           <ellipse cx="116" cy="190" rx="13" ry="8" fill={look.pattern === 'socks' ? '#fffaf2' : c.light} />
         </motion.g>
         {/* bandana */}
         <path d="M66 124 Q100 140 134 124 L130 134 Q100 168 70 134 Z" fill={look.bandana} />
-        <path d="M70 134 Q100 168 130 134 Q100 150 70 134Z" fill="#000" opacity="0.08" />
+        
         <g transform="translate(100 146)" fill="#fff" opacity="0.92">
           <ellipse cx="0" cy="3" rx="4.6" ry="3.8" />
           <circle cx="-5" cy="-2.5" r="1.8" />
@@ -248,7 +248,7 @@ export function Dog({ look, pose = 'idle', size = 160, className, onClick, shado
             </g>
           )}
           {/* head */}
-          <ellipse cx="100" cy="76" rx="58" ry="52" fill={`url(#${id}-head)`} />
+          <ellipse cx="100" cy="76" rx="58" ry="52" fill={c.base} />
           {/* fluffy cheeks */}
           <ellipse cx="54" cy="94" rx="14" ry="16" fill={c.base} />
           <ellipse cx="146" cy="94" rx="14" ry="16" fill={c.base} />
@@ -256,7 +256,6 @@ export function Dog({ look, pose = 'idle', size = 160, className, onClick, shado
           {look.pattern === 'patch' && <ellipse cx="76" cy="68" rx="20" ry="18" fill={markCol} opacity="0.9" />}
           {look.pattern === 'blaze' && <path d="M92 26 Q100 22 108 26 L114 80 Q100 88 86 80 Z" fill="#fffaf2" opacity="0.95" />}
           {/* highlight */}
-          <ellipse cx="80" cy="44" rx="24" ry="10" fill="#fff" opacity={dark ? 0.08 : 0.18} transform="rotate(-14 80 44)" />
 
           {/* floppy / folded ears (front) */}
           {look.ears === 'floppy' && (
@@ -301,8 +300,8 @@ export function Dog({ look, pose = 'idle', size = 160, className, onClick, shado
             </g>
           ) : (
             <g>
-              <ellipse cx="74" cy="72" rx="10" ry={sad ? 10 : 12} fill={`url(#${id}-eye)`} />
-              <ellipse cx="126" cy="72" rx="10" ry={sad ? 10 : 12} fill={`url(#${id}-eye)`} />
+              <ellipse cx="74" cy="72" rx="10" ry={sad ? 10 : 12} fill={eyeCol} />
+              <ellipse cx="126" cy="72" rx="10" ry={sad ? 10 : 12} fill={eyeCol} />
               <circle cx="77.5" cy="66.5" r="4" fill="#fff" />
               <circle cx="129.5" cy="66.5" r="4" fill="#fff" />
               <circle cx="71" cy="77" r="1.8" fill="#fff" opacity="0.8" />
@@ -323,10 +322,10 @@ export function Dog({ look, pose = 'idle', size = 160, className, onClick, shado
             </g>
           )}
           {/* blush */}
-          <ellipse cx="58" cy="92" rx="10" ry="6" fill="#f58ea0" opacity="0.45" />
-          <ellipse cx="142" cy="92" rx="10" ry="6" fill="#f58ea0" opacity="0.45" />
+          <ellipse cx="58" cy="92" rx="10" ry="6" fill="#f58ea0" opacity="0.6" />
+          <ellipse cx="142" cy="92" rx="10" ry="6" fill="#f58ea0" opacity="0.6" />
           {/* muzzle */}
-          <ellipse cx="100" cy="98" rx="30" ry="22" fill={`url(#${id}-muzzle)`} />
+          <ellipse cx="100" cy="98" rx="30" ry="22" fill={dark ? '#efe4da' : c.light} />
           <path d="M88 84 Q100 78 112 84 Q112 94 100 97 Q88 94 88 84Z" fill="#3a2a35" />
           <ellipse cx="96" cy="84" rx="4.5" ry="2.4" fill="#fff" opacity="0.6" />
           <path d="M100 97 L100 103" stroke="#3a2a35" strokeWidth="3" strokeLinecap="round" />

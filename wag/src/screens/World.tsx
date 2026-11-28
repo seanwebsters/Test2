@@ -245,8 +245,8 @@ export function WorldScreen({ phase, onPlay, onTab, onProfile, buildOpen, setBui
         </div>
         <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
           <div>
-            <p style={{ fontWeight: 800, fontSize: 13, color: phase === 'night' ? '#e9e2ff' : 'var(--ink-2)' }}>{greeting()},</p>
-            <h1 style={{ fontSize: 25, color: phase === 'night' ? '#fff' : 'var(--ink)', textShadow: '0 2px 10px rgba(255,255,255,.4)' }}>
+            <p style={{ fontFamily: 'var(--font-chunk)', fontSize: 16, color: '#fff', textShadow: '0 2px 0 rgba(30,40,20,.25)' }}>{greeting()},</p>
+            <h1 style={{ fontSize: 30, color: '#fff', textShadow: '0 3px 0 rgba(30,40,20,.25)' }}>
               {p.ownerName} & {dog.name}!
             </h1>
           </div>
@@ -302,7 +302,7 @@ export function WorldScreen({ phase, onPlay, onTab, onProfile, buildOpen, setBui
       {/* placing bar */}
       <AnimatePresence>
         {(placing || moving || selected) && (
-          <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 40, opacity: 0 }} className="glass" style={{ position: 'absolute', left: 16, right: 16, bottom: 'calc(var(--safe-bottom) + 178px)', borderRadius: 20, padding: 10, display: 'flex', alignItems: 'center', gap: 10, zIndex: 6 }}>
+          <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 40, opacity: 0 }} className="glass" style={{ position: 'absolute', left: 16, right: 16, bottom: 'calc(var(--safe-bottom) + 210px)', borderRadius: 20, padding: 10, display: 'flex', alignItems: 'center', gap: 10, zIndex: 6 }}>
             {placing && (
               <>
                 <svg viewBox="-34 -56 68 64" width="40" height="40">
@@ -348,7 +348,7 @@ export function WorldScreen({ phase, onPlay, onTab, onProfile, buildOpen, setBui
 
       {/* Play CTA */}
       {!placing && !moving && !selected && (
-        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 'calc(var(--safe-bottom) + 100px)', display: 'flex', justifyContent: 'center', zIndex: 5 }}>
+        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 'calc(var(--safe-bottom) + 132px)', display: 'flex', justifyContent: 'center', zIndex: 5 }}>
           <motion.button className="btn" onClick={onPlay} animate={{ scale: [1, 1.03, 1] }} transition={{ repeat: Infinity, duration: 2.2 }} style={{ minHeight: 66, padding: '0 34px', borderRadius: 26, flexDirection: 'row' }}>
             <svg viewBox="0 0 24 24" width="30" height="30">
               <path d="M7 4 L20 12 L7 20Z" fill="#fff" stroke="#fff" strokeWidth="2" strokeLinejoin="round" />
@@ -364,7 +364,7 @@ export function WorldScreen({ phase, onPlay, onTab, onProfile, buildOpen, setBui
       {/* first-visit coach */}
       <AnimatePresence>
         {!s.seenIntro && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="card" style={{ position: 'absolute', left: 20, right: 20, bottom: 'calc(var(--safe-bottom) + 184px)', padding: 14, zIndex: 7, display: 'flex', gap: 10, alignItems: 'center' }}>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="card" style={{ position: 'absolute', left: 20, right: 20, bottom: 'calc(var(--safe-bottom) + 216px)', padding: 14, zIndex: 7, display: 'flex', gap: 10, alignItems: 'center' }}>
             <Icon name="hand" size={30} />
             <p style={{ fontWeight: 700 }}>
               This is {p.islandName}. <b>Tap {dog.name}</b> to say hello — then drag to explore.
@@ -390,13 +390,13 @@ export function WorldScreen({ phase, onPlay, onTab, onProfile, buildOpen, setBui
 function SideBtn({ children, label, onClick, badge, count }: { children: React.ReactNode; label: string; onClick: () => void; badge?: boolean; count?: number }) {
   return (
     <motion.button whileTap={{ scale: 0.9 }} onClick={onClick} style={{ display: 'grid', justifyItems: 'center', gap: 2 }}>
-      <span style={{ position: 'relative', width: 52, height: 52, borderRadius: 18, background: 'rgba(255,250,241,.94)', display: 'grid', placeItems: 'center', boxShadow: '0 4px 0 rgba(110,91,184,.25), var(--shadow-sm)' }}>
+      <span style={{ position: 'relative', width: 54, height: 54, borderRadius: '50%', background: '#fff', display: 'grid', placeItems: 'center', boxShadow: '0 5px 0 var(--edge)' }}>
         {children}
         {badge && (
           <span style={{ position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9, background: '#f0607e', color: '#fff', fontSize: 10.5, fontWeight: 900, display: 'grid', placeItems: 'center', border: '2px solid #fff', padding: '0 3px' }}>{count ?? '!'}</span>
         )}
       </span>
-      <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--ink)', background: 'rgba(255,255,255,.75)', borderRadius: 8, padding: '0 6px' }}>{label}</span>
+      <span style={{ fontFamily: 'var(--font-chunk)', fontSize: 13, letterSpacing: '.02em', color: '#fff', textShadow: '0 2px 0 rgba(30,40,20,.35)' }}>{label}</span>
     </motion.button>
   );
 }
@@ -475,7 +475,7 @@ export function BuildSheet({ open, onClose, onPlay }: { open: boolean; onClose: 
   const area = (id?: string) => AREAS.find((a) => a.id === id);
   return (
     <Sheet open={open} onClose={onClose} title="Build your world">
-      <div className="row" style={{ background: 'linear-gradient(135deg,#fff3c4,#ffe7b8)' }}>
+      <div className="row" style={{ background: '#ffe7b8' }}>
         <Star size={40} />
         <div style={{ flex: 1 }}>
           <h4>
@@ -500,7 +500,7 @@ export function BuildSheet({ open, onClose, onPlay }: { open: boolean; onClose: 
           const afford = s.puzzle.stars >= p.stars;
           const a = area(p.area);
           return (
-            <motion.div key={p.id} layout className="tile" style={{ padding: 12, opacity: ready || done ? 1 : 0.55, background: done ? 'linear-gradient(180deg,#e9f7e2,#d5efc8)' : a ? 'linear-gradient(180deg,#f4efff,#e5dcfa)' : undefined }}>
+            <motion.div key={p.id} layout className="tile" style={{ padding: 12, opacity: ready || done ? 1 : 0.55, background: done ? '#d5efc8' : a ? '#e5dcfa' : undefined }}>
               <ProjectArt id={p.id} />
               <b style={{ fontSize: 13.5, lineHeight: 1.2 }}>{p.name.replaceAll('{dog}', dog.name)}</b>
               <span className="tiny" style={{ lineHeight: 1.25 }}>
@@ -634,7 +634,7 @@ function BagSheet({ open, onClose, onPlace }: { open: boolean; onClose: () => vo
             {CREATURES.map((c) => {
               const got = s.creatures.includes(c.id);
               return (
-                <div key={c.id} className="tile" style={{ background: got ? 'linear-gradient(180deg,#fff,#efe9fc)' : undefined }}>
+                <div key={c.id} className="tile" style={{ background: got ? '#efe9fc' : undefined }}>
                   <div className={got ? 'float' : ''}>
                     <Creature id={c.id} size={58} silhouette={!got} />
                   </div>

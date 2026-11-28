@@ -118,7 +118,7 @@ function ProfileSheet({ open, onClose, onPlus }: { open: boolean; onClose: () =>
   const lvl = levelFromXp(s.xp);
   return (
     <Sheet open={open} onClose={onClose} title={`${p.ownerName} & ${dog.name}`}>
-      <div className="row" style={{ background: 'linear-gradient(135deg,#efe9fc,#fff)' }}>
+      <div className="row" style={{ background: '#fff' }}>
         {dog.photo ? <img src={dog.photo} alt="" style={{ width: 64, height: 64, borderRadius: 20, objectFit: 'cover' }} /> : <Dog look={dog.look} size={64} shadow={false} />}
         <div style={{ flex: 1 }}>
           <h4>{LEVEL_TITLES[lvl.level - 1] ?? 'Forever Friends'}</h4>

@@ -28,13 +28,13 @@ export function PlayScreen({ onPick, onBuild }: { onPick: (l: LevelDef) => void;
   const totalStars = Object.values(s.puzzle.best).reduce((a, b) => a + b, 0);
 
   return (
-    <div className="screen" style={{ background: 'linear-gradient(180deg,#cfe8f7 0%, #e6dcfa 40%, #fbe7d6 100%)', paddingTop: 0 }}>
+    <div className="screen" style={{ background: 'var(--sky-flat)', paddingTop: 0 }}>
       <PieceDefs />
-      <div style={{ position: 'sticky', top: 0, zIndex: 5, margin: '0 -16px', padding: 'calc(var(--safe-top) + 12px) 16px 10px', background: 'linear-gradient(180deg, rgba(207,232,247,.96) 70%, rgba(207,232,247,0))' }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 5, margin: '0 -16px', padding: 'calc(var(--safe-top) + 12px) 16px 10px', background: 'var(--sky-flat)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h1 style={{ fontSize: 22 }}>Treasure Trails</h1>
-            <p className="tiny">{totalStars} of {LEVELS.length * 3} stars collected</p>
+            <h1 className="title" style={{ fontSize: 22 }}>Treasure Trails</h1>
+            <p className="tiny" style={{ color: '#fff' }}>{totalStars} of {LEVELS.length * 3} stars collected</p>
           </div>
           <Currencies seeds={false} />
         </div>
@@ -43,7 +43,7 @@ export function PlayScreen({ onPick, onBuild }: { onPick: (l: LevelDef) => void;
       {/* goal card */}
       {proj && (
         <motion.button whileTap={{ scale: 0.98 }} onClick={onBuild} className="card" style={{ width: '100%', padding: 14, display: 'flex', gap: 12, alignItems: 'center', textAlign: 'left' }}>
-          <div style={{ width: 54, height: 54, borderRadius: 16, background: 'linear-gradient(180deg,#fff3c4,#ffd36e)', display: 'grid', placeItems: 'center' }}>
+          <div style={{ width: 54, height: 54, borderRadius: 16, background: '#ffd36e', display: 'grid', placeItems: 'center' }}>
             <Star size={36} />
           </div>
           <div style={{ flex: 1 }}>
@@ -68,7 +68,7 @@ export function PlayScreen({ onPick, onBuild }: { onPick: (l: LevelDef) => void;
       </div>
 
       {s.puzzle.maps > 0 && (
-        <motion.button initial={{ scale: 0.9 }} animate={{ scale: [1, 1.02, 1] }} transition={{ repeat: Infinity, duration: 2 }} onClick={() => onPick(mapLevel(s.puzzle.mapsDone))} className="card" style={{ marginTop: 12, width: '100%', padding: 14, display: 'flex', gap: 12, alignItems: 'center', textAlign: 'left', background: 'linear-gradient(135deg,#fff3c4,#ffe0b0)' }}>
+        <motion.button initial={{ scale: 0.9 }} animate={{ scale: [1, 1.02, 1] }} transition={{ repeat: Infinity, duration: 2 }} onClick={() => onPick(mapLevel(s.puzzle.mapsDone))} className="card" style={{ marginTop: 12, width: '100%', padding: 14, display: 'flex', gap: 12, alignItems: 'center', textAlign: 'left', background: '#ffe0b0' }}>
           <MapIcon size={46} />
           <div style={{ flex: 1 }}>
             <b style={{ fontFamily: 'var(--font-display)', fontSize: 18 }}>A treasure map!</b>
@@ -82,7 +82,7 @@ export function PlayScreen({ onPick, onBuild }: { onPick: (l: LevelDef) => void;
       {CHAPTERS.map((ch, ci) => {
         const levels = LEVELS.filter((l) => l.chapter === ci);
         return (
-          <section key={ch.id} style={{ marginTop: 22, borderRadius: 28, padding: '16px 12px 24px', background: `linear-gradient(180deg, ${ch.sky[0]}, ${ch.sky[1]})`, boxShadow: 'var(--shadow-sm)', position: 'relative', overflow: 'hidden' }}>
+          <section key={ch.id} style={{ marginTop: 22, borderRadius: 28, padding: '16px 12px 24px', background: ch.sky[0], boxShadow: 'var(--shadow-sm)', position: 'relative', overflow: 'hidden' }}>
             <div style={{ textAlign: 'center' }}>
               <div className="banner" style={{ fontSize: 18 }}>
                 {ch.name}
@@ -118,7 +118,7 @@ export function PlayScreen({ onPick, onBuild }: { onPick: (l: LevelDef) => void;
                       style={{
                         width: isCur ? 80 : 68,
                         height: isCur ? 74 : 62,
-                        background: locked ? 'linear-gradient(180deg,#e9e4f2,#cfc6e0)' : best ? 'linear-gradient(180deg,#ffe08a,#f5b53d)' : 'linear-gradient(180deg,#a7e37b,#5fb54a)',
+                        background: locked ? '#cfc6e0' : best ? '#f5b53d' : '#5fb54a',
                         boxShadow: locked ? '0 5px 0 #b7aecb' : best ? '0 5px 0 #c98610, 0 10px 20px rgba(200,130,20,.35)' : '0 6px 0 #3f9a48, 0 10px 22px rgba(60,150,70,.4)',
                         color: locked ? '#9a90b3' : '#fff',
                         textShadow: locked ? 'none' : '0 2px 0 rgba(0,0,0,.2)',

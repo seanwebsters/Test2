@@ -193,7 +193,7 @@ export function DiaryScreen({ onPlus }: { onPlus: () => void }) {
   const [tab, setTab] = useState<'diary' | 'garden' | 'photos'>('diary');
   const dog = s.profile!.dog;
   return (
-    <div className="screen" style={{ background: 'linear-gradient(180deg,#e8ddf7 0%, #f8ecdc 60%, #fbe2d2 100%)' }}>
+    <div className="screen" style={{ background: 'var(--lav-bg)' }}>
       <h1 style={{ fontSize: 26 }}>{dog.name}’s Diary</h1>
       <div className="seg" style={{ marginTop: 12 }}>
         <button className={tab === 'diary' ? 'on' : ''} onClick={() => setTab('diary')}>
@@ -409,7 +409,7 @@ function Garden() {
         Every milestone you share plants something new. Tap a plant to remember.
       </p>
       <div className="card" style={{ overflow: 'hidden', padding: 0 }}>
-        <svg viewBox={`0 0 360 ${h}`} width="100%" style={{ display: 'block', background: 'linear-gradient(180deg,#cfe8f7,#eaf6dc 40%)' }}>
+        <svg viewBox={`0 0 360 ${h}`} width="100%" style={{ display: 'block', background: '#eaf6dc' }}>
           <rect y="40" width="360" height={h} fill="#a6d48f" />
           {Array.from({ length: rows }, (_, r) => (
             <path key={r} d={`M10 ${110 + r * 70} Q180 ${100 + r * 70} 350 ${110 + r * 70}`} stroke="#8a6a4c" strokeWidth="10" opacity=".35" fill="none" strokeLinecap="round" />

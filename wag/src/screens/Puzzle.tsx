@@ -415,7 +415,7 @@ export function Puzzle({ level, bonusMoves, onExit }: { level: LevelDef; bonusMo
   }, [board.holes, cell, chapter]);
 
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', background: `linear-gradient(180deg, ${chapter.sky[0]}, ${chapter.sky[1]})`, overflow: 'hidden', zIndex: 50 }}>
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', background: chapter.sky[0], overflow: 'hidden', zIndex: 50 }}>
       <PieceDefs />
       <ThemeBackdrop chapter={level.chapter} />
       {/* header */}
@@ -436,9 +436,9 @@ export function Puzzle({ level, bonusMoves, onExit }: { level: LevelDef; bonusMo
             <GoalChip key={k} g={g} score={score} />
           ))}
         </div>
-        <div style={{ position: 'absolute', right: 12, top: 8, textAlign: 'center', background: 'rgba(255,255,255,.92)', borderRadius: 18, padding: '6px 12px', boxShadow: 'var(--shadow-sm)' }}>
+        <div style={{ position: 'absolute', right: 12, top: 8, textAlign: 'center', background: '#fff', borderRadius: 20, padding: '6px 14px', boxShadow: '0 5px 0 var(--edge)' }}>
           <div className="tiny">Moves</div>
-          <motion.div key={moves} initial={{ scale: 1.4 }} animate={{ scale: 1 }} style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 600, lineHeight: 1, color: moves <= 3 ? '#e0566e' : 'var(--ink)' }}>
+          <motion.div key={moves} initial={{ scale: 1.4 }} animate={{ scale: 1 }} style={{ fontFamily: 'var(--font-chunk)', fontSize: 34, lineHeight: 1, color: moves <= 3 ? '#e0566e' : 'var(--ink)' }}>
             {moves}
           </motion.div>
         </div>
@@ -456,7 +456,7 @@ export function Puzzle({ level, bonusMoves, onExit }: { level: LevelDef; bonusMo
 
       {/* board */}
       <div ref={wrapRef} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: '0 10px calc(var(--safe-bottom) + 10px)', position: 'relative', zIndex: 3 }}>
-        <div className="board-wrap" style={{ background: `linear-gradient(180deg, ${chapter.frame}, color-mix(in srgb, ${chapter.frame} 70%, #000))` }}>
+        <div className="board-wrap" style={{ background: chapter.frame, boxShadow: `0 8px 0 color-mix(in srgb, ${chapter.frame} 65%, #000)` }}>
           <div className="board" style={{ width: boardPx, height: boardPx }} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}>
             {tiles}
             {board.dirt.map((d, i) =>
@@ -492,7 +492,7 @@ export function Puzzle({ level, bonusMoves, onExit }: { level: LevelDef; bonusMo
           <AnimatePresence>
             {banner && (
               <motion.div initial={{ scale: 0.3, opacity: 0, rotate: -8 }} animate={{ scale: 1, opacity: 1, rotate: -4 }} exit={{ scale: 1.4, opacity: 0 }} style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none', zIndex: 5 }}>
-                <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 40, color: '#fff', WebkitTextStroke: '2px #8f5bd8', textShadow: '0 4px 0 #6a3fc0, 0 10px 24px rgba(60,20,110,.5)' }}>{banner}</span>
+                <span style={{ fontFamily: 'var(--font-chunk)', fontSize: 44, color: '#fff', WebkitTextStroke: '2px #2d2a32', textShadow: '0 5px 0 #2d2a32' }}>{banner}</span>
               </motion.div>
             )}
           </AnimatePresence>
@@ -514,7 +514,7 @@ export function Puzzle({ level, bonusMoves, onExit }: { level: LevelDef; bonusMo
                 }
                 setBooster(on ? null : b);
               }}
-              style={{ position: 'relative', width: 62, height: 62, borderRadius: '50%', display: 'grid', placeItems: 'center', background: on ? '#fff3c4' : 'rgba(255,255,255,.9)', boxShadow: on ? '0 0 0 4px #f5b53d, var(--shadow)' : '0 4px 0 rgba(110,91,184,.25), var(--shadow-sm)' }}
+              style={{ position: 'relative', width: 62, height: 62, borderRadius: '50%', display: 'grid', placeItems: 'center', background: on ? '#fff3c4' : 'rgba(255,255,255,.9)', boxShadow: on ? '0 0 0 4px #f7b928, 0 5px 0 var(--edge)' : '0 5px 0 var(--edge)' }}
               aria-label={b}
             >
               <BoosterIcon id={b} size={40} />
@@ -536,7 +536,7 @@ export function Puzzle({ level, bonusMoves, onExit }: { level: LevelDef; bonusMo
         {state !== 'play' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ position: 'absolute', inset: 0, background: 'rgba(40,26,70,.55)', display: 'grid', placeItems: 'center', zIndex: 20, padding: 20 }}>
             {state === 'won' && <Confetti n={40} />}
-            <motion.div className="card" initial={{ scale: 0.7, y: 30 }} animate={{ scale: 1, y: 0 }} style={{ width: '100%', maxWidth: 340, padding: 22, textAlign: 'center', background: 'linear-gradient(180deg,#fffaf0,#f8ecd6)' }}>
+            <motion.div className="card" initial={{ scale: 0.7, y: 30 }} animate={{ scale: 1, y: 0 }} style={{ width: '100%', maxWidth: 340, padding: 22, textAlign: 'center', background: '#f8ecd6' }}>
               {state === 'won' && (
                 <>
                   <h2 style={{ fontSize: 30 }}>{level.map ? 'Treasure found!' : 'Level complete!'}</h2>

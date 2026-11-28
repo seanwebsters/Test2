@@ -21,7 +21,7 @@ export function FriendsScreen() {
   const community = COMMUNITY.base + s.community.contributed * 7;
 
   return (
-    <div className="screen" style={{ background: 'linear-gradient(180deg,#cfe0f7 0%, #ecdff7 50%, #fbe7d6 100%)' }}>
+    <div className="screen" style={{ background: 'var(--sky-flat)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 style={{ fontSize: 26 }}>Neighbourhood</h1>
         <button className="btn sm lav" onClick={() => setAdding(true)}>
@@ -72,7 +72,7 @@ export function FriendsScreen() {
       <div className="section-title">
         <h3>Weekly community challenge</h3>
       </div>
-      <div className="card" style={{ padding: 16, background: 'linear-gradient(135deg,#fff3dc,#f7e2c4)' }}>
+      <div className="card" style={{ padding: 16, background: '#f7e2c4' }}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <svg viewBox="0 0 48 48" width="52" height="52">
             <rect x="18" y="4" width="12" height="8" rx="2" fill="#7a5233" />
